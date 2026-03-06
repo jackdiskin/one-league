@@ -46,13 +46,13 @@ export default function Page() {
 
         <div className="flex items-center gap-2">
           <Link
-            href="/signin"
+            href="/auth/sign-in"
             className="hidden rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 md:inline-flex"
           >
             Sign in
           </Link>
           <Link
-            href="/signup"
+            href="/auth/sign-up"
             className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
           >
             Get started
@@ -94,7 +94,7 @@ export default function Page() {
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
               <Link
-                href="/signup"
+                href="/auth/sign-up"
                 className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
               >
                 Create account
@@ -268,13 +268,13 @@ export default function Page() {
               </div>
               <div className="flex gap-3">
                 <Link
-                  href="/signup"
+                  href="/auth/sign-up"
                   className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100"
                 >
                   Start a league
                 </Link>
                 <Link
-                  href="/signin"
+                  href="/auth/sign-in"
                   className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white ring-1 ring-white/20 hover:bg-white/15"
                 >
                   Join with code
