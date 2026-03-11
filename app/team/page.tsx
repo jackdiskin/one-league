@@ -250,7 +250,7 @@ export default async function TeamPage() {
           </div>
 
           {/* Roster list */}
-          <RosterList roster={roster} />
+          <RosterList roster={roster} teamId={team.id} />
 
           {/* Weekly performance */}
           <WeeklyPerformance players={weeklyPerf} week={lastScoreWeek} />
