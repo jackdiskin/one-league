@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 export interface SidebarLeague {
@@ -68,9 +69,11 @@ function rankLabel(r: number | null) {
 }
 
 export default function Sidebar({ user, leagues, currentWeek, season, logoUri }: Props) {
-  const [activeLeague, setActiveLeague] = useState<number | null>(leagues[0]?.id ?? null);
   const [leaguesOpen, setLeaguesOpen] = useState(true);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const initials = user.name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+  const selectedLeagueId = Number(searchParams.get('leagueId')) || leagues[0]?.id || null;
 
   return (
     <aside style={{
@@ -115,28 +118,31 @@ export default function Sidebar({ user, leagues, currentWeek, season, logoUri }:
         <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '6px 8px 4px' }}>
           Navigate
         </div>
-        {NAV.map(item => (
+        {NAV.map(item => {
+          const isActive = pathname === item.href;
+          return (
           <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '8px 10px', borderRadius: 10,
-              color: '#475569', fontSize: 13, fontWeight: 500,
+              color: isActive ? '#0f172a' : '#475569', fontSize: 13, fontWeight: 500,
               cursor: 'pointer', transition: 'all 0.15s',
+              background: isActive ? '#f8fafc' : 'transparent',
             }}
               onMouseEnter={e => {
                 (e.currentTarget as HTMLElement).style.background = '#f8fafc';
                 (e.currentTarget as HTMLElement).style.color = '#0f172a';
               }}
               onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.background = 'transparent';
-                (e.currentTarget as HTMLElement).style.color = '#475569';
+                (e.currentTarget as HTMLElement).style.background = isActive ? '#f8fafc' : 'transparent';
+                (e.currentTarget as HTMLElement).style.color = isActive ? '#0f172a' : '#475569';
               }}
             >
-              <span style={{ color: '#94a3b8', flexShrink: 0 }}>{item.icon}</span>
+              <span style={{ color: isActive ? '#059669' : '#94a3b8', flexShrink: 0 }}>{item.icon}</span>
               {item.label}
             </div>
           </Link>
-        ))}
+        )})}
       </div>
 
       {/* ── Divider ── */}
@@ -171,15 +177,15 @@ export default function Sidebar({ user, leagues, currentWeek, season, logoUri }:
               </div>
             )}
             {leagues.map(league => {
-              const isActive = league.id === activeLeague;
+              const isActive = pathname === '/league' && league.id === selectedLeagueId;
               const rl = rankLabel(league.rank);
               return (
-                <button
+                <Link
                   key={league.id}
-                  onClick={() => setActiveLeague(league.id)}
+                  href={`/league?leagueId=${league.id}`}
                   style={{
                     width: '100%', textAlign: 'left', background: 'none', border: 'none',
-                    cursor: 'pointer', padding: 0,
+                    cursor: 'pointer', padding: 0, textDecoration: 'none', display: 'block',
                   }}
                 >
                   <div style={{
@@ -244,7 +250,7 @@ export default function Sidebar({ user, leagues, currentWeek, season, logoUri }:
                       </div>
                     </div>
                   </div>
-                </button>
+                </Link>
               );
             })}
           </div>
