@@ -8,6 +8,21 @@ const nextConfig = {
         hostname: "imagedelivery.net",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "static.www.nfl.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "a.espncdn.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.nflverse.com",
+        pathname: "/**",
+      },
     ],
   },
 };
