@@ -117,7 +117,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     [userId, SEASON]
   );
 
-  // Ownership check
+  // Ownership + roster quota check
   const [owned] = await query<{ cnt: number }>(
     `SELECT COUNT(*) AS cnt FROM fantasy_team_roster
      WHERE fantasy_team_id = ? AND player_id = ? AND is_active = TRUE`,
@@ -125,6 +125,36 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   );
   const alreadyOwned = (owned?.cnt ?? 0) > 0;
   const canAfford = userTeam ? Number(userTeam.budget_remaining) >= Number(player.current_price) : false;
+
+  // Count active roster slots by position to enforce quotas
+  const QUOTA = { QB: 2, RB: 3, FLEX: 5, K: 1 } as const;
+  let blockReason: string | null = null;
+
+  if (userTeam && !alreadyOwned) {
+    const posCounts = await query<{ position: string; cnt: number }>(
+      `SELECT p.position, COUNT(*) AS cnt
+       FROM fantasy_team_roster ftr
+       JOIN players p ON p.id = ftr.player_id
+       WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE
+       GROUP BY p.position`,
+      [userTeam.id]
+    );
+    const countMap = Object.fromEntries(posCounts.map(r => [r.position, Number(r.cnt)]));
+    const rosterTotal = Object.values(countMap).reduce((s, n) => s + n, 0);
+    const flexCount   = (countMap.WR ?? 0) + (countMap.TE ?? 0);
+
+    if (rosterTotal >= 11) {
+      blockReason = 'Roster full — sell a player first';
+    } else if (player.position === 'QB' && (countMap.QB ?? 0) >= QUOTA.QB) {
+      blockReason = `QB slots full (${QUOTA.QB}/${QUOTA.QB})`;
+    } else if (player.position === 'RB' && (countMap.RB ?? 0) >= QUOTA.RB) {
+      blockReason = `RB slots full (${QUOTA.RB}/${QUOTA.RB})`;
+    } else if ((player.position === 'WR' || player.position === 'TE') && flexCount >= QUOTA.FLEX) {
+      blockReason = `WR/TE slots full (${QUOTA.FLEX}/${QUOTA.FLEX})`;
+    } else if (player.position === 'K' && (countMap.K ?? 0) >= QUOTA.K) {
+      blockReason = `K slot full (${QUOTA.K}/${QUOTA.K})`;
+    }
+  }
 
   // Price history
   const priceHistory = await query<PriceWeek>(
@@ -267,6 +297,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                     price={Number(player.current_price)}
                     canAfford={canAfford}
                     alreadyOwned={alreadyOwned}
+                    blockReason={blockReason}
                   />
                 )}
               </div>

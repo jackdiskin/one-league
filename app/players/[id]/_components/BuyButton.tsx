@@ -11,9 +11,10 @@ interface Props {
   price: number;
   canAfford: boolean;
   alreadyOwned: boolean;
+  blockReason?: string | null;
 }
 
-export default function BuyButton({ playerId, fantasyTeamId, currentWeek, price, canAfford, alreadyOwned }: Props) {
+export default function BuyButton({ playerId, fantasyTeamId, currentWeek, price, canAfford, alreadyOwned, blockReason }: Props) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const router = useRouter();
@@ -72,22 +73,24 @@ export default function BuyButton({ playerId, fantasyTeamId, currentWeek, price,
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
       <button
         onClick={handleBuy}
-        disabled={!canAfford || status === 'loading'}
+        disabled={!canAfford || !!blockReason || status === 'loading'}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
-          background: canAfford ? '#0f172a' : '#f1f5f9',
-          color: canAfford ? '#fff' : '#94a3b8',
+          background: canAfford && !blockReason ? '#0f172a' : '#f1f5f9',
+          color: canAfford && !blockReason ? '#fff' : '#94a3b8',
           border: 'none', borderRadius: 12,
           padding: '10px 20px', fontSize: 13, fontWeight: 700,
-          cursor: canAfford ? 'pointer' : 'not-allowed',
+          cursor: canAfford && !blockReason ? 'pointer' : 'not-allowed',
           transition: 'background 0.15s',
           opacity: status === 'loading' ? 0.7 : 1,
         }}
-        onMouseEnter={e => { if (canAfford) (e.currentTarget as HTMLElement).style.background = '#1e293b'; }}
-        onMouseLeave={e => { if (canAfford) (e.currentTarget as HTMLElement).style.background = '#0f172a'; }}
+        onMouseEnter={e => { if (canAfford && !blockReason) (e.currentTarget as HTMLElement).style.background = '#1e293b'; }}
+        onMouseLeave={e => { if (canAfford && !blockReason) (e.currentTarget as HTMLElement).style.background = '#0f172a'; }}
       >
         {status === 'loading' ? (
           <span>Buying…</span>
+        ) : blockReason ? (
+          <span>{blockReason}</span>
         ) : canAfford ? (
           <>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">

@@ -20,43 +20,26 @@ const POS_COLOR: Record<string, string> = {
 // Field dimensions
 const FIELD_H = 580;
 
-// Compute (x%, y%) for each player — y is the CENTER of the card
+// Compute (x%, y%) for each slot — always 8 fixed slots; player is null for empty slots
 function getPositions(wrs: Player[], tes: Player[], qbs: Player[], rbs: Player[], ks: Player[]) {
-  const out: Array<{ player: Player; x: number; y: number }> = [];
+  const out: Array<{ player: Player | null; pos: string; x: number; y: number }> = [];
 
-  // ── Receiver line (y = 25%) ──────────────────────────────
-  // WRs split wide to edges; TE slots inside-right
-  const rcvLine: { p: Player; x: number }[] = [];
-  const w = wrs.length, t = tes.length;
-
-  if      (w === 0 && t === 0) { /* nothing */ }
-  else if (w === 1 && t === 0) rcvLine.push({ p: wrs[0], x: 50 });
-  else if (w === 2 && t === 0) rcvLine.push({ p: wrs[0], x: 15 }, { p: wrs[1], x: 82 });
-  else if (w === 3 && t === 0) rcvLine.push({ p: wrs[0], x: 9  }, { p: wrs[1], x: 48 }, { p: wrs[2], x: 85 });
-  else if (w === 0 && t >= 1)  rcvLine.push({ p: tes[0], x: 50 });
-  else if (w === 1 && t >= 1)  rcvLine.push({ p: wrs[0], x: 14 }, { p: tes[0], x: 74 });
-  else if (w === 2 && t >= 1)  rcvLine.push({ p: wrs[0], x: 9  }, { p: tes[0], x: 54 }, { p: wrs[1], x: 84 });
-  else if (w === 3 && t >= 1)  rcvLine.push({ p: wrs[0], x: 7  }, { p: wrs[1], x: 29 }, { p: tes[0], x: 63 }, { p: wrs[2], x: 85 });
-  else {
-    const all = [...wrs, ...tes];
-    all.forEach((p, i) => rcvLine.push({ p, x: (i + 1) / (all.length + 1) * 100 }));
-  }
-  rcvLine.forEach(({ p, x }) => out.push({ player: p, x, y: 26 }));
-
-  // ── QB in shotgun (y = 47%) ──────────────────────────────
-  qbs.forEach(p => out.push({ player: p, x: 50, y: 47 }));
-
-  // ── RBs flanking QB (y = 62%) ────────────────────────────
-  if      (rbs.length === 1) out.push({ player: rbs[0], x: 50, y: 62 });
-  else if (rbs.length === 2) {
-    out.push({ player: rbs[0], x: 34, y: 62 });
-    out.push({ player: rbs[1], x: 66, y: 62 });
-  } else {
-    rbs.forEach((p, i) => out.push({ player: p, x: (i + 1) / (rbs.length + 1) * 100, y: 62 }));
+  // ── Receiver line (y = 26%) — always 4 evenly-spaced slots ──────────────
+  const flex = [...wrs, ...tes];
+  const flexX = [10, 35, 62, 87];
+  for (let i = 0; i < 4; i++) {
+    out.push({ player: flex[i] ?? null, pos: flex[i]?.position ?? 'WR', x: flexX[i], y: 26 });
   }
 
-  // ── Kicker (y = 80%) ─────────────────────────────────────
-  ks.forEach(p => out.push({ player: p, x: 50, y: 80 }));
+  // ── QB in shotgun (y = 47%) — always 1 slot ──────────────────────────────
+  out.push({ player: qbs[0] ?? null, pos: 'QB', x: 50, y: 47 });
+
+  // ── RBs flanking QB (y = 62%) — always 2 slots ────────────────────────────
+  out.push({ player: rbs[0] ?? null, pos: 'RB', x: 34, y: 62 });
+  out.push({ player: rbs[1] ?? null, pos: 'RB', x: 66, y: 62 });
+
+  // ── Kicker (y = 80%) — always 1 slot ─────────────────────────────────────
+  out.push({ player: ks[0] ?? null, pos: 'K', x: 50, y: 80 });
 
   return out;
 }
@@ -151,6 +134,68 @@ function PlayerCard({ player, x, y }: { player: Player; x: number; y: number }) 
   );
 }
 
+function EmptySlotCard({ pos, x, y }: { pos: string; x: number; y: number }) {
+  const color = POS_COLOR[pos] ?? '#94a3b8';
+  return (
+    <div style={{
+      position: 'absolute',
+      left: `${x}%`,
+      top: `${y}%`,
+      transform: 'translate(-50%, -50%)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 5,
+      zIndex: 10,
+      opacity: 0.55,
+    }}>
+      <div style={{
+        background: 'rgba(15,23,42,0.5)',
+        backdropFilter: 'blur(8px)',
+        borderRadius: 20,
+        padding: '3px 9px',
+        fontSize: 10,
+        fontWeight: 700,
+        color: 'rgba(255,255,255,0.6)',
+        border: '1px solid rgba(255,255,255,0.15)',
+        whiteSpace: 'nowrap',
+      }}>
+        Empty
+      </div>
+      <div style={{
+        width: 72, height: 72, borderRadius: '50%',
+        border: '3px dashed rgba(255,255,255,0.35)',
+        background: 'rgba(0,0,0,0.12)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <div style={{
+          width: 22, height: 22, borderRadius: '50%',
+          background: color,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 7, fontWeight: 900, color: '#fff',
+          opacity: 0.7,
+        }}>
+          {pos}
+        </div>
+      </div>
+      <div style={{
+        background: 'rgba(255,255,255,0.12)',
+        borderRadius: 10,
+        padding: '5px 10px',
+        textAlign: 'center',
+        minWidth: 66,
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+          {pos} Slot
+        </div>
+        <div style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
+          open
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Yard line with optional number labels
 function YardLine({ y, label, highlight = false }: { y: number; label?: string; highlight?: boolean }) {
   return (
@@ -191,7 +236,9 @@ export default async function MyTeamSummary({ userId, seasonYear }: Props) {
   }>(
     `SELECT ft.id, ft.team_name, ft.total_points, ft.budget_remaining,
             l.name AS league_name,
-            RANK() OVER (PARTITION BY ft.league_id ORDER BY ft.total_points DESC) AS \`rank\`,
+            (SELECT COUNT(*) + 1 FROM fantasy_teams ft2
+             WHERE ft2.league_id = ft.league_id AND ft2.season_year = ft.season_year
+               AND ft2.total_points > ft.total_points) AS \`rank\`,
             (SELECT COUNT(*) FROM fantasy_teams WHERE league_id = ft.league_id) AS league_size
      FROM fantasy_teams ft
      JOIN leagues l ON l.id = ft.league_id
@@ -357,15 +404,11 @@ export default async function MyTeamSummary({ userId, seasonYear }: Props) {
           <rect x="50" y="2" width="2" height="22" fill="rgba(251,191,36,0.7)" rx="1" />
         </svg>
 
-        {/* Players */}
-        {positions.map(({ player, x, y }) => (
-          <PlayerCard key={player.full_name} player={player} x={x} y={y} />
-        ))}
-
-        {starters.length === 0 && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, fontWeight: 600 }}>No starters set</span>
-          </div>
+        {/* Players + empty slots */}
+        {positions.map(({ player, pos, x, y }, i) =>
+          player
+            ? <PlayerCard key={`${player.full_name}-${i}`} player={player} x={x} y={y} />
+            : <EmptySlotCard key={`empty-${pos}-${i}`} pos={pos} x={x} y={y} />
         )}
       </div>
     </div>

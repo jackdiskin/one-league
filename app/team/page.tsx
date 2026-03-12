@@ -35,7 +35,11 @@ async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
   return query<SidebarLeague>(
     `SELECT l.id, l.name, l.season_year,
             ft.team_name,
-            RANK() OVER (PARTITION BY ft.league_id ORDER BY ft.total_points DESC) AS \`rank\`,
+            CASE WHEN ft.id IS NOT NULL THEN
+              (SELECT COUNT(*) + 1 FROM fantasy_teams ft2
+               WHERE ft2.league_id = l.id AND ft2.season_year = l.season_year
+                 AND ft2.total_points > ft.total_points)
+            ELSE NULL END AS \`rank\`,
             (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
      FROM league_members lm
      JOIN leagues l ON l.id = lm.league_id
@@ -53,7 +57,9 @@ async function fetchTeam(userId: string) {
   }>(
     `SELECT ft.id, ft.team_name, ft.total_points, ft.budget_remaining,
             l.name AS league_name,
-            RANK() OVER (PARTITION BY ft.league_id ORDER BY ft.total_points DESC) AS \`rank\`,
+            (SELECT COUNT(*) + 1 FROM fantasy_teams ft2
+             WHERE ft2.league_id = ft.league_id AND ft2.season_year = ft.season_year
+               AND ft2.total_points > ft.total_points) AS \`rank\`,
             (SELECT COUNT(*) FROM fantasy_teams WHERE league_id = ft.league_id) AS league_size
      FROM fantasy_teams ft
      JOIN leagues l ON l.id = ft.league_id
@@ -250,7 +256,12 @@ export default async function TeamPage() {
           </div>
 
           {/* Roster list */}
-          <RosterList roster={roster} teamId={team.id} />
+          <RosterList
+            roster={roster}
+            teamId={team.id}
+            currentWeek={currentWeek}
+            budgetRemaining={team.budget_remaining}
+          />
 
           {/* Weekly performance */}
           <WeeklyPerformance players={weeklyPerf} week={lastScoreWeek} />

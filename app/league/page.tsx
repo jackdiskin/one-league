@@ -73,7 +73,11 @@ async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
   return query<SidebarLeague>(
     `SELECT l.id, l.name, l.season_year,
             ft.team_name,
-            RANK() OVER (PARTITION BY l.id ORDER BY ft.total_points DESC) AS \`rank\`,
+            CASE WHEN ft.id IS NOT NULL THEN
+              (SELECT COUNT(*) + 1 FROM fantasy_teams ft2
+               WHERE ft2.league_id = l.id AND ft2.season_year = l.season_year
+                 AND ft2.total_points > ft.total_points)
+            ELSE NULL END AS \`rank\`,
             (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
      FROM league_members lm
      JOIN leagues l ON l.id = lm.league_id
@@ -89,16 +93,19 @@ async function fetchLeagueSummary(userId: string, requestedLeagueId?: number | n
   const params: Array<string | number> = [userId];
   if (requestedLeagueId) { filters.push(`l.id = ?`); params.push(requestedLeagueId); }
   const rows = await query<LeagueSummary>(
-    `SELECT * FROM (
-       SELECT l.id, l.name, l.season_year, l.salary_cap, l.max_members,
-              (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count,
-              ft.id AS team_id, ft.team_name, ft.total_points, ft.budget_remaining,
-              RANK() OVER (PARTITION BY l.id ORDER BY ft.total_points DESC) AS \`rank\`
-       FROM league_members lm
-       JOIN leagues l ON l.id = lm.league_id
-       LEFT JOIN fantasy_teams ft ON ft.league_id = l.id AND ft.user_id = lm.user_id
-       WHERE ${filters.join(' AND ')}
-     ) m ORDER BY m.id DESC LIMIT 1`,
+    `SELECT l.id, l.name, l.season_year, l.salary_cap, l.max_members,
+            (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count,
+            ft.id AS team_id, ft.team_name, ft.total_points, ft.budget_remaining,
+            CASE WHEN ft.id IS NOT NULL THEN
+              (SELECT COUNT(*) + 1 FROM fantasy_teams ft2
+               WHERE ft2.league_id = l.id AND ft2.season_year = l.season_year
+                 AND ft2.total_points > ft.total_points)
+            ELSE NULL END AS \`rank\`
+     FROM league_members lm
+     JOIN leagues l ON l.id = lm.league_id
+     LEFT JOIN fantasy_teams ft ON ft.league_id = l.id AND ft.user_id = lm.user_id
+     WHERE ${filters.join(' AND ')}
+     ORDER BY l.id DESC LIMIT 1`,
     params
   );
   return rows[0] ?? null;
