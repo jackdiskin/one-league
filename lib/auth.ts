@@ -32,4 +32,5 @@ export const auth = betterAuth({
     password: process.env.MYSQL_PASSWORD!,
     database: process.env.MYSQL_DATABASE!
   }),
+  secret: process.env.BETTER_AUTH_SECRET!
 });
