@@ -28,7 +28,11 @@ export default async function AuthPage({ params }: { params: Promise<{ authView:
         Trade the market. Compete on OneLeague.
       </div>
 
-      <AuthView socialLayout="horizontal" pathname={authView} redirectTo="/dashboard" />
+      <AuthView
+        socialLayout="horizontal"
+        pathname={authView}
+        redirectTo={authView === 'sign-up' ? '/onboarding/draft' : '/dashboard'}
+      />
       {showGoogle && <GoogleSignInButton callbackURL="/dashboard" />}
 
     </div>

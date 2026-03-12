@@ -63,6 +63,13 @@ export default async function DashboardPage() {
   const userId    = session.user.id;
   const firstName = session.user.name?.split(' ')[0] ?? 'there';
 
+  // New users with no team yet → onboarding
+  const [teamCheck] = await query<{ id: number }>(
+    `SELECT id FROM fantasy_teams WHERE user_id = ? AND season_year = ? LIMIT 1`,
+    [userId, SEASON]
+  );
+  if (!teamCheck) redirect('/onboarding/draft');
+
   const [currentWeek, discoverLeagues, userLeagues] = await Promise.all([
     fetchCurrentWeek(),
     fetchDiscoverLeagues(userId),
