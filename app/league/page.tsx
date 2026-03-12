@@ -74,14 +74,29 @@ async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
     `SELECT l.id, l.name, l.season_year,
             ft.team_name,
             CASE WHEN ft.id IS NOT NULL THEN
-              (SELECT COUNT(*) + 1 FROM fantasy_teams ft2
-               WHERE ft2.league_id = l.id AND ft2.season_year = l.season_year
-                 AND ft2.total_points > ft.total_points)
+              (SELECT COUNT(*) + 1
+               FROM fantasy_teams ft2
+               JOIN league_members lm2 ON lm2.user_id = ft2.user_id AND lm2.league_id = l.id
+               LEFT JOIN (
+                 SELECT ftr2.fantasy_team_id, SUM(pms2.current_price) AS rv
+                 FROM fantasy_team_roster ftr2
+                 JOIN player_market_state pms2 ON pms2.player_id = ftr2.player_id AND pms2.season_year = l.season_year
+                 WHERE ftr2.is_active = TRUE GROUP BY ftr2.fantasy_team_id
+               ) rv2 ON rv2.fantasy_team_id = ft2.id
+               WHERE ft2.season_year = l.season_year
+                 AND (ft2.total_points > ft.total_points
+                      OR (ft2.total_points = ft.total_points
+                          AND COALESCE(rv2.rv, 0) > (
+                            SELECT COALESCE(SUM(pms3.current_price), 0)
+                            FROM fantasy_team_roster ftr3
+                            JOIN player_market_state pms3 ON pms3.player_id = ftr3.player_id AND pms3.season_year = l.season_year
+                            WHERE ftr3.fantasy_team_id = ft.id AND ftr3.is_active = TRUE
+                          ))))
             ELSE NULL END AS \`rank\`,
             (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
      FROM league_members lm
      JOIN leagues l ON l.id = lm.league_id
-     LEFT JOIN fantasy_teams ft ON ft.league_id = l.id AND ft.user_id = ?
+     LEFT JOIN fantasy_teams ft ON ft.user_id = ? AND ft.season_year = l.season_year
      WHERE lm.user_id = ?
      ORDER BY l.created_at DESC`,
     [userId, userId]
@@ -98,12 +113,13 @@ async function fetchLeagueSummary(userId: string, requestedLeagueId?: number | n
             ft.id AS team_id, ft.team_name, ft.total_points, ft.budget_remaining,
             CASE WHEN ft.id IS NOT NULL THEN
               (SELECT COUNT(*) + 1 FROM fantasy_teams ft2
-               WHERE ft2.league_id = l.id AND ft2.season_year = l.season_year
+               JOIN league_members lm2 ON lm2.user_id = ft2.user_id AND lm2.league_id = l.id
+               WHERE ft2.season_year = l.season_year
                  AND ft2.total_points > ft.total_points)
             ELSE NULL END AS \`rank\`
      FROM league_members lm
      JOIN leagues l ON l.id = lm.league_id
-     LEFT JOIN fantasy_teams ft ON ft.league_id = l.id AND ft.user_id = lm.user_id
+     LEFT JOIN fantasy_teams ft ON ft.user_id = lm.user_id AND ft.season_year = l.season_year
      WHERE ${filters.join(' AND ')}
      ORDER BY l.id DESC LIMIT 1`,
     params
@@ -122,6 +138,7 @@ async function fetchStandings(leagueId: number, lastScoreWeek: number): Promise<
        COALESCE(tx.trade_count, 0) AS trade_count
      FROM fantasy_teams ft
      JOIN \`user\` u ON u.id = ft.user_id
+     JOIN league_members lm ON lm.user_id = ft.user_id AND lm.league_id = ?
      LEFT JOIN (
        SELECT ftr.fantasy_team_id, SUM(pms.current_price) AS roster_value
        FROM fantasy_team_roster ftr
@@ -134,9 +151,9 @@ async function fetchStandings(leagueId: number, lastScoreWeek: number): Promise<
        SELECT fantasy_team_id, COUNT(*) AS trade_count
        FROM player_transactions WHERE season_year = ? GROUP BY fantasy_team_id
      ) tx ON tx.fantasy_team_id = ft.id
-     WHERE ft.league_id = ? AND ft.season_year = ?
+     WHERE ft.season_year = ?
      ORDER BY ft.total_points DESC, roster_value DESC`,
-    [SEASON, SEASON, lastScoreWeek, SEASON, leagueId, SEASON]
+    [leagueId, SEASON, SEASON, lastScoreWeek, SEASON, SEASON]
   );
 }
 
@@ -147,7 +164,8 @@ async function fetchTeamWeeklyScores(leagueId: number): Promise<TeamWeekScore[]>
      FROM fantasy_team_weekly_scores ftws
      JOIN fantasy_teams ft ON ft.id = ftws.fantasy_team_id
      JOIN \`user\` u ON u.id = ft.user_id
-     WHERE ft.league_id = ? AND ftws.season_year = ?
+     JOIN league_members lm ON lm.user_id = ft.user_id AND lm.league_id = ?
+     WHERE ftws.season_year = ?
      ORDER BY ft.id, ftws.week`,
     [leagueId, SEASON]
   );
@@ -161,7 +179,8 @@ async function fetchTransactions(leagueId: number): Promise<TransactionRow[]> {
      JOIN fantasy_teams ft ON ft.id = pt.fantasy_team_id
      JOIN \`user\` u ON u.id = ft.user_id
      JOIN players p ON p.id = pt.player_id
-     WHERE ft.league_id = ? AND pt.season_year = ?
+     JOIN league_members lm ON lm.user_id = ft.user_id AND lm.league_id = ?
+     WHERE pt.season_year = ?
      ORDER BY pt.created_at DESC, pt.id DESC LIMIT 10`,
     [leagueId, SEASON]
   );
@@ -175,7 +194,8 @@ async function fetchWeeklyWinners(leagueId: number): Promise<WeeklyWinnerRow[]> 
               ROW_NUMBER() OVER (PARTITION BY ftws.week ORDER BY ftws.points DESC) AS row_num
        FROM fantasy_team_weekly_scores ftws
        JOIN fantasy_teams ft ON ft.id = ftws.fantasy_team_id
-       WHERE ft.league_id = ? AND ftws.season_year = ?
+       JOIN league_members lm ON lm.user_id = ft.user_id AND lm.league_id = ?
+       WHERE ftws.season_year = ?
      ) leaders
      JOIN fantasy_teams ft ON ft.id = leaders.fantasy_team_id
      JOIN \`user\` u ON u.id = ft.user_id
@@ -192,11 +212,12 @@ async function fetchRosterValues(leagueId: number): Promise<ValueRow[]> {
             COUNT(ftr.id) AS active_players
      FROM fantasy_teams ft
      JOIN \`user\` u ON u.id = ft.user_id
+     JOIN league_members lm ON lm.user_id = ft.user_id AND lm.league_id = ?
      LEFT JOIN fantasy_team_roster ftr ON ftr.fantasy_team_id = ft.id AND ftr.is_active = TRUE
      LEFT JOIN player_market_state pms ON pms.player_id = ftr.player_id AND pms.season_year = ?
-     WHERE ft.league_id = ? AND ft.season_year = ?
+     WHERE ft.season_year = ?
      GROUP BY ft.id ORDER BY roster_value DESC LIMIT 6`,
-    [SEASON, leagueId, SEASON]
+    [leagueId, SEASON, SEASON]
   );
 }
 

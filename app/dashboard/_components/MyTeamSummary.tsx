@@ -237,9 +237,10 @@ export default async function MyTeamSummary({ userId, seasonYear }: Props) {
     `SELECT ft.id, ft.team_name, ft.total_points, ft.budget_remaining,
             l.name AS league_name,
             (SELECT COUNT(*) + 1 FROM fantasy_teams ft2
-             WHERE ft2.league_id = ft.league_id AND ft2.season_year = ft.season_year
+             JOIN league_members lm2 ON lm2.user_id = ft2.user_id AND lm2.league_id = ft.league_id
+             WHERE ft2.season_year = ft.season_year
                AND ft2.total_points > ft.total_points) AS \`rank\`,
-            (SELECT COUNT(*) FROM fantasy_teams WHERE league_id = ft.league_id) AS league_size
+            (SELECT COUNT(*) FROM league_members WHERE league_id = ft.league_id) AS league_size
      FROM fantasy_teams ft
      JOIN leagues l ON l.id = ft.league_id
      WHERE ft.user_id = ? AND ft.season_year = ?

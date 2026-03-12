@@ -31,13 +31,14 @@ async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
             ft.team_name,
             CASE WHEN ft.id IS NOT NULL THEN
               (SELECT COUNT(*) + 1 FROM fantasy_teams ft2
-               WHERE ft2.league_id = l.id AND ft2.season_year = l.season_year
+               JOIN league_members lm2 ON lm2.user_id = ft2.user_id AND lm2.league_id = l.id
+               WHERE ft2.season_year = l.season_year
                  AND ft2.total_points > ft.total_points)
             ELSE NULL END AS \`rank\`,
             (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
      FROM league_members lm
      JOIN leagues l ON l.id = lm.league_id
-     LEFT JOIN fantasy_teams ft ON ft.league_id = l.id AND ft.user_id = ?
+     LEFT JOIN fantasy_teams ft ON ft.user_id = ? AND ft.season_year = l.season_year
      WHERE lm.user_id = ?
      ORDER BY l.created_at DESC`,
     [userId, userId]

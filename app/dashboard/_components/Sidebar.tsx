@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
+import LeagueHubModal from './CreateLeagueModal';
 
 export interface SidebarLeague {
   id: number;
@@ -69,7 +70,8 @@ function rankLabel(r: number | null) {
 }
 
 export default function Sidebar({ user, leagues, currentWeek, season, logoUri }: Props) {
-  const [leaguesOpen, setLeaguesOpen] = useState(true);
+  const [leaguesOpen, setLeaguesOpen]   = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const initials = user.name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
@@ -150,24 +152,47 @@ export default function Sidebar({ user, leagues, currentWeek, season, logoUri }:
 
       {/* ── My Leagues ── */}
       <div style={{ padding: '0 10px', flex: 1 }}>
-        <button
-          onClick={() => setLeaguesOpen(o => !o)}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '6px 8px 6px', background: 'none', border: 'none', cursor: 'pointer',
-          }}
-        >
-          <span style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            My Leagues
-          </span>
-          <svg
-            width="12" height="12" viewBox="0 0 24 24" fill="none"
-            stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
-            style={{ transform: leaguesOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+        <div style={{ display: 'flex', alignItems: 'center', padding: '6px 8px 6px' }}>
+          <button
+            onClick={() => setLeaguesOpen(o => !o)}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
           >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </button>
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              My Leagues
+            </span>
+            <svg
+              width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
+              style={{ transform: leaguesOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            title="Create a league"
+            style={{
+              width: 22, height: 22, borderRadius: 6, border: '1px solid #e2e8f0',
+              background: '#f8fafc', cursor: 'pointer', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#64748b', transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = '#0f172a';
+              (e.currentTarget as HTMLElement).style.color = '#fff';
+              (e.currentTarget as HTMLElement).style.borderColor = '#0f172a';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = '#f8fafc';
+              (e.currentTarget as HTMLElement).style.color = '#64748b';
+              (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0';
+            }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+        </div>
 
         {leaguesOpen && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 2 }}>
@@ -256,6 +281,8 @@ export default function Sidebar({ user, leagues, currentWeek, season, logoUri }:
           </div>
         )}
       </div>
+
+      {showCreateModal && <LeagueHubModal onClose={() => setShowCreateModal(false)} />}
 
       {/* ── User footer ── */}
       <div style={{
