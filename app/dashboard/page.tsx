@@ -30,10 +30,24 @@ async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
     `SELECT l.id, l.name, l.season_year,
             ft.team_name,
             CASE WHEN ft.id IS NOT NULL THEN
-              (SELECT COUNT(*) + 1 FROM fantasy_teams ft2
+              (SELECT COUNT(*) + 1
+               FROM fantasy_teams ft2
                JOIN league_members lm2 ON lm2.user_id = ft2.user_id AND lm2.league_id = l.id
+               LEFT JOIN (
+                 SELECT ftr2.fantasy_team_id, SUM(pms2.current_price) AS rv
+                 FROM fantasy_team_roster ftr2
+                 JOIN player_market_state pms2 ON pms2.player_id = ftr2.player_id AND pms2.season_year = l.season_year
+                 WHERE ftr2.is_active = TRUE GROUP BY ftr2.fantasy_team_id
+               ) rv2 ON rv2.fantasy_team_id = ft2.id
                WHERE ft2.season_year = l.season_year
-                 AND ft2.total_points > ft.total_points)
+                 AND (ft2.total_points > ft.total_points
+                      OR (ft2.total_points = ft.total_points
+                          AND COALESCE(rv2.rv, 0) > (
+                            SELECT COALESCE(SUM(pms3.current_price), 0)
+                            FROM fantasy_team_roster ftr3
+                            JOIN player_market_state pms3 ON pms3.player_id = ftr3.player_id AND pms3.season_year = l.season_year
+                            WHERE ftr3.fantasy_team_id = ft.id AND ftr3.is_active = TRUE
+                          ))))
             ELSE NULL END AS \`rank\`,
             (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
      FROM league_members lm
