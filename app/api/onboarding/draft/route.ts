@@ -99,14 +99,21 @@ export async function POST(request: NextRequest) {
   }
 
   // Build slot assignments
+  // Starting lineup: 1 QB, 2 RB, 4 WR/TE, 1 K — extras go to BENCH
+  function shuffle<T>(arr: T[]): T[] {
+    return [...arr].sort(() => Math.random() - 0.5);
+  }
+
   const slotMap = new Map<number, string>();
-  const qbs    = players.filter(p => p.position === 'QB');
-  const rbs    = players.filter(p => p.position === 'RB');
-  const flex   = players.filter(p => p.position === 'WR' || p.position === 'TE');
+  const qbs    = shuffle(players.filter(p => p.position === 'QB'));
+  const rbs    = shuffle(players.filter(p => p.position === 'RB'));
+  const flex   = shuffle(players.filter(p => p.position === 'WR' || p.position === 'TE'));
   const ks     = players.filter(p => p.position === 'K');
-  qbs.forEach((p, i)  => slotMap.set(p.id, `QB${i + 1}`));
-  rbs.forEach((p, i)  => slotMap.set(p.id, `RB${i + 1}`));
-  flex.forEach((p, i) => slotMap.set(p.id, `WR${i + 1}`));
+
+  // Starters first, bench after
+  qbs.forEach((p, i)  => slotMap.set(p.id, i < 1 ? `QB${i + 1}` : 'BENCH'));
+  rbs.forEach((p, i)  => slotMap.set(p.id, i < 2 ? `RB${i + 1}` : 'BENCH'));
+  flex.forEach((p, i) => slotMap.set(p.id, i < 4 ? `WR${i + 1}` : 'BENCH'));
   ks.forEach((p, i)   => slotMap.set(p.id, `K${i + 1}`));
 
   const budgetRemaining = CAP - totalCost;

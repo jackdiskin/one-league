@@ -483,7 +483,7 @@ function LeagueModal({
             Join a League
           </h2>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
-            Compete against other managers to win the season.
+            Compete against other GMs to win the season.
           </p>
         </div>
 
