@@ -208,6 +208,207 @@ function EmptySlot({ label, group }: { label: string; group: string }) {
   );
 }
 
+// ─── Welcome / how-it-works modal ─────────────────────────────────────────────
+const WELCOME_STEPS = [
+  {
+    icon: '🏈',
+    eyebrow: 'Welcome to',
+    title: 'OneLeague',
+    subtitle: 'The fantasy football league where the market never sleeps.',
+    body: 'OneLeague combines classic fantasy football with a live trading market. Draft a squad, set your lineup each week, actively buy and sell players like stocks, and compete globally.',
+    accent: '#34d399',
+  },
+  {
+    icon: '📋',
+    eyebrow: 'Step 1',
+    title: 'Draft Your Squad',
+    subtitle: '11 players. $200M cap. One shot.',
+    body: null,
+    bullets: [
+      { icon: '🔵', label: '2 Quarterbacks', sub: 'Your franchise signal-callers' },
+      { icon: '🟢', label: '3 Running Backs', sub: 'Ground game and receiving threats' },
+      { icon: '🟡', label: '5 Wide Receivers / Tight Ends', sub: 'Any mix — all count as flex spots' },
+      { icon: '⚪', label: '1 Kicker', sub: 'Every point counts at the margins' },
+    ],
+    accent: '#60a5fa',
+  },
+  {
+    icon: '📈',
+    eyebrow: 'Step 2',
+    title: 'Trade the Market',
+    subtitle: 'Prices move in real time — buy low, sell high.',
+    body: 'Every buy pushes a player\'s price up; every sell pushes it down. Weekly prices also reset based on performance vs. projections and momentum. Your market cap starts at $200M, but grows or shrinks with your P&L.',
+    callout: {
+      label: 'P&L Example',
+      text: 'Buy a player for $5M → sell for $8M → your cap grows by $3M. Lose on a trade and your cap shrinks.',
+    },
+    accent: '#fbbf24',
+  },
+  {
+    icon: '🏆',
+    eyebrow: 'Step 3',
+    title: 'Compete & Win',
+    subtitle: 'Weekly lineups. Season-long standings.',
+    body: 'Each week, set your starting lineup from your active roster. Your starters earn fantasy points based on real NFL performance. Compete in private leagues with friends or go head-to-head in global public leagues.',
+    bullets: [
+      { icon: '📅', label: 'Weekly lineup decisions', sub: 'Start your best 7 each week' },
+      { icon: '🌐', label: 'Global public leagues', sub: 'Compete against the world' },
+      { icon: '🔒', label: 'Private leagues', sub: 'Invite friends with a code' },
+    ],
+    accent: '#a78bfa',
+  },
+] as const;
+
+function WelcomeModal({ userName, onClose }: { userName: string; onClose: () => void }) {
+  const [step, setStep] = useState(0);
+  const s = WELCOME_STEPS[step];
+  const isLast = step === WELCOME_STEPS.length - 1;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(5,8,20,0.92)', backdropFilter: 'blur(16px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 24,
+    }}>
+      <div style={{
+        width: '100%', maxWidth: 480,
+        borderRadius: 24, overflow: 'hidden',
+        boxShadow: '0 40px 100px rgba(0,0,0,0.7)',
+        animation: 'modal-in 0.4s cubic-bezier(0.34,1.4,0.64,1) both',
+      }}>
+        {/* Hero banner */}
+        <div style={{
+          padding: '32px 32px 28px',
+          background: `linear-gradient(135deg, #070a16 0%, #0d1f3c 60%, #0f2a1e 100%)`,
+          position: 'relative', overflow: 'hidden',
+        }}>
+          {/* Subtle grid pattern */}
+          <div style={{
+            position: 'absolute', inset: 0, opacity: 0.04,
+            backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
+          }} />
+
+          {/* Glow orb */}
+          <div style={{
+            position: 'absolute', top: -40, right: -40,
+            width: 160, height: 160, borderRadius: '50%',
+            background: s.accent, opacity: 0.12, filter: 'blur(40px)',
+            transition: 'background 0.4s',
+          }} />
+
+          <div style={{ position: 'relative' }}>
+            <div style={{ fontSize: 40, marginBottom: 10, lineHeight: 1 }}>{s.icon}</div>
+            <div style={{
+              fontSize: 10, fontWeight: 800, letterSpacing: '0.14em',
+              textTransform: 'uppercase', color: s.accent, marginBottom: 6,
+              transition: 'color 0.3s',
+            }}>
+              {s.eyebrow}
+            </div>
+            <h2 style={{
+              fontSize: 26, fontWeight: 900, letterSpacing: '-0.03em',
+              color: '#fff', margin: '0 0 6px',
+            }}>
+              {s.title}
+            </h2>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.5 }}>
+              {s.subtitle}
+            </p>
+          </div>
+
+          {/* Step dots */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 20 }}>
+            {WELCOME_STEPS.map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  height: 3, borderRadius: 99, transition: 'all 0.3s',
+                  background: i === step ? s.accent : 'rgba(255,255,255,0.15)',
+                  width: i === step ? 24 : 8,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ background: '#fff', padding: '24px 32px 28px' }}>
+          {s.body && (
+            <p style={{ fontSize: 14, color: '#475569', lineHeight: 1.65, margin: '0 0 16px' }}>
+              {s.body}
+            </p>
+          )}
+
+          {'bullets' in s && s.bullets && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {s.bullets.map((b, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 12px', borderRadius: 10, background: '#f8fafc',
+                  border: '1px solid #f1f5f9',
+                }}>
+                  <span style={{ fontSize: 16, flexShrink: 0 }}>{b.icon}</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{b.label}</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8' }}>{b.sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {'callout' in s && s.callout && (
+            <div style={{
+              marginTop: 12, padding: '10px 14px', borderRadius: 12,
+              background: 'linear-gradient(135deg, #fffbeb, #fef3c7)',
+              border: '1px solid #fde68a',
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>
+                {s.callout.label}
+              </div>
+              <div style={{ fontSize: 12, color: '#78350f', lineHeight: 1.5 }}>
+                {s.callout.text}
+              </div>
+            </div>
+          )}
+
+          {/* CTA row */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 20, alignItems: 'center' }}>
+            {step > 0 && (
+              <button
+                onClick={() => setStep(s => s - 1)}
+                style={{
+                  padding: '9px 16px', borderRadius: 10,
+                  border: '1.5px solid #e2e8f0', background: '#fff',
+                  fontSize: 13, fontWeight: 600, color: '#64748b', cursor: 'pointer',
+                }}
+              >
+                ← Back
+              </button>
+            )}
+            <button
+              onClick={() => isLast ? onClose() : setStep(s => s + 1)}
+              style={{
+                flex: 1, padding: '10px 0', borderRadius: 12, border: 'none',
+                background: `linear-gradient(135deg, ${s.accent} 0%, ${s.accent}cc 100%)`,
+                fontSize: 14, fontWeight: 800, color: '#fff', cursor: 'pointer',
+                boxShadow: `0 4px 16px ${s.accent}44`,
+                transition: 'all 0.2s',
+              }}
+            >
+              {isLast
+                ? `Let's Draft, ${userName.split(' ')[0]} →`
+                : 'Next →'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── League joining modal ──────────────────────────────────────────────────────
 function LeagueModal({
   publicLeagues,
@@ -462,6 +663,7 @@ export default function DraftBoard({
   const [search, setSearch]         = useState('');
   const [page, setPage]             = useState(1);
   const [showModal, setShowModal]   = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
   const [justAdded, setJustAdded]   = useState<number | null>(null);
   const PAGE_SIZE = 20;
 
@@ -857,7 +1059,7 @@ export default function DraftBoard({
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <div style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.4em', textTransform: 'uppercase' }}>
-              OPPONENT
+              END ZONE
             </div>
           </div>
 
@@ -868,7 +1070,7 @@ export default function DraftBoard({
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <div style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.4em', textTransform: 'uppercase' }}>
-              YOUR ZONE
+              END ZONE
             </div>
           </div>
 
@@ -896,14 +1098,6 @@ export default function DraftBoard({
               <div style={{ width: 12, height: 1, background: 'rgba(255,255,255,0.22)' }} />
             </div>
           ))}
-
-          {/* Goal posts */}
-          <svg style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} width="80" height="52" viewBox="0 0 60 52">
-            <rect x="29" y="2"  width="2" height="50" fill="rgba(251,191,36,0.65)" rx="1" />
-            <rect x="8"  y="22" width="44" height="2" fill="rgba(251,191,36,0.65)" rx="1" />
-            <rect x="8"  y="2"  width="2" height="22" fill="rgba(251,191,36,0.65)" rx="1" />
-            <rect x="50" y="2"  width="2" height="22" fill="rgba(251,191,36,0.65)" rx="1" />
-          </svg>
 
           {/* Formation slots */}
           {FORMATION_SLOTS.map(slot => {
@@ -956,6 +1150,14 @@ export default function DraftBoard({
           playerIds={selected.map(p => p.id)}
           season={season}
           onClose={() => setShowModal(false)}
+        />
+      )}
+
+      {/* ── WELCOME MODAL ─────────────────────────────────────────────────────── */}
+      {showWelcome && (
+        <WelcomeModal
+          userName={userName}
+          onClose={() => setShowWelcome(false)}
         />
       )}
     </div>
