@@ -149,20 +149,23 @@ def seed_players(cursor):
         short_name = str(row.get("short_name") or full_name).strip()
         jersey     = safe_int(row.get("jersey_number"), None)
 
+        espn_id = str(row["espn_id"]) if row.get("espn_id") else None
+
         cursor.execute(
             """
             INSERT INTO players
                 (external_player_id, full_name, short_name, team_code, team_name,
-                 position, status, headshot_url, jersey_number)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 position, status, headshot_url, jersey_number, espn_athlete_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
-                full_name     = VALUES(full_name),
-                short_name    = VALUES(short_name),
-                team_code     = VALUES(team_code),
-                team_name     = VALUES(team_name),
-                status        = VALUES(status),
-                headshot_url  = VALUES(headshot_url),
-                jersey_number = VALUES(jersey_number)
+                full_name        = VALUES(full_name),
+                short_name       = VALUES(short_name),
+                team_code        = VALUES(team_code),
+                team_name        = VALUES(team_name),
+                status           = VALUES(status),
+                headshot_url     = VALUES(headshot_url),
+                jersey_number    = VALUES(jersey_number),
+                espn_athlete_id  = VALUES(espn_athlete_id)
             """,
             (
                 str(row["gsis_id"]),
@@ -174,6 +177,7 @@ def seed_players(cursor):
                 status,
                 row.get("headshot_url") or None,
                 jersey,
+                espn_id,
             ),
         )
         inserted += cursor.rowcount == 1

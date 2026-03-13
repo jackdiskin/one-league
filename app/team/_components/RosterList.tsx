@@ -2,10 +2,11 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useMemo, useCallback, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatPrice, formatPoints } from '@/lib/format';
 import { BID_ASK_SPREAD, PRICE_IMPACT_RATE } from '@/lib/pricing';
+import { useLiveStats, getLivePoints, type LiveStatDelta } from '@/hooks/useLiveStats';
 
 export interface RosterPlayer {
   id: number;
@@ -19,6 +20,59 @@ export interface RosterPlayer {
   roster_slot: string;
   last_week_points: number | null;
   season_points: number | null;
+  espn_athlete_id: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Live stat chips — Bloomberg-style data pills shown below player name during live games
+// ---------------------------------------------------------------------------
+function LiveStatChips({ totals }: { totals: LiveStatDelta }) {
+  const t = totals;
+  type Chip = { value: string; label: string; color: string; bg: string; border: string; flash?: boolean };
+  const chips: Chip[] = [];
+
+  if (t.passingYards  > 0) chips.push({ value: String(t.passingYards),            label: 'PaYd',  color: '#2563eb', bg: 'rgba(37,99,235,0.08)',    border: 'rgba(37,99,235,0.22)'   });
+  if (t.passingTds    > 0) chips.push({ value: String(t.passingTds),               label: 'PaTD',  color: '#92400e', bg: 'rgba(251,191,36,0.16)',   border: 'rgba(217,119,6,0.38)',  flash: true });
+  if (t.rushingYards  > 0) chips.push({ value: String(t.rushingYards),             label: 'RuYd',  color: '#059669', bg: 'rgba(5,150,105,0.08)',    border: 'rgba(5,150,105,0.22)'   });
+  if (t.rushingTds    > 0) chips.push({ value: String(t.rushingTds),               label: 'RuTD',  color: '#92400e', bg: 'rgba(251,191,36,0.16)',   border: 'rgba(217,119,6,0.38)',  flash: true });
+  if (t.receptions    > 0) chips.push({ value: `${t.receptions} rec · ${t.receivingYards} yd`, label: 'Rec', color: '#7c3aed', bg: 'rgba(124,58,237,0.08)', border: 'rgba(124,58,237,0.22)' });
+  if (t.receivingTds  > 0) chips.push({ value: String(t.receivingTds),             label: 'RecTD', color: '#92400e', bg: 'rgba(251,191,36,0.16)',   border: 'rgba(217,119,6,0.38)',  flash: true });
+  if (t.interceptions > 0) chips.push({ value: String(t.interceptions),            label: 'INT',   color: '#dc2626', bg: 'rgba(220,38,38,0.08)',    border: 'rgba(220,38,38,0.22)'   });
+  if (t.fumblesLost   > 0) chips.push({ value: String(t.fumblesLost),              label: 'FL',    color: '#dc2626', bg: 'rgba(220,38,38,0.08)',    border: 'rgba(220,38,38,0.22)'   });
+  if (t.twoPtConversions > 0) chips.push({ value: String(t.twoPtConversions),      label: '2PT',   color: '#0369a1', bg: 'rgba(3,105,161,0.08)',    border: 'rgba(3,105,161,0.22)'   });
+
+  const fgMade = (t.fg0_39 ?? 0) + (t.fg40_49 ?? 0) + (t.fg50Plus ?? 0);
+  const fgAtt  = fgMade + (t.fgMissed ?? 0);
+  if (fgAtt  > 0) chips.push({ value: `${fgMade}/${fgAtt}`,                        label: 'FG',    color: '#b45309', bg: 'rgba(180,83,9,0.08)',     border: 'rgba(180,83,9,0.22)'    });
+  if (t.xpMade > 0) chips.push({ value: String(t.xpMade),                          label: 'XP',    color: '#78350f', bg: 'rgba(120,53,15,0.07)',    border: 'rgba(120,53,15,0.18)'   });
+
+  if (chips.length === 0) return null;
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 5 }}>
+      {chips.map((chip, i) => (
+        <span
+          key={i}
+          style={{
+            display: 'inline-flex', alignItems: 'baseline', gap: 3,
+            padding: '2px 6px',
+            borderRadius: 4,
+            border: `1px solid ${chip.border}`,
+            background: chip.bg,
+            color: chip.color,
+            animation: chip.flash ? 'td-flash 0.7s ease-out' : undefined,
+          }}
+        >
+          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+            {chip.value}
+          </span>
+          <span style={{ fontSize: 8.5, fontWeight: 700, opacity: 0.65, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            {chip.label}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 const POS_COLORS: Record<string, { pill: string; bar: string; light: string; ring: string }> = {
@@ -41,6 +95,25 @@ const STARTER_SLOT_GROUPS = [
   { key: 'FLEX', positions: ['WR', 'TE'], maxStarters: 4, slotPrefix: 'WR', label: 'Receivers',     singularLabel: 'WR/TE Starter' },
   { key: 'K',    positions: ['K'],        maxStarters: 1, slotPrefix: 'K',  label: 'Kicker',        singularLabel: 'K Starter'   },
 ] as const;
+
+// Extracted so PlayerRow (defined outside RosterList) can call it without closures
+function isEligibleForSwap(p: RosterPlayer, selected: RosterPlayer | null): boolean {
+  if (!selected) return false;
+  if (p.id === selected.id) return false;
+  const flex = ['WR', 'TE'];
+  const sameGroup = (a: string, b: string) => (flex.includes(a) && flex.includes(b)) || a === b;
+  if (!sameGroup(selected.position, p.position)) return false;
+  return (selected.roster_slot === 'BENCH') !== (p.roster_slot === 'BENCH');
+}
+
+interface PlayerRowProps {
+  p: RosterPlayer;
+  selected: RosterPlayer | null;
+  swapping: Set<number>;
+  liveData: import('@/hooks/useLiveStats').LivePlayerStats | undefined;
+  onPlayerClick: (p: RosterPlayer) => void;
+  onSellClick: (p: RosterPlayer) => void;
+}
 
 function Avatar({ player, size = 40, col }: { player: RosterPlayer; size?: number; col: typeof POS_COLORS[string] }) {
   return (
@@ -345,6 +418,168 @@ function SellModal({
   );
 }
 
+const PlayerRow = memo(function PlayerRow({
+  p, selected, swapping, liveData, onPlayerClick, onSellClick,
+}: PlayerRowProps) {
+  const col        = POS_COLORS[p.position] ?? POS_COLORS.K;
+  const isSelected = selected?.id === p.id;
+  const eligible   = isEligibleForSwap(p, selected);
+  const isSwapping = swapping.has(p.id);
+  const isBench    = p.roster_slot === 'BENCH';
+  const isLive     = liveData != null;
+  const livePoints = liveData?.totals.fantasyPointsTotal ?? null;
+
+  const currentPrice  = Number(p.current_price);
+  const purchasePrice = Number(p.purchase_price);
+  const pnl           = currentPrice - purchasePrice;
+  const isGain        = pnl >= 0;
+
+  return (
+    <div
+      onClick={() => { if (!isSwapping) onPlayerClick(p); }}
+      style={{
+        display: 'flex', alignItems: 'center',
+        padding: '9px 20px',
+        cursor: isSwapping ? 'default' : 'pointer',
+        position: 'relative',
+        background: isSelected
+          ? col.light
+          : isLive
+            ? 'linear-gradient(135deg, rgba(5,150,105,0.04) 0%, rgba(255,255,255,0) 60%)'
+            : 'transparent',
+        outline: isSelected
+          ? `1.5px solid ${col.ring}`
+          : eligible
+            ? `1.5px dashed ${col.ring}`
+            : 'none',
+        outlineOffset: '-2px',
+        borderRadius: (isSelected || eligible) ? 10 : 0,
+        transition: 'background 0.15s',
+        opacity: isSwapping ? 0.6 : 1,
+      }}
+    >
+      {/* Live left-rail accent */}
+      {isLive && !isSelected && (
+        <div style={{
+          position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
+          width: 3, height: '70%', minHeight: 24, borderRadius: 4,
+          background: 'linear-gradient(180deg, #10b981, #059669)',
+        }} />
+      )}
+      {/* Selected left-rail accent */}
+      {isSelected && (
+        <div style={{
+          position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
+          width: 4, height: '60%', minHeight: 18, borderRadius: 4, background: col.bar, opacity: 0.8,
+        }} />
+      )}
+
+      <Avatar player={p} col={col} />
+
+      {/* Name / position / live chips */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {p.full_name}
+          </span>
+          {isLive && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0,
+              padding: '1px 6px', borderRadius: 20,
+              background: 'linear-gradient(135deg, #0f172a 0%, #064e3b 100%)',
+              fontSize: 8.5, fontWeight: 800, color: '#fff',
+              letterSpacing: '0.06em', textTransform: 'uppercase',
+              boxShadow: '0 1px 4px rgba(5,150,105,0.4)',
+            }}>
+              <span style={{
+                width: 5, height: 5, borderRadius: '50%', background: '#34d399', flexShrink: 0,
+                animation: 'live-pulse 1.4s ease-in-out infinite',
+              }} />
+              LIVE
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ background: col.bar, color: '#fff', borderRadius: 20, padding: '1px 5px', fontSize: 8.5, fontWeight: 800 }}>
+            {p.position}
+          </span>
+          <span>{p.team_code}</span>
+          {isBench && <span style={{ fontSize: 9, color: '#cbd5e1', fontWeight: 600 }}>· BENCH</span>}
+        </div>
+        {isLive && liveData && <LiveStatChips totals={liveData.totals} />}
+      </div>
+
+      {/* Data columns */}
+      <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+        <div style={{ width: 72, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+          {formatPrice(currentPrice)}
+        </div>
+        <div style={{ width: 72, textAlign: 'right', fontSize: 12, color: '#64748b' }}>
+          {formatPrice(purchasePrice)}
+        </div>
+        <div style={{ width: 60, textAlign: 'right' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: isGain ? '#059669' : '#e11d48' }}>
+            {isGain ? '+' : ''}{formatPrice(pnl)}
+          </span>
+        </div>
+        <div style={{ width: 68, textAlign: 'right' }}>
+          {isLive && livePoints != null ? (
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#059669' }}>{formatPoints(livePoints)}</span>
+          ) : p.last_week_points != null ? (
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>{formatPoints(p.last_week_points)}</span>
+          ) : (
+            <span style={{ fontSize: 12, color: '#e2e8f0' }}>—</span>
+          )}
+        </div>
+        <div style={{ width: 72, textAlign: 'right', fontSize: 12, color: '#64748b' }}>
+          {p.season_points != null ? formatPoints(p.season_points) : '—'}
+        </div>
+      </div>
+
+      {/* Sell + link (80px) */}
+      <div style={{ width: 80, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+        <button
+          onClick={e => { e.stopPropagation(); onSellClick(p); }}
+          disabled={isSwapping}
+          style={{
+            padding: '4px 8px', borderRadius: 8, border: '1px solid #fecaca',
+            background: '#fff', fontSize: 10, fontWeight: 700, color: '#e11d48',
+            cursor: isSwapping ? 'default' : 'pointer', transition: 'all 0.15s',
+          }}
+        >
+          Sell
+        </button>
+        <Link
+          href={`/player/${p.id}`}
+          onClick={e => e.stopPropagation()}
+          style={{
+            width: 26, height: 26, borderRadius: 7, border: '1px solid #f1f5f9',
+            background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#94a3b8', flexShrink: 0, textDecoration: 'none',
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+            <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+          </svg>
+        </Link>
+      </div>
+
+      {/* Swap overlay */}
+      {isSwapping && (
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: 10,
+          background: 'rgba(255,255,255,0.6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 11, fontWeight: 700, color: '#64748b',
+        }}>
+          Swapping...
+        </div>
+      )}
+    </div>
+  );
+});
+
 export default function RosterList({ roster, teamId, currentWeek, budgetRemaining }: {
   roster: RosterPlayer[];
   teamId: number;
@@ -357,6 +592,29 @@ export default function RosterList({ roster, teamId, currentWeek, budgetRemainin
   const [selected, setSelected]     = useState<RosterPlayer | null>(null);
   const [swapping, setSwapping]     = useState<Set<number>>(new Set());
   const [sellTarget, setSellTarget] = useState<RosterPlayer | null>(null);
+
+  // Live stats via WebSocket — subscribe to all players on roster who have an ESPN ID
+  const espnIds = useMemo(
+    () => roster.map(p => p.espn_athlete_id).filter(Boolean) as string[],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [roster.map(p => p.espn_athlete_id).join(',')],
+  );
+  const liveStats = useLiveStats(espnIds);
+
+  const handlePlayerClick = useCallback((p: RosterPlayer) => {
+    if (swapping.has(p.id)) return;
+    setSelected(prev => {
+      if (!prev) return p;
+      if (prev.id === p.id) return null;
+      if (isEligibleForSwap(p, prev)) { executeSwap(prev, p); return null; }
+      return p;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [swapping]);
+
+  const handleSellClick = useCallback((p: RosterPlayer) => {
+    setSellTarget(p);
+  }, []);
 
   const starters = roster.filter(p => p.roster_slot !== 'BENCH');
   const bench    = roster.filter(p => p.roster_slot === 'BENCH');
@@ -403,27 +661,6 @@ export default function RosterList({ roster, teamId, currentWeek, budgetRemainin
   function isEmptyBenchEligible(): boolean {
     if (!selected) return false;
     return selected.roster_slot !== 'BENCH';
-  }
-
-  function handlePlayerClick(p: RosterPlayer) {
-    if (swapping.has(p.id)) return;
-
-    if (!selected) {
-      setSelected(p);
-      return;
-    }
-
-    if (selected.id === p.id) {
-      setSelected(null);
-      return;
-    }
-
-    if (isEligible(p)) {
-      executeSwap(selected, p);
-    } else {
-      // Re-select if same section/position allows it
-      setSelected(p);
-    }
   }
 
   async function executeSwap(playerA: RosterPlayer, playerB: RosterPlayer) {
@@ -595,171 +832,21 @@ export default function RosterList({ roster, teamId, currentWeek, budgetRemainin
     );
   }
 
-  function PlayerRow({ p, section }: { p: RosterPlayer; section: 'starter' | 'bench' }) {
-    const col      = POS_COLORS[p.position] ?? POS_COLORS.K;
-    const pnl      = Number(p.current_price) - Number(p.purchase_price);
-    const pnlPct   = Number(p.purchase_price) > 0 ? (pnl / Number(p.purchase_price)) * 100 : 0;
-    const isUp     = pnl >= 0;
-    const isSelected  = selected?.id === p.id;
-    const eligible    = isEligible(p);
-    const isSwapping  = swapping.has(p.id);
-    const isDimmed    = isSelectionActive && !isSelected && !eligible && !isSwapping;
-
-    return (
-      <div
-        onClick={() => handlePlayerClick(p)}
-        style={{
-          display: 'flex', alignItems: 'center',
-          padding: '10px 20px',
-          cursor: isSwapping ? 'wait' : 'pointer',
-          transition: 'all 0.2s',
-          opacity: isDimmed ? 0.35 : isSwapping ? 0.6 : 1,
-          background: isSelected
-            ? col.light
-            : eligible
-            ? col.light
-            : 'transparent',
-          outline: isSelected ? `2px solid ${col.ring}` : eligible ? `1.5px dashed ${col.ring}` : 'none',
-          outlineOffset: '-2px',
-          borderRadius: isSelected || eligible ? 10 : 0,
-          position: 'relative',
-        }}
-        onMouseEnter={e => {
-          if (!isSelected && !eligible && !isDimmed) {
-            (e.currentTarget as HTMLElement).style.background = '#fafafa';
-          }
-        }}
-        onMouseLeave={e => {
-          if (!isSelected && !eligible) {
-            (e.currentTarget as HTMLElement).style.background = 'transparent';
-          }
-        }}
-      >
-        {/* Eligible badge */}
-        {eligible && (
-          <div style={{
-            position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
-            width: 4, height: '60%', minHeight: 20, borderRadius: 4,
-            background: col.ring, opacity: 0.8,
-          }} />
-        )}
-
-        {/* Avatar + Name */}
-        <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
-          <Avatar player={p} col={col} />
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {p.full_name}
-            </div>
-            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>{p.team_code}</span>
-              <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${col.pill}`}>{p.position}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Current price */}
-        <div style={{ width: 72, textAlign: 'right', fontSize: 12, fontWeight: 700, color: '#0f172a' }}>
-          {formatPrice(p.current_price)}
-        </div>
-
-        {/* Purchase price */}
-        <div style={{ width: 72, textAlign: 'right', fontSize: 11, color: '#94a3b8' }}>
-          {formatPrice(p.purchase_price)}
-        </div>
-
-        {/* P&L */}
-        <div style={{ width: 60, textAlign: 'right' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: isUp ? '#10b981' : '#f43f5e' }}>
-            {isUp ? '+' : ''}{formatPrice(Math.abs(pnl))}
-          </div>
-          <div style={{ fontSize: 9, color: isUp ? '#10b981' : '#f43f5e' }}>
-            {isUp ? '▲' : '▼'} {Math.abs(pnlPct).toFixed(1)}%
-          </div>
-        </div>
-
-        {/* Last week */}
-        <div style={{ width: 68, textAlign: 'right', fontSize: 13, fontWeight: 700, color: p.last_week_points != null ? '#0f172a' : '#cbd5e1' }}>
-          {p.last_week_points != null ? formatPoints(p.last_week_points) : '—'}
-        </div>
-
-        {/* Season */}
-        <div style={{ width: 72, textAlign: 'right', fontSize: 12, color: '#475569' }}>
-          {p.season_points != null ? formatPoints(p.season_points) : '—'}
-        </div>
-
-        {/* Sell button */}
-        <button
-          onClick={e => { e.stopPropagation(); setSellTarget(p); setSelected(null); }}
-          title={`Sell ${p.full_name}`}
-          style={{
-            marginLeft: 6, flexShrink: 0,
-            padding: '3px 8px', borderRadius: 6,
-            border: '1px solid #fecaca', background: '#fff5f5',
-            fontSize: 10, fontWeight: 700, color: '#e11d48',
-            cursor: 'pointer', lineHeight: 1.4,
-            transition: 'all 0.15s',
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.background = '#fef2f2';
-            (e.currentTarget as HTMLElement).style.borderColor = '#f87171';
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.background = '#fff5f5';
-            (e.currentTarget as HTMLElement).style.borderColor = '#fecaca';
-          }}
-        >
-          Sell
-        </button>
-
-        {/* Player page link */}
-        <Link
-          href={`/players/${p.id}`}
-          onClick={e => e.stopPropagation()}
-          style={{
-            marginLeft: 10, flexShrink: 0, width: 24, height: 24,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            borderRadius: 6, color: '#cbd5e1', textDecoration: 'none',
-            transition: 'color 0.15s, background 0.15s',
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.color = '#64748b';
-            (e.currentTarget as HTMLElement).style.background = '#f1f5f9';
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.color = '#cbd5e1';
-            (e.currentTarget as HTMLElement).style.background = 'transparent';
-          }}
-          title={`View ${p.full_name}'s profile`}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-            <polyline points="15 3 21 3 21 9" />
-            <line x1="10" y1="14" x2="21" y2="3" />
-          </svg>
-        </Link>
-
-        {/* Swap indicator */}
-        {isSwapping && (
-          <div style={{
-            position: 'absolute', inset: 0, borderRadius: 10,
-            background: 'rgba(255,255,255,0.6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 700, color: '#64748b',
-          }}>
-            Swapping...
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div style={{ borderRadius: 16, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0', overflow: 'hidden', position: 'relative' }}>
       <style>{`
         @keyframes eligible-pulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
           50%       { box-shadow: 0 0 0 5px rgba(16,185,129,0); }
+        }
+        @keyframes live-pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%       { opacity: 0.5; transform: scale(0.8); }
+        }
+        @keyframes td-flash {
+          0%   { background: rgba(251,191,36,0.45); transform: scale(1.08); }
+          60%  { background: rgba(251,191,36,0.22); transform: scale(1.02); }
+          100% { background: rgba(251,191,36,0.16); transform: scale(1); }
         }
       `}</style>
 
@@ -769,13 +856,16 @@ export default function RosterList({ roster, teamId, currentWeek, budgetRemainin
           <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>Full Roster</h3>
           <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{roster.length} active players · {starters.length} starters · {bench.length} bench</p>
         </div>
-        {/* Column labels */}
-        <div style={{ display: 'flex', gap: 0, fontSize: 9, fontWeight: 700, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        {/* Column labels — widths mirror PlayerRow data columns exactly.
+            The trailing 80px spacer matches the sell button (≈46px) + link icon (≈34px)
+            so every label sits directly above its column. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, fontSize: 9, fontWeight: 700, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           <span style={{ width: 72, textAlign: 'right' }}>Price</span>
           <span style={{ width: 72, textAlign: 'right' }}>Bought at</span>
           <span style={{ width: 60, textAlign: 'right' }}>P&amp;L</span>
-          <span style={{ width: 68, textAlign: 'right' }}>Last Wk</span>
+          <span style={{ width: 68, textAlign: 'right' }}>Live / Wk</span>
           <span style={{ width: 72, textAlign: 'right' }}>Season</span>
+          <span style={{ width: 80, flexShrink: 0 }} />
         </div>
       </div>
 
@@ -863,7 +953,15 @@ export default function RosterList({ roster, teamId, currentWeek, budgetRemainin
                   </span>
                 )}
               </div>
-              {groupPlayers.map(p => <PlayerRow key={p.id} p={p} section="starter" />)}
+              {groupPlayers.map(p => (
+                <PlayerRow
+                  key={p.id} p={p}
+                  selected={selected} swapping={swapping}
+                  liveData={liveStats.get(p.espn_athlete_id ?? '') ?? undefined}
+                  onPlayerClick={handlePlayerClick}
+                  onSellClick={handleSellClick}
+                />
+              ))}
               {emptySlots.map(slot => (
                 <EmptySlotRow
                   key={slot}
@@ -933,7 +1031,15 @@ export default function RosterList({ roster, teamId, currentWeek, budgetRemainin
                 </span>
                 <span style={{ fontSize: 10, color: '#cbd5e1', fontWeight: 500 }}>· {players.length}</span>
               </div>
-              {players.map(p => <PlayerRow key={p.id} p={p} section="bench" />)}
+              {players.map(p => (
+                <PlayerRow
+                  key={p.id} p={p}
+                  selected={selected} swapping={swapping}
+                  liveData={liveStats.get(p.espn_athlete_id ?? '') ?? undefined}
+                  onPlayerClick={handlePlayerClick}
+                  onSellClick={handleSellClick}
+                />
+              ))}
             </div>
           );
         })}

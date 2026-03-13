@@ -103,6 +103,7 @@ async function fetchTeam(userId: string) {
 async function fetchRoster(teamId: number, lastWeek: number): Promise<RosterPlayer[]> {
   return query<RosterPlayer>(
     `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url,
+            p.espn_athlete_id,
             pms.current_price, ftr.purchase_price, ftr.acquired_week, ftr.roster_slot,
             pws.fantasy_points           AS last_week_points,
             tot.season_points
