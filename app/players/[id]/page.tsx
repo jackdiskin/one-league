@@ -3,7 +3,8 @@ import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
-import { formatPrice, formatPoints, formatWeekLong, formatSeasonStatus } from '@/lib/format';
+import { formatPrice, formatPoints, formatWeekLong } from '@/lib/format';
+import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import PriceChart, { type PriceWeek } from './_components/PriceChart';
 import BuyButton from './_components/BuyButton';
@@ -218,10 +219,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           <div className="flex items-center justify-between px-6 py-3">
             <BackLink href="/team" label="My Team" />
             <div className="flex items-center gap-3 ml-auto">
-              <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-slate-50 ring-1 ring-slate-200 px-3 py-1">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                <span className="text-xs font-medium text-slate-600">{formatSeasonStatus(SEASON, currentWeek)}</span>
-              </div>
+              <SeasonModeSwitcher season={SEASON} currentWeek={currentWeek} />
               <div className="h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
                 {session.user.name?.[0]?.toUpperCase() ?? '?'}
               </div>

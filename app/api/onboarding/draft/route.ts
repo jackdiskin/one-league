@@ -3,7 +3,7 @@ import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { auth } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/mysql';
 
-const SEASON      = 2025;
+const SEASON      = 2026;
 const CAP         = 200_000_000;
 const QUOTA       = { QB: 2, RB: 3, FLEX: 5, K: 1 };
 

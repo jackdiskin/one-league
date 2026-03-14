@@ -2,7 +2,8 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
-import { formatPoints, formatPrice, formatWeek, formatWeekLong, formatSeasonStatus } from '@/lib/format';
+import { formatPoints, formatPrice, formatWeek, formatWeekLong } from '@/lib/format';
+import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import PlayerCatalog, { type CatalogPlayer } from './_components/PlayerCatalog';
 
@@ -111,13 +112,7 @@ export default async function PlayersPage() {
           borderBottom: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 24px' }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              borderRadius: 20, background: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 12px',
-            }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>{formatSeasonStatus(SEASON, currentWeek)}</span>
-            </div>
+            <SeasonModeSwitcher season={SEASON} currentWeek={currentWeek} />
             <div style={{
               width: 32, height: 32, borderRadius: '50%', background: '#0f172a', color: '#fff',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800,

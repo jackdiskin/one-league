@@ -22,9 +22,9 @@ export default async function StandingsCard({ userId, seasonYear }: Props) {
             ft.total_points, ft.budget_remaining, ft.user_id
      FROM fantasy_teams ft
      JOIN \`user\` u ON u.id = ft.user_id
-     WHERE ft.league_id = ?
+     WHERE ft.league_id = ? AND ft.season_year = ?
      ORDER BY ft.total_points DESC`,
-    [membership.league_id]
+    [membership.league_id, seasonYear]
   );
 
   return (

@@ -212,8 +212,8 @@ function EmptySlot({ label, group }: { label: string; group: string }) {
 const WELCOME_STEPS = [
   {
     icon: '🏈',
-    eyebrow: 'Welcome to',
-    title: 'OneLeague',
+    eyebrow: 'Welcome To OneLeague',
+    title: 'Draft 2026',
     subtitle: 'The fantasy football league where the market never sleeps.',
     body: 'OneLeague combines classic fantasy football with a live trading market. Draft a squad, set your lineup each week, actively buy and sell players like stocks, and compete globally.',
     accent: '#34d399',
@@ -300,19 +300,49 @@ function WelcomeModal({ userName, onClose }: { userName: string; onClose: () => 
 
           <div style={{ position: 'relative' }}>
             <div style={{ fontSize: 40, marginBottom: 10, lineHeight: 1 }}>{s.icon}</div>
-            <div style={{
-              fontSize: 10, fontWeight: 800, letterSpacing: '0.14em',
-              textTransform: 'uppercase', color: s.accent, marginBottom: 6,
-              transition: 'color 0.3s',
-            }}>
-              {s.eyebrow}
-            </div>
-            <h2 style={{
-              fontSize: 26, fontWeight: 900, letterSpacing: '-0.03em',
-              color: '#fff', margin: '0 0 6px',
-            }}>
-              {s.title}
-            </h2>
+            {step === 0 ? (
+              <>
+                <div style={{
+                  fontSize: 10, fontWeight: 800, letterSpacing: '0.18em',
+                  textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)',
+                  marginBottom: 10,
+                }}>
+                  {s.eyebrow}
+                </div>
+                <div style={{
+                  fontFamily: "'Barlow Condensed', 'Impact', sans-serif",
+                  fontSize: 72, fontWeight: 900,
+                  fontStyle: 'italic',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 0.9,
+                  margin: '0 0 14px',
+                  background: 'linear-gradient(135deg, #34d399 0%, #10b981 40%, #fbbf24 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                  animation: 'draft-glow 3s ease-in-out infinite',
+                  display: 'inline-block',
+                }}>
+                  {s.title}
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{
+                  fontSize: 10, fontWeight: 800, letterSpacing: '0.14em',
+                  textTransform: 'uppercase', color: s.accent, marginBottom: 6,
+                  transition: 'color 0.3s',
+                }}>
+                  {s.eyebrow}
+                </div>
+                <h2 style={{
+                  fontSize: 26, fontWeight: 900, letterSpacing: '-0.03em',
+                  color: '#fff', margin: '0 0 6px',
+                }}>
+                  {s.title}
+                </h2>
+              </>
+            )}
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.5 }}>
               {s.subtitle}
             </p>
@@ -451,7 +481,7 @@ function LeagueModal({
       });
       const json = await res.json();
       if (!res.ok) { setError(json.error ?? 'Something went wrong'); return; }
-      router.push('/dashboard');
+      router.push(`/dashboard?season=${season}`);
     } catch {
       setError('Network error — please try again.');
     } finally {
@@ -753,6 +783,11 @@ export default function DraftBoard({
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,900;1,900&display=swap');
+        @keyframes draft-glow {
+          0%, 100% { text-shadow: 0 0 40px rgba(52,211,153,0.5), 0 0 80px rgba(52,211,153,0.2); }
+          50%       { text-shadow: 0 0 60px rgba(52,211,153,0.8), 0 0 120px rgba(52,211,153,0.35), 0 0 200px rgba(251,191,36,0.15); }
+        }
         @keyframes slot-pop {
           0%   { transform: scale(0.6); opacity: 0; }
           100% { transform: scale(1);   opacity: 1; }

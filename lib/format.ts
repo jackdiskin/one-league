@@ -43,7 +43,7 @@ const MAX_PLAYOFF_WEEK = Math.max(...Object.keys(PLAYOFF_WEEKS).map(Number));
  */
 export function formatSeasonStatus(season: number, currentWeek: number): string {
   if (currentWeek >= MAX_PLAYOFF_WEEK) {
-    return `Season ${season + 1} · Pre-Season`;
+    return `Season ${season} · Post-Season`;
   }
   return `Season ${season} · ${formatWeekLong(currentWeek)}`;
 }

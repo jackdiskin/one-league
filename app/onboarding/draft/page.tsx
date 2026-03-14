@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
 import DraftBoard, { type DraftPlayer, type PublicLeague } from './_components/DraftBoard';
 
-const SEASON = 2025;
+const SEASON = 2026;
 
 async function fetchPlayers(): Promise<DraftPlayer[]> {
   return query<DraftPlayer>(

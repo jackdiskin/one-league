@@ -11,19 +11,26 @@ import StandingsCard   from './_components/StandingsCard';
 import DiscoverLeagues from './_components/DiscoverLeagues';
 import MarketPulse     from './_components/MarketPulse';
 import Sidebar, { type SidebarLeague } from './_components/Sidebar';
-import { formatWeekLong, formatSeasonStatus } from '@/lib/format';
-
-const SEASON = 2025;
+import { formatWeekLong } from '@/lib/format';
+import SeasonModeSwitcher from './_components/SeasonModeSwitcher';
 
 function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`rounded-2xl bg-slate-100 animate-pulse ${className}`} />;
 }
 
-async function fetchCurrentWeek(): Promise<number> {
+async function fetchCurrentWeek(season: number): Promise<number> {
   const [row] = await query<{ w: number }>(
-    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [SEASON]
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [season]
   );
   return row?.w ?? 1;
+}
+
+async function detectUserSeason(userId: string): Promise<number> {
+  const [row] = await query<{ season_year: number }>(
+    `SELECT MAX(season_year) AS season_year FROM fantasy_teams WHERE user_id = ?`,
+    [userId]
+  );
+  return row?.season_year ?? 2025;
 }
 
 async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
@@ -76,12 +83,21 @@ async function fetchDiscoverLeagues(userId: string) {
   );
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ season?: string }>;
+}) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/auth/sign-in');
 
   const userId    = session.user.id;
   const firstName = session.user.name?.split(' ')[0] ?? 'there';
+
+  // Resolve season: explicit param → user's latest team → 2025 fallback
+  const params = await searchParams;
+  const requestedSeason = params.season ? parseInt(params.season, 10) : null;
+  const SEASON = requestedSeason ?? await detectUserSeason(userId);
 
   // New users with no team yet → onboarding
   const [teamCheck] = await query<{ id: number }>(
@@ -91,7 +107,7 @@ export default async function DashboardPage() {
   if (!teamCheck) redirect('/onboarding/draft');
 
   const [currentWeek, discoverLeagues, userLeagues] = await Promise.all([
-    fetchCurrentWeek(),
+    fetchCurrentWeek(SEASON),
     fetchDiscoverLeagues(userId),
     fetchUserLeagues(userId),
   ]);
@@ -120,12 +136,7 @@ export default async function DashboardPage() {
         {/* Header */}
         <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
           <div className="flex items-center justify-between px-6 py-3">
-            <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-slate-50 ring-1 ring-slate-200 px-3 py-1">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span className="text-xs font-medium text-slate-600">
-                {formatSeasonStatus(SEASON, currentWeek)}
-              </span>
-            </div>
+            <SeasonModeSwitcher season={SEASON} currentWeek={currentWeek} />
             <div className="flex items-center gap-3 ml-auto">
               <div className="h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold cursor-pointer hover:bg-slate-700 transition-colors">
                 {session.user.name?.[0]?.toUpperCase() ?? '?'}
