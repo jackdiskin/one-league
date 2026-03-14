@@ -8,7 +8,7 @@ import { formatPrice, formatPoints, formatWeekLong } from '@/lib/format';
 import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 
-const SEASON = 2025;
+const PREV_SEASON = 2025;
 
 type MoverRow = {
   id: number; full_name: string; position: string; team_code: string; headshot_url: string | null;
@@ -39,16 +39,16 @@ const POS_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
 };
 
 // ── Queries ────────────────────────────────────────────────────────────────
-async function fetchCurrentWeek(): Promise<number> {
+async function fetchCurrentWeek(season: number): Promise<number> {
   const [row] = await query<{ w: number }>(
-    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [SEASON]
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [season]
   );
   return row?.w ?? 1;
 }
 
-async function fetchLastScoreWeek(): Promise<number> {
+async function fetchLastScoreWeek(season: number): Promise<number> {
   const [row] = await query<{ w: number }>(
-    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [SEASON]
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [season]
   );
   return row?.w ?? 1;
 }
@@ -61,14 +61,14 @@ async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
             (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
      FROM league_members lm
      JOIN leagues l ON l.id = lm.league_id
-     LEFT JOIN fantasy_teams ft ON ft.league_id = l.id AND ft.user_id = ?
+     LEFT JOIN fantasy_teams ft ON ft.league_id = l.id AND ft.user_id = ? AND ft.season_year = l.season_year
      WHERE lm.user_id = ?
      ORDER BY l.created_at DESC`,
     [userId, userId]
   );
 }
 
-async function fetchMovers(lastWeek: number): Promise<MoverRow[]> {
+async function fetchMovers(season: number, lastWeek: number): Promise<MoverRow[]> {
   return query<MoverRow>(
     `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url,
             pms.current_price, pms.base_weekly_price,
@@ -83,11 +83,11 @@ async function fetchMovers(lastWeek: number): Promise<MoverRow[]> {
        AND pms.base_weekly_price > 0
      ORDER BY ABS(pms.current_price - pms.base_weekly_price) DESC
      LIMIT 20`,
-    [SEASON, SEASON, lastWeek]
+    [season, season, lastWeek]
   );
 }
 
-async function fetchMostTraded(): Promise<TradedRow[]> {
+async function fetchMostTraded(season: number): Promise<TradedRow[]> {
   return query<TradedRow>(
     `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url,
             pms.current_price, pms.buy_orders_count, pms.sell_orders_count,
@@ -99,11 +99,11 @@ async function fetchMostTraded(): Promise<TradedRow[]> {
        AND (pms.buy_orders_count + pms.sell_orders_count) > 0
      ORDER BY total_orders DESC
      LIMIT 10`,
-    [SEASON]
+    [season]
   );
 }
 
-async function fetchHighDemand(): Promise<TradedRow[]> {
+async function fetchHighDemand(season: number): Promise<TradedRow[]> {
   return query<TradedRow>(
     `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url,
             pms.current_price, pms.buy_orders_count, pms.sell_orders_count,
@@ -115,11 +115,11 @@ async function fetchHighDemand(): Promise<TradedRow[]> {
        AND pms.net_order_flow > 0
      ORDER BY pms.net_order_flow DESC
      LIMIT 10`,
-    [SEASON]
+    [season]
   );
 }
 
-async function fetchSellPressure(): Promise<TradedRow[]> {
+async function fetchSellPressure(season: number): Promise<TradedRow[]> {
   return query<TradedRow>(
     `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url,
             pms.current_price, pms.buy_orders_count, pms.sell_orders_count,
@@ -131,11 +131,11 @@ async function fetchSellPressure(): Promise<TradedRow[]> {
        AND pms.net_order_flow < 0
      ORDER BY pms.net_order_flow ASC
      LIMIT 10`,
-    [SEASON]
+    [season]
   );
 }
 
-async function fetchRecentTransactions(): Promise<RecentTx[]> {
+async function fetchRecentTransactions(season: number): Promise<RecentTx[]> {
   return query<RecentTx>(
     `SELECT pt.id, pt.transaction_type, pt.week, pt.price, pt.price_before, pt.price_after, pt.created_at,
             ft.team_name, u.name AS user_name,
@@ -147,7 +147,7 @@ async function fetchRecentTransactions(): Promise<RecentTx[]> {
      WHERE pt.season_year = ?
      ORDER BY pt.created_at DESC, pt.id DESC
      LIMIT 12`,
-    [SEASON]
+    [season]
   );
 }
 
@@ -224,24 +224,30 @@ function Empty({ msg, dark }: { msg: string; dark?: boolean }) {
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────
-export default async function MarketPage() {
+export default async function MarketPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ season?: string }>;
+}) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/auth/sign-in');
 
   const userId = session.user.id;
+  const { season: seasonParam } = await searchParams;
+  const SEASON = seasonParam ? parseInt(seasonParam, 10) : PREV_SEASON;
 
   const [currentWeek, lastScoreWeek, userLeagues] = await Promise.all([
-    fetchCurrentWeek(),
-    fetchLastScoreWeek(),
+    fetchCurrentWeek(SEASON),
+    fetchLastScoreWeek(SEASON),
     fetchUserLeagues(userId),
   ]);
 
   const [movers, mostTraded, highDemand, sellPressure, recentTx] = await Promise.all([
-    fetchMovers(lastScoreWeek),
-    fetchMostTraded(),
-    fetchHighDemand(),
-    fetchSellPressure(),
-    fetchRecentTransactions(),
+    fetchMovers(SEASON, lastScoreWeek),
+    fetchMostTraded(SEASON),
+    fetchHighDemand(SEASON),
+    fetchSellPressure(SEASON),
+    fetchRecentTransactions(SEASON),
   ]);
 
   const gainers = movers.filter(m => Number(m.price_delta) >= 0).slice(0, 8);

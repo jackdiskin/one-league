@@ -7,18 +7,18 @@ import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import PlayerCatalog, { type CatalogPlayer } from './_components/PlayerCatalog';
 
-const SEASON = 2025;
+const PREV_SEASON = 2025;
 
-async function fetchCurrentWeek(): Promise<number> {
+async function fetchCurrentWeek(season: number): Promise<number> {
   const [row] = await query<{ w: number }>(
-    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [SEASON]
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [season]
   );
   return row?.w ?? 1;
 }
 
-async function fetchLastScoreWeek(): Promise<number> {
+async function fetchLastScoreWeek(season: number): Promise<number> {
   const [row] = await query<{ w: number }>(
-    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [SEASON]
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [season]
   );
   return row?.w ?? 1;
 }
@@ -31,14 +31,14 @@ async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
             (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
      FROM league_members lm
      JOIN leagues l ON l.id = lm.league_id
-     LEFT JOIN fantasy_teams ft ON ft.league_id = l.id AND ft.user_id = ?
+     LEFT JOIN fantasy_teams ft ON ft.league_id = l.id AND ft.user_id = ? AND ft.season_year = l.season_year
      WHERE lm.user_id = ?
      ORDER BY l.created_at DESC`,
     [userId, userId]
   );
 }
 
-async function fetchPlayers(lastWeek: number): Promise<CatalogPlayer[]> {
+async function fetchPlayers(season: number, lastWeek: number): Promise<CatalogPlayer[]> {
   return query<CatalogPlayer>(
     `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url,
             COALESCE(pms.current_price, 0)      AS current_price,
@@ -62,23 +62,29 @@ async function fetchPlayers(lastWeek: number): Promise<CatalogPlayer[]> {
      ) own ON own.player_id = p.id
      WHERE p.position IN ('QB','RB','WR','TE','K')
      ORDER BY COALESCE(pms.current_price, 0) DESC`,
-    [SEASON, SEASON, lastWeek, SEASON]
+    [season, season, lastWeek, season]
   );
 }
 
-export default async function PlayersPage() {
+export default async function PlayersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ season?: string }>;
+}) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/auth/sign-in');
 
   const userId = session.user.id;
+  const { season: seasonParam } = await searchParams;
+  const SEASON = seasonParam ? parseInt(seasonParam, 10) : PREV_SEASON;
 
   const [currentWeek, lastScoreWeek, userLeagues] = await Promise.all([
-    fetchCurrentWeek(),
-    fetchLastScoreWeek(),
+    fetchCurrentWeek(SEASON),
+    fetchLastScoreWeek(SEASON),
     fetchUserLeagues(userId),
   ]);
 
-  const players = await fetchPlayers(lastScoreWeek);
+  const players = await fetchPlayers(SEASON, lastScoreWeek);
 
   // Quick summary stats
   const totalPlayers  = players.length;

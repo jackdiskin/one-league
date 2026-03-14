@@ -122,6 +122,9 @@ class PipelineConfig:
     pts_xp_made:    float = float(os.getenv("PTS_XP_MADE",     "1"))
     pts_xp_missed:  float = float(os.getenv("PTS_XP_MISSED",   "0"))
     pts_two_pt:     float = float(os.getenv("PTS_TWO_PT",      "2"))
+    # Finalization hook — set both to enable auto-finalize on game completion
+    app_url:        str   = os.getenv("APP_URL",      "")  # e.g. http://localhost:3000
+    admin_secret:   str   = os.getenv("ADMIN_SECRET", "")
 
 
 # ---------------------------------------------------------------------------
@@ -817,6 +820,9 @@ class LiveIngestionPipeline:
         self.writer        = writer
         self.delta_tracker = delta_tracker
         self.on_deltas     = on_deltas
+        # Transition tracking for auto-finalize
+        self._event_states:     Dict[str, str] = {}  # event_id → last known game_state
+        self._finalized_events: Set[str]        = set()  # events already finalized
 
     def extract_active_event_ids(self, scoreboard: Dict[str, Any]) -> List[str]:
         event_ids: List[str] = []
@@ -827,6 +833,27 @@ class LiveIngestionPipeline:
                 event_ids.append(event_id)
         return event_ids
 
+    def _call_finalize(self, season: int, week_num: int) -> None:
+        """Call the app's finalize-games endpoint after a game transitions to 'post'."""
+        app_url = self.config.app_url.rstrip("/")
+        secret  = self.config.admin_secret
+        if not app_url or not secret:
+            print(f"[finalize] Skipping week={week_num} — APP_URL or ADMIN_SECRET not set")
+            return
+        url = f"{app_url}/api/admin/finalize-games"
+        try:
+            resp = self.client.session.post(
+                url,
+                json={"season_year": season, "week_num": week_num},
+                headers={"x-admin-secret": secret},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            finalized = resp.json().get("data", {}).get("finalized", "?")
+            print(f"[finalize] season={season} week={week_num} → {finalized} players written to player_weekly_scores")
+        except Exception as exc:
+            print(f"[finalize] WARN: failed to call finalize-games for week={week_num}: {exc}")
+
     def process_summary(self, summary_json: Dict[str, Any]) -> Dict[str, Any]:
         snapshot_ts  = datetime.now(timezone.utc).replace(tzinfo=None)
         game_row     = SummaryParser.parse_game_row(summary_json, snapshot_ts)
@@ -835,6 +862,24 @@ class LiveIngestionPipeline:
         if self.writer:
             self.writer.upsert_game_state(game_row)
             self.writer.upsert_player_rows(player_rows)
+
+        # Detect in → post transition and trigger finalization (once per event)
+        event_id  = game_row.get("event_id", "")
+        new_state = (game_row.get("game_state") or "").lower()
+        old_state = self._event_states.get(event_id, "")
+        if new_state == "post" and old_state == "in" and event_id not in self._finalized_events:
+            self._finalized_events.add(event_id)
+            season   = game_row.get("season")
+            week_num = game_row.get("week_num")
+            if season and week_num:
+                print(f"[finalize] Game {event_id} transitioned in→post, triggering finalization for week={week_num}")
+                threading.Thread(
+                    target=self._call_finalize,
+                    args=(season, week_num),
+                    daemon=True,
+                ).start()
+        if event_id:
+            self._event_states[event_id] = new_state
 
         if self.delta_tracker and player_rows:
             deltas = self.delta_tracker.compute_and_update(player_rows)

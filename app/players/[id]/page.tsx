@@ -11,6 +11,7 @@ import BuyButton from './_components/BuyButton';
 import BackLink from './_components/BackLink';
 import LivePlayerHeroStats from './_components/LivePlayerHeroStats';
 import WeeklyStatsTable, { type WeekScore, type StatCol } from './_components/WeeklyStatsTable';
+import FinalPlayerHeroStats from './_components/FinalPlayerHeroStats';
 
 const SEASON = 2025;
 const CURRENT_SEASON = 2026;
@@ -71,7 +72,7 @@ async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
             (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
      FROM league_members lm
      JOIN leagues l ON l.id = lm.league_id
-     LEFT JOIN fantasy_teams ft ON ft.league_id = l.id AND ft.user_id = ?
+     LEFT JOIN fantasy_teams ft ON ft.league_id = l.id AND ft.user_id = ? AND ft.season_year = l.season_year
      WHERE lm.user_id = ?
      ORDER BY l.created_at DESC`,
     [userId, userId]
@@ -176,7 +177,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
             pws.interceptions_thrown, pws.rushing_yards, pws.rushing_tds,
             pws.receptions, pws.receiving_yards, pws.receiving_tds,
             pws.field_goals_made, pws.extra_points_made,
-            COALESCE(pwp.expected_points, 0) AS projected_points
+            COALESCE(pws.fg_0_39, 0)            AS fg_0_39,
+            COALESCE(pws.fg_40_49, 0)           AS fg_40_49,
+            COALESCE(pws.fg_50_plus, 0)         AS fg_50_plus,
+            COALESCE(pws.two_pt_conversions, 0) AS two_pt_conversions,
+            COALESCE(pwp.expected_points, 0)    AS projected_points
      FROM player_weekly_scores pws
      LEFT JOIN player_weekly_projections pwp
        ON pwp.player_id = pws.player_id AND pwp.season_year = pws.season_year
@@ -186,10 +191,36 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     [playerId, seasonYear]
   );
 
-  const [weeklyScores, currentSeasonScores] = await Promise.all([
+  // Game state for the player's most recent live event + the max active week
+  // Both are needed to avoid showing LIVE/FINAL badges for old completed seasons.
+  const liveGameStateQuery = player.espn_athlete_id
+    ? query<{ game_state: string; week_num: number }>(
+        `SELECT lgs.game_state, lgs.week_num
+         FROM live_game_states lgs
+         JOIN live_player_stats lps ON lps.event_id = lgs.event_id
+         WHERE lps.player_id = ?
+         ORDER BY lgs.updated_at DESC
+         LIMIT 1`,
+        [player.espn_athlete_id],
+      )
+    : Promise.resolve([]);
+
+  const maxLiveWeekQuery = query<{ max_week: number | null }>(
+    `SELECT MAX(week_num) AS max_week FROM live_game_states WHERE season = ?`,
+    [CURRENT_SEASON],
+  );
+
+  const [weeklyScores, currentSeasonScores, liveGameStateRows, maxLiveWeekRows] = await Promise.all([
     weeklyScoresQuery(SEASON),
     weeklyScoresQuery(CURRENT_SEASON),
+    liveGameStateQuery,
+    maxLiveWeekQuery,
   ]);
+
+  const liveGameState  = liveGameStateRows[0] ?? null;
+  const maxLiveWeek    = maxLiveWeekRows[0]?.max_week ?? null;
+  // Only show live/final section if the player's game is in the current active week
+  const showLiveSection = liveGameState !== null && liveGameState.week_num === maxLiveWeek;
 
   const pos = player.position;
   const posStyle = POS_COLORS[pos] ?? { pill: 'bg-slate-100 text-slate-600', color: '#94a3b8' };
@@ -310,11 +341,27 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
               </div>
             </div>
 
-            {/* Live stats — client island, renders only when player is in a live game */}
-            <LivePlayerHeroStats
-              espnAthleteId={player.espn_athlete_id}
-              position={player.position}
-            />
+            {/* Hero stats — live during game, final badge once game ends.
+                Hidden once a new week's games start (data lives in the weekly table). */}
+            {showLiveSection && (
+              liveGameState!.game_state === 'post'
+                ? (() => {
+                    const finalScore = currentSeasonScores.find(
+                      (s) => s.week === liveGameState!.week_num,
+                    );
+                    return finalScore ? (
+                      <FinalPlayerHeroStats
+                        position={player.position}
+                        statCols={statCols as StatCol[]}
+                        score={finalScore}
+                      />
+                    ) : null;
+                  })()
+                : <LivePlayerHeroStats
+                    espnAthleteId={player.espn_athlete_id}
+                    position={player.position}
+                  />
+            )}
           </div>
 
           {/* ── Price chart + market stats ── */}

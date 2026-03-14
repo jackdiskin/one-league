@@ -9,9 +9,9 @@ import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar
 import LeagueChart, { type TeamWeekScore } from './_components/LeagueChart';
 import SeasonRecapWrapper from './_components/SeasonRecapWrapper';
 
-const SEASON = 2025;
+const PREV_SEASON = 2025;
 
-type SearchParams = Promise<{ leagueId?: string }>;
+type SearchParams = Promise<{ leagueId?: string; season?: string }>;
 
 type LeagueSummary = {
   id: number; name: string; season_year: number;
@@ -57,16 +57,16 @@ function formatTransactionTime(value: string) {
 }
 
 // ── Queries ────────────────────────────────────────────────────────────────
-async function fetchCurrentWeek(): Promise<number> {
+async function fetchCurrentWeek(season: number): Promise<number> {
   const [row] = await query<{ w: number }>(
-    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [SEASON]
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [season]
   );
   return row?.w ?? 1;
 }
 
-async function fetchLastScoreWeek(): Promise<number> {
+async function fetchLastScoreWeek(season: number): Promise<number> {
   const [row] = await query<{ w: number }>(
-    `SELECT MAX(week) AS w FROM fantasy_team_weekly_scores WHERE season_year = ?`, [SEASON]
+    `SELECT MAX(week) AS w FROM fantasy_team_weekly_scores WHERE season_year = ?`, [season]
   );
   return row?.w ?? 1;
 }
@@ -143,7 +143,7 @@ async function fetchLeagueSummary(userId: string, requestedLeagueId?: number | n
   return rows[0] ?? null;
 }
 
-async function fetchStandings(leagueId: number, lastScoreWeek: number): Promise<StandingRow[]> {
+async function fetchStandings(season: number, leagueId: number, lastScoreWeek: number): Promise<StandingRow[]> {
   return query<StandingRow>(
     `SELECT
        RANK() OVER (ORDER BY ft.total_points DESC, COALESCE(rv.roster_value,0) DESC) AS \`rank\`,
@@ -169,11 +169,11 @@ async function fetchStandings(leagueId: number, lastScoreWeek: number): Promise<
      ) tx ON tx.fantasy_team_id = ft.id
      WHERE ft.season_year = ?
      ORDER BY ft.total_points DESC, roster_value DESC`,
-    [leagueId, SEASON, SEASON, lastScoreWeek, SEASON, SEASON]
+    [leagueId, season, season, lastScoreWeek, season, season]
   );
 }
 
-async function fetchTeamWeeklyScores(leagueId: number): Promise<TeamWeekScore[]> {
+async function fetchTeamWeeklyScores(season: number, leagueId: number): Promise<TeamWeekScore[]> {
   return query<TeamWeekScore>(
     `SELECT ft.id AS fantasy_team_id, ft.team_name, u.name AS user_name, ft.user_id,
             ftws.week, ftws.points
@@ -183,11 +183,11 @@ async function fetchTeamWeeklyScores(leagueId: number): Promise<TeamWeekScore[]>
      JOIN league_members lm ON lm.user_id = ft.user_id AND lm.league_id = ?
      WHERE ftws.season_year = ?
      ORDER BY ft.id, ftws.week`,
-    [leagueId, SEASON]
+    [leagueId, season]
   );
 }
 
-async function fetchTransactions(leagueId: number): Promise<TransactionRow[]> {
+async function fetchTransactions(season: number, leagueId: number): Promise<TransactionRow[]> {
   return query<TransactionRow>(
     `SELECT pt.id, pt.transaction_type, pt.week, pt.price, pt.price_before, pt.price_after, pt.created_at,
             ft.team_name, u.name AS user_name, p.full_name, p.position, p.team_code, p.headshot_url
@@ -198,11 +198,11 @@ async function fetchTransactions(leagueId: number): Promise<TransactionRow[]> {
      JOIN league_members lm ON lm.user_id = ft.user_id AND lm.league_id = ?
      WHERE pt.season_year = ?
      ORDER BY pt.created_at DESC, pt.id DESC LIMIT 10`,
-    [leagueId, SEASON]
+    [leagueId, season]
   );
 }
 
-async function fetchWeeklyWinners(leagueId: number): Promise<WeeklyWinnerRow[]> {
+async function fetchWeeklyWinners(season: number, leagueId: number): Promise<WeeklyWinnerRow[]> {
   return query<WeeklyWinnerRow>(
     `SELECT leaders.week, ft.team_name, u.name AS user_name, leaders.points
      FROM (
@@ -217,11 +217,11 @@ async function fetchWeeklyWinners(leagueId: number): Promise<WeeklyWinnerRow[]> 
      JOIN \`user\` u ON u.id = ft.user_id
      WHERE leaders.row_num = 1
      ORDER BY leaders.week DESC LIMIT 6`,
-    [leagueId, SEASON]
+    [leagueId, season]
   );
 }
 
-async function fetchRosterValues(leagueId: number): Promise<ValueRow[]> {
+async function fetchRosterValues(season: number, leagueId: number): Promise<ValueRow[]> {
   return query<ValueRow>(
     `SELECT ft.id AS fantasy_team_id, ft.team_name, u.name AS user_name,
             COALESCE(SUM(pms.current_price), 0) AS roster_value,
@@ -233,7 +233,7 @@ async function fetchRosterValues(leagueId: number): Promise<ValueRow[]> {
      LEFT JOIN player_market_state pms ON pms.player_id = ftr.player_id AND pms.season_year = ?
      WHERE ft.season_year = ?
      GROUP BY ft.id ORDER BY roster_value DESC LIMIT 6`,
-    [leagueId, SEASON, SEASON]
+    [leagueId, season, season]
   );
 }
 
@@ -279,12 +279,13 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
   if (!session) redirect('/auth/sign-in');
 
   const userId = session.user.id;
-  const { leagueId } = await searchParams;
+  const { leagueId, season: seasonParam } = await searchParams;
+  const SEASON = seasonParam ? parseInt(seasonParam, 10) : PREV_SEASON;
   const requestedLeagueId = leagueId ? Number(leagueId) : null;
 
   const [currentWeek, lastScoreWeek, userLeagues, league] = await Promise.all([
-    fetchCurrentWeek(),
-    fetchLastScoreWeek(),
+    fetchCurrentWeek(SEASON),
+    fetchLastScoreWeek(SEASON),
     fetchUserLeagues(userId),
     fetchLeagueSummary(userId, requestedLeagueId),
   ]);
@@ -309,11 +310,11 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
   }
 
   const [standings, weeklyScores, transactions, weeklyWinners, rosterValues] = await Promise.all([
-    fetchStandings(league.id, lastScoreWeek),
-    fetchTeamWeeklyScores(league.id),
-    fetchTransactions(league.id),
-    fetchWeeklyWinners(league.id),
-    fetchRosterValues(league.id),
+    fetchStandings(SEASON, league.id, lastScoreWeek),
+    fetchTeamWeeklyScores(SEASON, league.id),
+    fetchTransactions(SEASON, league.id),
+    fetchWeeklyWinners(SEASON, league.id),
+    fetchRosterValues(SEASON, league.id),
   ]);
 
   const leaderPoints = Number(standings[0]?.total_points ?? 0);

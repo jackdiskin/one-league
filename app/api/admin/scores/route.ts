@@ -18,7 +18,11 @@ interface PlayerScoreInput {
   receiving_tds?: number;
   fumbles_lost?: number;
   field_goals_made?: number;
+  fg_0_39?: number;
+  fg_40_49?: number;
+  fg_50_plus?: number;
   extra_points_made?: number;
+  two_pt_conversions?: number;
   sacks?: number;
   defensive_interceptions?: number;
   defensive_tds?: number;
@@ -51,9 +55,10 @@ export async function POST(request: NextRequest) {
             passing_yards, passing_tds, interceptions_thrown,
             rushing_yards, rushing_tds,
             receptions, receiving_yards, receiving_tds,
-            fumbles_lost, field_goals_made, extra_points_made,
+            fumbles_lost, field_goals_made, fg_0_39, fg_40_49, fg_50_plus,
+            extra_points_made, two_pt_conversions,
             sacks, defensive_interceptions, defensive_tds, points_allowed)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            fantasy_points          = VALUES(fantasy_points),
            passing_yards           = VALUES(passing_yards),
@@ -66,7 +71,11 @@ export async function POST(request: NextRequest) {
            receiving_tds           = VALUES(receiving_tds),
            fumbles_lost            = VALUES(fumbles_lost),
            field_goals_made        = VALUES(field_goals_made),
+           fg_0_39                 = VALUES(fg_0_39),
+           fg_40_49                = VALUES(fg_40_49),
+           fg_50_plus              = VALUES(fg_50_plus),
            extra_points_made       = VALUES(extra_points_made),
+           two_pt_conversions      = VALUES(two_pt_conversions),
            sacks                   = VALUES(sacks),
            defensive_interceptions = VALUES(defensive_interceptions),
            defensive_tds           = VALUES(defensive_tds),
@@ -76,7 +85,9 @@ export async function POST(request: NextRequest) {
           s.passing_yards ?? 0, s.passing_tds ?? 0, s.interceptions_thrown ?? 0,
           s.rushing_yards ?? 0, s.rushing_tds ?? 0,
           s.receptions ?? 0, s.receiving_yards ?? 0, s.receiving_tds ?? 0,
-          s.fumbles_lost ?? 0, s.field_goals_made ?? 0, s.extra_points_made ?? 0,
+          s.fumbles_lost ?? 0, s.field_goals_made ?? 0,
+          s.fg_0_39 ?? 0, s.fg_40_49 ?? 0, s.fg_50_plus ?? 0,
+          s.extra_points_made ?? 0, s.two_pt_conversions ?? 0,
           s.sacks ?? 0, s.defensive_interceptions ?? 0, s.defensive_tds ?? 0, s.points_allowed ?? 0,
         ]
       );

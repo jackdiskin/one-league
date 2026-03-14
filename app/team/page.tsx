@@ -12,22 +12,22 @@ import CapBreakdown  from './_components/CapBreakdown';
 import WeeklyPerformance, { type PerfPlayer } from './_components/WeeklyPerformance';
 import AvailablePlayers, { type AvailablePlayer } from './_components/AvailablePlayers';
 
-const SEASON = 2025;
+const PREV_SEASON = 2025;
 
 function Skeleton({ h = 200 }: { h?: number }) {
   return <div className="rounded-2xl bg-slate-100 animate-pulse" style={{ height: h }} />;
 }
 
-async function fetchCurrentWeek(): Promise<number> {
+async function fetchCurrentWeek(season: number): Promise<number> {
   const [row] = await query<{ w: number }>(
-    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [SEASON]
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [season]
   );
   return row?.w ?? 1;
 }
 
-async function fetchLastScoreWeek(): Promise<number> {
+async function fetchLastScoreWeek(season: number): Promise<number> {
   const [row] = await query<{ w: number }>(
-    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [SEASON]
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [season]
   );
   return row?.w ?? 1;
 }
@@ -66,7 +66,7 @@ async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
   );
 }
 
-async function fetchTeam(userId: string) {
+async function fetchTeam(userId: string, season: number) {
   const [team] = await query<{
     id: number; team_name: string; total_points: number;
     budget_remaining: number; league_name: string; rank: number; league_size: number;
@@ -96,12 +96,12 @@ async function fetchTeam(userId: string) {
      JOIN leagues l ON l.id = ft.league_id
      WHERE ft.user_id = ? AND ft.season_year = ?
      ORDER BY ft.created_at DESC LIMIT 1`,
-    [userId, SEASON]
+    [userId, season]
   );
   return team ?? null;
 }
 
-async function fetchRoster(teamId: number, lastWeek: number): Promise<RosterPlayer[]> {
+async function fetchRoster(season: number, teamId: number, lastWeek: number): Promise<RosterPlayer[]> {
   return query<RosterPlayer>(
     `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url,
             p.espn_athlete_id,
@@ -120,11 +120,11 @@ async function fetchRoster(teamId: number, lastWeek: number): Promise<RosterPlay
      ) tot ON tot.player_id = ftr.player_id
      WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE
      ORDER BY FIELD(p.position,'QB','RB','WR','TE','K'), pms.current_price DESC`,
-    [SEASON, SEASON, lastWeek, SEASON, teamId]
+    [season, season, lastWeek, season, teamId]
   );
 }
 
-async function fetchWeeklyPerf(teamId: number, lastWeek: number): Promise<PerfPlayer[]> {
+async function fetchWeeklyPerf(season: number, teamId: number, lastWeek: number): Promise<PerfPlayer[]> {
   return query<PerfPlayer>(
     `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url,
             pws.fantasy_points   AS last_week_points,
@@ -137,11 +137,11 @@ async function fetchWeeklyPerf(teamId: number, lastWeek: number): Promise<PerfPl
        ON pwp.player_id = ftr.player_id AND pwp.season_year = ? AND pwp.week = ?
           AND pwp.projection_source = 'internal_model'
      WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE`,
-    [SEASON, lastWeek, SEASON, lastWeek, teamId]
+    [season, lastWeek, season, lastWeek, teamId]
   );
 }
 
-async function fetchAvailable(teamId: number, lastWeek: number): Promise<AvailablePlayer[]> {
+async function fetchAvailable(season: number, teamId: number, lastWeek: number): Promise<AvailablePlayer[]> {
   return query<AvailablePlayer>(
     `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url,
             COALESCE(pms.current_price, 0) AS current_price,
@@ -156,21 +156,27 @@ async function fetchAvailable(teamId: number, lastWeek: number): Promise<Availab
      )
      AND p.position IN ('QB','RB','WR','TE','K')
      ORDER BY COALESCE(pms.current_price, 0) DESC`,
-    [SEASON, SEASON, lastWeek, teamId]
+    [season, season, lastWeek, teamId]
   );
 }
 
-export default async function TeamPage() {
+export default async function TeamPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ season?: string }>;
+}) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/auth/sign-in');
 
   const userId = session.user.id;
+  const { season: seasonParam } = await searchParams;
+  const SEASON = seasonParam ? parseInt(seasonParam, 10) : PREV_SEASON;
 
   const [currentWeek, lastScoreWeek, userLeagues, team] = await Promise.all([
-    fetchCurrentWeek(),
-    fetchLastScoreWeek(),
+    fetchCurrentWeek(SEASON),
+    fetchLastScoreWeek(SEASON),
     fetchUserLeagues(userId),
-    fetchTeam(userId),
+    fetchTeam(userId, SEASON),
   ]);
 
 
@@ -194,9 +200,9 @@ export default async function TeamPage() {
   }
 
   const [roster, weeklyPerf, available] = await Promise.all([
-    fetchRoster(team.id, lastScoreWeek),
-    fetchWeeklyPerf(team.id, lastScoreWeek),
-    fetchAvailable(team.id, lastScoreWeek),
+    fetchRoster(SEASON, team.id, lastScoreWeek),
+    fetchWeeklyPerf(SEASON, team.id, lastScoreWeek),
+    fetchAvailable(SEASON, team.id, lastScoreWeek),
   ]);
 
   const rankLabel = team.rank === 1 ? '1st' : team.rank === 2 ? '2nd' : team.rank === 3 ? '3rd' : `${team.rank}th`;

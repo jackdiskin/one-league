@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { formatSeasonStatus } from '@/lib/format';
 
 const PREV_SEASON = 2025;
@@ -14,6 +14,7 @@ interface Props {
 
 export default function SeasonModeSwitcher({ season, currentWeek }: Props) {
   const router   = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(false);
 
   async function handleForwardClick() {
@@ -23,7 +24,7 @@ export default function SeasonModeSwitcher({ season, currentWeek }: Props) {
       const res  = await fetch(`/api/teams/has-team?season=${NEXT_SEASON}`);
       const data = await res.json();
       if (data.hasTeam) {
-        router.push(`/dashboard?season=${NEXT_SEASON}`);
+        router.push(`${pathname}?season=${NEXT_SEASON}`);
       } else {
         router.push('/onboarding/draft');
       }
@@ -33,7 +34,7 @@ export default function SeasonModeSwitcher({ season, currentWeek }: Props) {
   }
 
   function handleBackClick() {
-    router.push(`/dashboard?season=${PREV_SEASON}`);
+    router.push(`${pathname}?season=${PREV_SEASON}`);
   }
 
   const statusText  = formatSeasonStatus(season, currentWeek);
