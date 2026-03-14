@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
-import { formatPoints, formatPrice, formatWeek, formatWeekLong } from '@/lib/format';
+import { formatPoints, formatPrice, formatWeek, formatWeekLong, formatSeasonStatus } from '@/lib/format';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import PlayerCatalog, { type CatalogPlayer } from './_components/PlayerCatalog';
 
@@ -116,7 +116,7 @@ export default async function PlayersPage() {
               borderRadius: 20, background: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 12px',
             }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>Season {SEASON} · {formatWeekLong(currentWeek)}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>{formatSeasonStatus(SEASON, currentWeek)}</span>
             </div>
             <div style={{
               width: 32, height: 32, borderRadius: '50%', background: '#0f172a', color: '#fff',

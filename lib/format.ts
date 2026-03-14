@@ -31,3 +31,19 @@ export function formatWeek(week: number): string {
 export function formatWeekLong(week: number): string {
   return PLAYOFF_WEEKS[week] ?? `Week ${week}`;
 }
+
+const MAX_PLAYOFF_WEEK = Math.max(...Object.keys(PLAYOFF_WEEKS).map(Number));
+
+/**
+ * Returns the season status label shown in the nav header.
+ * After the Super Bowl has been played (currentWeek >= MAX_PLAYOFF_WEEK),
+ * advances the season by one and shows "Pre-Season" until new season data arrives.
+ * e.g. season=2025, week=22 → "Season 2026 · Pre-Season"
+ *      season=2025, week=10 → "Season 2025 · Week 10"
+ */
+export function formatSeasonStatus(season: number, currentWeek: number): string {
+  if (currentWeek >= MAX_PLAYOFF_WEEK) {
+    return `Season ${season + 1} · Pre-Season`;
+  }
+  return `Season ${season} · ${formatWeekLong(currentWeek)}`;
+}

@@ -2,10 +2,11 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
-import { formatPoints, formatPrice, formatWeekLong, formatWeek } from '@/lib/format';
+import { formatPoints, formatPrice, formatWeekLong, formatWeek, formatSeasonStatus } from '@/lib/format';
 import Image from 'next/image';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import LeagueChart, { type TeamWeekScore } from './_components/LeagueChart';
+import SeasonRecapWrapper from './_components/SeasonRecapWrapper';
 
 const SEASON = 2025;
 
@@ -355,7 +356,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
             }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
               <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>
-                Season {SEASON} · {formatWeekLong(currentWeek)}
+                {formatSeasonStatus(SEASON, currentWeek)}
               </span>
             </div>
             <div style={{
@@ -755,6 +756,17 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
 
         </main>
       </div>
+
+      {/* Season recap — auto-shows once any playoff-week data exists (> 18),
+          confirming the full regular season slate has been scored. */}
+      {currentWeek > 18 && (
+        <SeasonRecapWrapper
+          myStanding={myStanding}
+          weeklyScores={weeklyScores}
+          weeklyWinners={weeklyWinners}
+          standings={standings}
+        />
+      )}
     </div>
   );
 }

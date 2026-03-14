@@ -11,7 +11,7 @@ import StandingsCard   from './_components/StandingsCard';
 import DiscoverLeagues from './_components/DiscoverLeagues';
 import MarketPulse     from './_components/MarketPulse';
 import Sidebar, { type SidebarLeague } from './_components/Sidebar';
-import { formatWeekLong } from '@/lib/format';
+import { formatWeekLong, formatSeasonStatus } from '@/lib/format';
 
 const SEASON = 2025;
 
@@ -123,7 +123,7 @@ export default async function DashboardPage() {
             <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-slate-50 ring-1 ring-slate-200 px-3 py-1">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
               <span className="text-xs font-medium text-slate-600">
-                Season {SEASON} · {formatWeekLong(currentWeek)}
+                {formatSeasonStatus(SEASON, currentWeek)}
               </span>
             </div>
             <div className="flex items-center gap-3 ml-auto">

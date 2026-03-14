@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
-import { formatPrice, formatPoints, formatWeekLong } from '@/lib/format';
+import { formatPrice, formatPoints, formatWeekLong, formatSeasonStatus } from '@/lib/format';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import MyTeamSummary from '@/app/dashboard/_components/MyTeamSummary';
 import RosterList,   { type RosterPlayer }   from './_components/RosterList';
@@ -225,7 +225,7 @@ export default async function TeamPage() {
             <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-slate-50 ring-1 ring-slate-200 px-3 py-1">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
               <span className="text-xs font-medium text-slate-600">
-                Season {SEASON} · {formatWeekLong(currentWeek)}
+                {formatSeasonStatus(SEASON, currentWeek)}
               </span>
             </div>
             <div className="flex items-center gap-3 ml-auto">
