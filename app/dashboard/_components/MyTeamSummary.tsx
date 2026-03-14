@@ -1,28 +1,14 @@
-import Image from 'next/image';
 import { query } from '@/lib/mysql';
 import { formatPrice, formatPoints } from '@/lib/format';
+import LiveTeamField, { type FieldPlayer, type FieldSlot } from './LiveTeamField';
 
 interface Props { userId: string; seasonYear: number }
 
-interface Player {
-  full_name: string; position: string; team_code: string;
-  current_price: number; headshot_url: string | null;
-}
-
-const POS_COLOR: Record<string, string> = {
-  QB: '#3b82f6',
-  RB: '#10b981',
-  WR: '#f59e0b',
-  TE: '#a855f7',
-  K:  '#cbd5e1',
-};
-
-// Field dimensions
-const FIELD_H = 580;
+type Player = FieldPlayer;
 
 // Compute (x%, y%) for each slot — always 8 fixed slots; player is null for empty slots
 function getPositions(wrs: Player[], tes: Player[], qbs: Player[], rbs: Player[], ks: Player[]) {
-  const out: Array<{ player: Player | null; pos: string; x: number; y: number }> = [];
+  const out: FieldSlot[] = [];
 
   // ── Receiver line (y = 26%) — always 4 evenly-spaced slots ──────────────
   const flex = [...wrs, ...tes];
@@ -44,190 +30,6 @@ function getPositions(wrs: Player[], tes: Player[], qbs: Player[], rbs: Player[]
   return out;
 }
 
-function PlayerCard({ player, x, y }: { player: Player; x: number; y: number }) {
-  const lastName = player.full_name.split(' ').slice(1).join(' ') || player.full_name;
-  const color = POS_COLOR[player.position] ?? '#94a3b8';
-
-  return (
-    <div style={{
-      position: 'absolute',
-      left: `${x}%`,
-      top: `${y}%`,
-      transform: 'translate(-50%, -50%)',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: 5,
-      cursor: 'pointer',
-      zIndex: 10,
-    }}>
-      {/* Price chip */}
-      <div style={{
-        background: 'rgba(15,23,42,0.75)',
-        backdropFilter: 'blur(8px)',
-        borderRadius: 20,
-        padding: '3px 9px',
-        fontSize: 11,
-        fontWeight: 700,
-        color: '#fff',
-        border: '1px solid rgba(255,255,255,0.2)',
-        whiteSpace: 'nowrap',
-        letterSpacing: '-0.01em',
-      }}>
-        {formatPrice(player.current_price)}
-      </div>
-
-      {/* Avatar */}
-      <div style={{ position: 'relative' }}>
-        {player.headshot_url ? (
-          <Image
-            src={player.headshot_url} alt={player.full_name}
-            width={72} height={72} unoptimized
-            style={{
-              width: 72, height: 72, borderRadius: '50%', objectFit: 'cover',
-              border: '3px solid #fff',
-              boxShadow: '0 4px 18px rgba(0,0,0,0.45)',
-              display: 'block',
-            }}
-          />
-        ) : (
-          <div style={{
-            width: 72, height: 72, borderRadius: '50%',
-            background: '#334155', border: '3px solid #fff',
-            boxShadow: '0 4px 18px rgba(0,0,0,0.45)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 24, fontWeight: 700, color: '#fff',
-          }}>
-            {player.full_name[0]}
-          </div>
-        )}
-        <div style={{
-          position: 'absolute', bottom: 0, right: 0,
-          width: 22, height: 22, borderRadius: '50%',
-          background: color, border: '2.5px solid #fff',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 7, fontWeight: 900, color: '#fff',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
-        }}>
-          {player.position}
-        </div>
-      </div>
-
-      {/* Name card */}
-      <div style={{
-        background: 'rgba(255,255,255,0.97)',
-        borderRadius: 10,
-        padding: '5px 10px',
-        textAlign: 'center',
-        boxShadow: '0 3px 12px rgba(0,0,0,0.25)',
-        minWidth: 66,
-        maxWidth: 94,
-      }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {lastName}
-        </div>
-        <div style={{ fontSize: 10, fontWeight: 600, color: '#64748b', marginTop: 1 }}>
-          {player.team_code}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EmptySlotCard({ pos, x, y }: { pos: string; x: number; y: number }) {
-  const color = POS_COLOR[pos] ?? '#94a3b8';
-  return (
-    <div style={{
-      position: 'absolute',
-      left: `${x}%`,
-      top: `${y}%`,
-      transform: 'translate(-50%, -50%)',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: 5,
-      zIndex: 10,
-      opacity: 0.55,
-    }}>
-      <div style={{
-        background: 'rgba(15,23,42,0.5)',
-        backdropFilter: 'blur(8px)',
-        borderRadius: 20,
-        padding: '3px 9px',
-        fontSize: 10,
-        fontWeight: 700,
-        color: 'rgba(255,255,255,0.6)',
-        border: '1px solid rgba(255,255,255,0.15)',
-        whiteSpace: 'nowrap',
-      }}>
-        Empty
-      </div>
-      <div style={{
-        width: 72, height: 72, borderRadius: '50%',
-        border: '3px dashed rgba(255,255,255,0.35)',
-        background: 'rgba(0,0,0,0.12)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <div style={{
-          width: 22, height: 22, borderRadius: '50%',
-          background: color,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 7, fontWeight: 900, color: '#fff',
-          opacity: 0.7,
-        }}>
-          {pos}
-        </div>
-      </div>
-      <div style={{
-        background: 'rgba(255,255,255,0.12)',
-        borderRadius: 10,
-        padding: '5px 10px',
-        textAlign: 'center',
-        minWidth: 66,
-      }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
-          {pos} Slot
-        </div>
-        <div style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
-          open
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Yard line with optional number labels
-function YardLine({ y, label, highlight = false }: { y: number; label?: string; highlight?: boolean }) {
-  return (
-    <>
-      <div style={{
-        position: 'absolute', left: 36, right: 36, top: `${y}%`,
-        height: highlight ? 2 : 1,
-        background: highlight ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.22)',
-      }} />
-      {label && (
-        <>
-          <div style={{
-            position: 'absolute', left: 8, top: `${y}%`,
-            transform: 'translateY(-50%)',
-            fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.38)',
-            letterSpacing: '0.05em',
-          }}>
-            {label}
-          </div>
-          <div style={{
-            position: 'absolute', right: 8, top: `${y}%`,
-            transform: 'translateY(-50%)',
-            fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.38)',
-            letterSpacing: '0.05em',
-          }}>
-            {label}
-          </div>
-        </>
-      )}
-    </>
-  );
-}
 
 export default async function MyTeamSummary({ userId, seasonYear }: Props) {
   const [team] = await query<{
@@ -273,7 +75,7 @@ export default async function MyTeamSummary({ userId, seasonYear }: Props) {
   }
 
   const starters = await query<Player>(
-    `SELECT p.full_name, p.position, p.team_code, pms.current_price, p.headshot_url
+    `SELECT p.full_name, p.position, p.team_code, pms.current_price, p.headshot_url, p.espn_athlete_id
      FROM fantasy_team_roster ftr
      JOIN players p ON p.id = ftr.player_id
      JOIN player_market_state pms ON pms.player_id = ftr.player_id AND pms.season_year = ?
@@ -332,100 +134,7 @@ export default async function MyTeamSummary({ userId, seasonYear }: Props) {
       </div>
 
       {/* ── Field ── */}
-      <div style={{
-        position: 'relative',
-        height: FIELD_H,
-        overflow: 'hidden',
-        background: `repeating-linear-gradient(180deg, #1a7a32 0px, #1a7a32 48px, #1e8838 48px, #1e8838 96px)`,
-      }}>
-
-        {/* Opponent end zone (top) */}
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, height: '9%',
-          background: 'rgba(0,0,0,0.18)',
-          borderBottom: '2px solid rgba(255,255,255,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 900, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.35em', textTransform: 'uppercase' }}>
-            
-          </div>
-        </div>
-
-        {/* Own end zone (bottom) */}
-        <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0, height: '9%',
-          background: 'rgba(0,0,0,0.18)',
-          borderTop: '2px solid rgba(255,255,255,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 900, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.35em', textTransform: 'uppercase' }}>
-           
-          </div>
-        </div>
-
-        {/* Sidelines */}
-        <div style={{ position: 'absolute', top: '9%', bottom: '9%', left: 36, width: 2, background: 'rgba(255,255,255,0.55)' }} />
-        <div style={{ position: 'absolute', top: '9%', bottom: '9%', right: 36, width: 2, background: 'rgba(255,255,255,0.55)' }} />
-
-        {/* 5-yard tick lines (no labels) */}
-        {[
-          9+(91-9)*0.5/9, 9+(91-9)*1.5/9, 9+(91-9)*2.5/9, 9+(91-9)*3.5/9,
-          9+(91-9)*4.5/9, 9+(91-9)*5.5/9, 9+(91-9)*6.5/9, 9+(91-9)*7.5/9,
-        ].map(pct => (
-          <div key={pct} style={{
-            position: 'absolute', left: 36, right: 36, top: `${pct}%`,
-            height: 1, background: 'rgba(255,255,255,0.10)',
-          }} />
-        ))}
-
-        {/* Hash marks — two columns of short lines inside sidelines */}
-        {Array.from({ length: 18 }, (_, i) => (
-          <div key={i} style={{
-            position: 'absolute', top: `${10 + i * (80/18)}%`,
-            left: 0, right: 0,
-            display: 'flex', justifyContent: 'space-between', padding: '0 100px',
-          }}>
-            <div style={{ width: 14, height: 1, background: 'rgba(255,255,255,0.25)' }} />
-            <div style={{ width: 14, height: 1, background: 'rgba(255,255,255,0.25)' }} />
-          </div>
-        ))}
-
-        {/* Line of scrimmage — blue glow */}
-        <div style={{
-          position: 'absolute', left: 36, right: 36, top: `${losY}%`,
-          height: 2, background: 'rgba(96,165,250,0.7)',
-          boxShadow: '0 0 10px rgba(96,165,250,0.5)',
-        }} />
-        <div style={{
-          position: 'absolute', right: 40, top: `calc(${losY}% - 14px)`,
-          fontSize: 8, fontWeight: 800, color: 'rgba(147,197,253,0.85)',
-          textTransform: 'uppercase', letterSpacing: '0.1em',
-        }}>
-          Line of Scrimmage
-        </div>
-
-        {/* Goal posts — top end zone */}
-        <svg
-          style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 1 }}
-          width="80" height="52" viewBox="0 0 60 52"
-        >
-          {/* Upright post */}
-          <rect x="29" y="2" width="2" height="50" fill="rgba(251,191,36,0.7)" rx="1" />
-          {/* Crossbar */}
-          <rect x="8" y="22" width="44" height="2" fill="rgba(251,191,36,0.7)" rx="1" />
-          {/* Left fork */}
-          <rect x="8" y="2" width="2" height="22" fill="rgba(251,191,36,0.7)" rx="1" />
-          {/* Right fork */}
-          <rect x="50" y="2" width="2" height="22" fill="rgba(251,191,36,0.7)" rx="1" />
-        </svg>
-
-        {/* Players + empty slots */}
-        {positions.map(({ player, pos, x, y }, i) =>
-          player
-            ? <PlayerCard key={`${player.full_name}-${i}`} player={player} x={x} y={y} />
-            : <EmptySlotCard key={`empty-${pos}-${i}`} pos={pos} x={x} y={y} />
-        )}
-      </div>
+      <LiveTeamField positions={positions} losY={losY} />
     </div>
   );
 }

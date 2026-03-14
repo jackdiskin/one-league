@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
-import { formatPoints, formatPrice } from '@/lib/format';
+import { formatPoints, formatPrice, formatWeekLong, formatWeek } from '@/lib/format';
 import Image from 'next/image';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import LeagueChart, { type TeamWeekScore } from './_components/LeagueChart';
@@ -57,7 +57,7 @@ function formatTransactionTime(value: string) {
 // ── Queries ────────────────────────────────────────────────────────────────
 async function fetchCurrentWeek(): Promise<number> {
   const [row] = await query<{ w: number }>(
-    `SELECT MAX(week) AS w FROM player_price_weeks WHERE season_year = ?`, [SEASON]
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [SEASON]
   );
   return row?.w ?? 1;
 }
@@ -355,7 +355,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
             }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
               <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>
-                Season {SEASON} · Week {currentWeek}
+                Season {SEASON} · {formatWeekLong(currentWeek)}
               </span>
             </div>
             <div style={{
@@ -603,7 +603,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
                   {
                     label: 'Best Recent Week', accent: '#7dd3fc', bg: 'rgba(14,165,233,0.10)',
                     title: bestWeek?.team_name ?? '—',
-                    sub: bestWeek ? `Wk ${bestWeek.week} · ${formatPoints(bestWeek.points)} pts` : 'No completed weeks',
+                    sub: bestWeek ? `${formatWeek(bestWeek.week)} · ${formatPoints(bestWeek.points)} pts` : 'No completed weeks',
                   },
                 ].map(item => (
                   <div key={item.label} style={{
@@ -634,7 +634,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
                         fontSize: 9, fontWeight: 700, color: '#94a3b8', background: '#f8fafc',
                         border: '1px solid #e2e8f0', borderRadius: 20, padding: '1px 6px',
                         textTransform: 'uppercase', letterSpacing: '0.08em',
-                      }}>Wk {w.week}</span>
+                      }}>{formatWeek(w.week)}</span>
                       <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{w.team_name}</span>
                     </div>
                     <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{w.user_name}</div>
@@ -744,7 +744,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
                       <span style={{ color: priceDelta >= 0 ? '#10b981' : '#f43f5e' }}>
                         {priceDelta >= 0 ? '▲' : '▼'} {formatPrice(Math.abs(priceDelta))} market
                       </span>
-                      <span>Wk {tx.week}</span>
+                      <span>{formatWeek(tx.week)}</span>
                       <span style={{ marginLeft: 'auto' }}>{formatTransactionTime(tx.created_at)}</span>
                     </div>
                   </div>

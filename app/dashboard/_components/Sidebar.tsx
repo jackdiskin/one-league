@@ -1,5 +1,6 @@
 'use client';
 
+import { formatWeek } from '@/lib/format';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -117,7 +118,7 @@ export default function Sidebar({ user, leagues, currentWeek, season, logoUri }:
               One League
             </div>
             <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500, marginTop: 2 }}>
-              {season} · Wk {currentWeek}
+              {season} · {formatWeek(currentWeek)}
             </div>
           </div>
         </Link>

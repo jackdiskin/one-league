@@ -3,13 +3,16 @@ import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
-import { formatPrice, formatPoints } from '@/lib/format';
+import { formatPrice, formatPoints, formatWeekLong } from '@/lib/format';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import PriceChart, { type PriceWeek } from './_components/PriceChart';
 import BuyButton from './_components/BuyButton';
 import BackLink from './_components/BackLink';
+import LivePlayerHeroStats from './_components/LivePlayerHeroStats';
+import WeeklyStatsTable, { type WeekScore, type StatCol } from './_components/WeeklyStatsTable';
 
 const SEASON = 2025;
+const CURRENT_SEASON = 2026;
 
 const POS_COLORS: Record<string, { pill: string; color: string }> = {
   QB: { pill: 'bg-blue-100 text-blue-700',      color: '#3b82f6' },
@@ -54,7 +57,7 @@ const STAT_COLS: Record<string, { key: string; label: string }[]> = {
 
 async function fetchCurrentWeek() {
   const [r] = await query<{ w: number }>(
-    `SELECT MAX(week) AS w FROM player_price_weeks WHERE season_year = ?`, [SEASON]
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [SEASON]
   );
   return r?.w ?? 1;
 }
@@ -91,10 +94,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   // Player + market state
   const [player] = await query<{
     id: number; full_name: string; position: string; team_code: string;
-    headshot_url: string | null; current_price: number; base_weekly_price: number;
+    headshot_url: string | null; espn_athlete_id: string | null;
+    current_price: number; base_weekly_price: number;
     intraday_high: number; intraday_low: number; net_order_flow: number;
   }>(
-    `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url,
+    `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url, p.espn_athlete_id,
             COALESCE(pms.current_price, 0)       AS current_price,
             COALESCE(pms.base_weekly_price, 0)   AS base_weekly_price,
             COALESCE(pms.intraday_high, 0)       AS intraday_high,
@@ -164,8 +168,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     [playerId, SEASON]
   );
 
-  // Weekly scores + projections
-  const weeklyScores = await query<Record<string, number>>(
+  // Weekly scores + projections (both historical and current season in parallel)
+  const weeklyScoresQuery = (seasonYear: number) => query<WeekScore>(
     `SELECT pws.week,
             pws.fantasy_points, pws.passing_yards, pws.passing_tds,
             pws.interceptions_thrown, pws.rushing_yards, pws.rushing_tds,
@@ -178,8 +182,13 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           AND pwp.week = pws.week AND pwp.projection_source = 'internal_model'
      WHERE pws.player_id = ? AND pws.season_year = ?
      ORDER BY pws.week DESC`,
-    [playerId, SEASON]
+    [playerId, seasonYear]
   );
+
+  const [weeklyScores, currentSeasonScores] = await Promise.all([
+    weeklyScoresQuery(SEASON),
+    weeklyScoresQuery(CURRENT_SEASON),
+  ]);
 
   const pos = player.position;
   const posStyle = POS_COLORS[pos] ?? { pill: 'bg-slate-100 text-slate-600', color: '#94a3b8' };
@@ -211,7 +220,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
             <div className="flex items-center gap-3 ml-auto">
               <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-slate-50 ring-1 ring-slate-200 px-3 py-1">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                <span className="text-xs font-medium text-slate-600">Season {SEASON} · Week {currentWeek}</span>
+                <span className="text-xs font-medium text-slate-600">Season {SEASON} · {formatWeekLong(currentWeek)}</span>
               </div>
               <div className="h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
                 {session.user.name?.[0]?.toUpperCase() ?? '?'}
@@ -302,6 +311,12 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                 )}
               </div>
             </div>
+
+            {/* Live stats — client island, renders only when player is in a live game */}
+            <LivePlayerHeroStats
+              espnAthleteId={player.espn_athlete_id}
+              position={player.position}
+            />
           </div>
 
           {/* ── Price chart + market stats ── */}
@@ -358,71 +373,14 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           </div>
 
           {/* ── Weekly stats table ── */}
-          {weeklyScores.length > 0 && (
-            <div className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm overflow-hidden">
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <h3 style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>Weekly Stats</h3>
-                  <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{SEASON} season · {weeklyScores.length} weeks</p>
-                </div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  Season avg: {formatPoints(seasonPts / (weeklyScores.length || 1))} / wk
-                </div>
-              </div>
-
-              {/* Column headers */}
-              <div style={{
-                display: 'flex', padding: '7px 20px',
-                background: '#f8fafc', borderBottom: '1px solid #f1f5f9',
-                fontSize: 9, fontWeight: 700, color: '#94a3b8',
-                textTransform: 'uppercase', letterSpacing: '0.08em',
-              }}>
-                <div style={{ width: 60 }}>Week</div>
-                <div style={{ width: 80, textAlign: 'right' }}>Pts</div>
-                <div style={{ width: 80, textAlign: 'right' }}>Proj</div>
-                <div style={{ width: 72, textAlign: 'right' }}>Diff</div>
-                {statCols.map(c => (
-                  <div key={c.key} style={{ flex: 1, textAlign: 'right' }}>{c.label}</div>
-                ))}
-              </div>
-
-              {weeklyScores.map((row, i) => {
-                const actual = Number(row.fantasy_points ?? 0);
-                const proj   = Number(row.projected_points ?? 0);
-                const diff   = proj > 0 ? actual - proj : null;
-                return (
-                  <div key={row.week} style={{
-                    display: 'flex', padding: '10px 20px', alignItems: 'center',
-                    borderBottom: i < weeklyScores.length - 1 ? '1px solid #f8fafc' : 'none',
-                    background: i % 2 === 0 ? 'transparent' : '#fafafa',
-                  }}>
-                    <div style={{ width: 60 }}>
-                      <span style={{
-                        fontSize: 11, fontWeight: 700,
-                        background: '#f1f5f9', color: '#475569',
-                        borderRadius: 6, padding: '2px 7px',
-                      }}>
-                        Wk {row.week}
-                      </span>
-                    </div>
-                    <div style={{ width: 80, textAlign: 'right', fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
-                      {formatPoints(actual)}
-                    </div>
-                    <div style={{ width: 80, textAlign: 'right', fontSize: 12, color: '#94a3b8' }}>
-                      {proj > 0 ? formatPoints(proj) : '—'}
-                    </div>
-                    <div style={{ width: 72, textAlign: 'right', fontSize: 12, fontWeight: 700, color: diff != null ? (diff >= 0 ? '#10b981' : '#f43f5e') : '#cbd5e1' }}>
-                      {diff != null ? `${diff >= 0 ? '+' : ''}${formatPoints(diff)}` : '—'}
-                    </div>
-                    {statCols.map(c => (
-                      <div key={c.key} style={{ flex: 1, textAlign: 'right', fontSize: 12, color: '#475569' }}>
-                        {Number(row[c.key] ?? 0) || '—'}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
+          {(weeklyScores.length > 0 || currentSeasonScores.length > 0) && (
+            <WeeklyStatsTable
+              historicalScores={weeklyScores}
+              currentScores={currentSeasonScores}
+              statCols={statCols as StatCol[]}
+              historicalSeason={SEASON}
+              currentSeason={CURRENT_SEASON}
+            />
           )}
 
         </main>

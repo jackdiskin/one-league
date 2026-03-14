@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { query } from '@/lib/mysql';
-import { formatPrice, formatPct } from '@/lib/format';
+import { formatPrice, formatPct, formatWeek } from '@/lib/format';
 
 interface Props { seasonYear: number }
 
@@ -147,7 +147,7 @@ export default async function TopMovers({ seasonYear }: Props) {
         <div className="flex items-center gap-2 mb-4">
           <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">↑</span>
           <h3 className="font-semibold text-slate-900">Top Gainers</h3>
-          <span className="ml-auto text-xs text-slate-400">Wk {maxWeek}</span>
+          <span className="ml-auto text-xs text-slate-400">{formatWeek(maxWeek)}</span>
         </div>
         <div className="space-y-2">
           {gainers.map((m) => <MoverRow key={m.player_id} mover={enrich(m)} up={true} />)}
@@ -159,7 +159,7 @@ export default async function TopMovers({ seasonYear }: Props) {
         <div className="flex items-center gap-2 mb-4">
           <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-rose-600 text-xs font-bold">↓</span>
           <h3 className="font-semibold text-slate-900">Top Losers</h3>
-          <span className="ml-auto text-xs text-slate-400">Wk {maxWeek}</span>
+          <span className="ml-auto text-xs text-slate-400">{formatWeek(maxWeek)}</span>
         </div>
         <div className="space-y-2">
           {losers.map((m) => <MoverRow key={m.player_id} mover={enrich(m)} up={false} />)}

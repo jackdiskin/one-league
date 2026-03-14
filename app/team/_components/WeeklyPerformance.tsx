@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { formatPoints } from '@/lib/format';
+import { formatPoints, formatWeekLong } from '@/lib/format';
 
 export interface PerfPlayer {
   id: number;
@@ -29,7 +29,7 @@ export default function WeeklyPerformance({ players, week }: { players: PerfPlay
       {/* Header */}
       <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>Week {week} Performance</h3>
+          <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>{formatWeekLong(week)} Performance</h3>
           <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{played.length} players scored</p>
         </div>
         {/* Team totals */}

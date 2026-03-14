@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { formatPrice } from '@/lib/format';
+import { formatPrice, formatWeek, formatWeekLong } from '@/lib/format';
 
 export interface PriceWeek {
   week: number;
@@ -144,7 +144,7 @@ export default function PriceChart({ data }: { data: PriceWeek[] }) {
               x={xScale(i)} y={H - PAD.bottom + 13}
               textAnchor="middle" fontSize={7} fill="#cbd5e1" fontWeight={600}
             >
-              Wk {d.week}
+              {formatWeek(d.week)}
             </text>
             <rect
               x={xScale(i) - segW / 2} y={PAD.top}
@@ -190,7 +190,7 @@ export default function PriceChart({ data }: { data: PriceWeek[] }) {
           transform: hoveredPt.x > W * 0.7 ? 'translateX(calc(-100% - 20px))' : undefined,
         }}>
           <div style={{ fontWeight: 800, fontSize: 12 }}>{formatPrice(hoveredData.closing_price)}</div>
-          <div style={{ color: '#64748b', marginTop: 2, fontSize: 10 }}>Week {hoveredData.week}</div>
+          <div style={{ color: '#64748b', marginTop: 2, fontSize: 10 }}>{formatWeekLong(hoveredData.week)}</div>
           {priceDiff !== null && (
             <div style={{ color: priceDiff >= 0 ? '#10b981' : '#f43f5e', fontWeight: 700, marginTop: 2, fontSize: 10 }}>
               {priceDiff >= 0 ? '+' : ''}{formatPrice(priceDiff)}

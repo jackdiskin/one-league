@@ -11,6 +11,7 @@ import StandingsCard   from './_components/StandingsCard';
 import DiscoverLeagues from './_components/DiscoverLeagues';
 import MarketPulse     from './_components/MarketPulse';
 import Sidebar, { type SidebarLeague } from './_components/Sidebar';
+import { formatWeekLong } from '@/lib/format';
 
 const SEASON = 2025;
 
@@ -20,7 +21,7 @@ function Skeleton({ className = '' }: { className?: string }) {
 
 async function fetchCurrentWeek(): Promise<number> {
   const [row] = await query<{ w: number }>(
-    `SELECT MAX(week) AS w FROM player_price_weeks WHERE season_year = ?`, [SEASON]
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [SEASON]
   );
   return row?.w ?? 1;
 }
@@ -122,7 +123,7 @@ export default async function DashboardPage() {
             <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-slate-50 ring-1 ring-slate-200 px-3 py-1">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
               <span className="text-xs font-medium text-slate-600">
-                Season {SEASON} · Week {currentWeek}
+                Season {SEASON} · {formatWeekLong(currentWeek)}
               </span>
             </div>
             <div className="flex items-center gap-3 ml-auto">
@@ -150,7 +151,7 @@ export default async function DashboardPage() {
               </span>
             </h1>
             <p className="text-slate-500 text-sm mt-1">
-              Week {currentWeek} · {SEASON} NFL season
+              {formatWeekLong(currentWeek)} · {SEASON} NFL season
             </p>
           </div>
 

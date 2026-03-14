@@ -2,9 +2,9 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState, useTransition, useMemo, useCallback, memo } from 'react';
+import { useState, useTransition, useMemo, useCallback, memo, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { formatPrice, formatPoints } from '@/lib/format';
+import { formatPrice, formatPoints, formatWeekLong } from '@/lib/format';
 import { BID_ASK_SPREAD, PRICE_IMPACT_RATE } from '@/lib/pricing';
 import { useLiveStats, getLivePoints, type LiveStatDelta } from '@/hooks/useLiveStats';
 
@@ -24,53 +24,144 @@ export interface RosterPlayer {
 }
 
 // ---------------------------------------------------------------------------
-// Live stat chips — Bloomberg-style data pills shown below player name during live games
+// Live stat chips — Bloomberg-style data pills with delta-flash animations
 // ---------------------------------------------------------------------------
-function LiveStatChips({ totals }: { totals: LiveStatDelta }) {
-  const t = totals;
-  type Chip = { value: string; label: string; color: string; bg: string; border: string; flash?: boolean };
-  const chips: Chip[] = [];
+type ChipFlash = { id: number; delta: number; isTd: boolean; isNeg: boolean };
 
-  if (t.passingYards  > 0) chips.push({ value: String(t.passingYards),            label: 'PaYd',  color: '#2563eb', bg: 'rgba(37,99,235,0.08)',    border: 'rgba(37,99,235,0.22)'   });
-  if (t.passingTds    > 0) chips.push({ value: String(t.passingTds),               label: 'PaTD',  color: '#92400e', bg: 'rgba(251,191,36,0.16)',   border: 'rgba(217,119,6,0.38)',  flash: true });
-  if (t.rushingYards  > 0) chips.push({ value: String(t.rushingYards),             label: 'RuYd',  color: '#059669', bg: 'rgba(5,150,105,0.08)',    border: 'rgba(5,150,105,0.22)'   });
-  if (t.rushingTds    > 0) chips.push({ value: String(t.rushingTds),               label: 'RuTD',  color: '#92400e', bg: 'rgba(251,191,36,0.16)',   border: 'rgba(217,119,6,0.38)',  flash: true });
-  if (t.receptions    > 0) chips.push({ value: `${t.receptions} rec · ${t.receivingYards} yd`, label: 'Rec', color: '#7c3aed', bg: 'rgba(124,58,237,0.08)', border: 'rgba(124,58,237,0.22)' });
-  if (t.receivingTds  > 0) chips.push({ value: String(t.receivingTds),             label: 'RecTD', color: '#92400e', bg: 'rgba(251,191,36,0.16)',   border: 'rgba(217,119,6,0.38)',  flash: true });
-  if (t.interceptions > 0) chips.push({ value: String(t.interceptions),            label: 'INT',   color: '#dc2626', bg: 'rgba(220,38,38,0.08)',    border: 'rgba(220,38,38,0.22)'   });
-  if (t.fumblesLost   > 0) chips.push({ value: String(t.fumblesLost),              label: 'FL',    color: '#dc2626', bg: 'rgba(220,38,38,0.08)',    border: 'rgba(220,38,38,0.22)'   });
-  if (t.twoPtConversions > 0) chips.push({ value: String(t.twoPtConversions),      label: '2PT',   color: '#0369a1', bg: 'rgba(3,105,161,0.08)',    border: 'rgba(3,105,161,0.22)'   });
+function LiveStatChips({ totals }: { totals: LiveStatDelta }) {
+  const prevRef = useRef<LiveStatDelta | null>(null);
+  const [flashes, setFlashes] = useState<Record<string, ChipFlash>>({});
+
+  // Runs after every render; only triggers setFlashes when totals actually changed
+  useEffect(() => {
+    const prev = prevRef.current;
+    prevRef.current = { ...totals };
+    if (!prev) return;
+
+    const updates: Array<{ key: string; delta: number; isTd: boolean; isNeg: boolean }> = [];
+    const chk = (key: string, curr: number, p: number, isTd = false, isNeg = false) => {
+      const diff = curr - p;
+      if (diff > 0) updates.push({ key, delta: diff, isTd, isNeg });
+    };
+
+    chk('passing',   totals.passingYards,     prev.passingYards);
+    chk('passingTd', totals.passingTds,       prev.passingTds,       true);
+    chk('rushing',   totals.rushingYards,     prev.rushingYards);
+    chk('rushingTd', totals.rushingTds,       prev.rushingTds,       true);
+    chk('rec',       totals.receivingYards,   prev.receivingYards);
+    chk('recTd',     totals.receivingTds,     prev.receivingTds,     true);
+    chk('int',       totals.interceptions,    prev.interceptions,    false, true);
+    chk('fl',        totals.fumblesLost,      prev.fumblesLost,      false, true);
+    chk('twopt',     totals.twoPtConversions, prev.twoPtConversions, true);
+    const fgCurr = (totals.fg0_39 ?? 0) + (totals.fg40_49 ?? 0) + (totals.fg50Plus ?? 0);
+    const fgPrev = (prev.fg0_39   ?? 0) + (prev.fg40_49   ?? 0) + (prev.fg50Plus   ?? 0);
+    chk('fg', fgCurr, fgPrev, true);
+    chk('xp', totals.xpMade, prev.xpMade);
+
+    if (!updates.length) return;
+    setFlashes(cur => {
+      const next = { ...cur };
+      for (const u of updates) {
+        next[u.key] = { id: (cur[u.key]?.id ?? 0) + 1, delta: u.delta, isTd: u.isTd, isNeg: u.isNeg };
+      }
+      return next;
+    });
+  });
+
+  const t = totals;
+  type ChipDef = {
+    value: string; label: string;
+    color: string; bg: string; border: string;
+    flashKey: string; deltaText: (delta: number) => string;
+    isTd?: boolean; isNeg?: boolean;
+  };
+  const chips: ChipDef[] = [];
+
+  if (t.passingYards    > 0) chips.push({ value: String(t.passingYards),  label: 'Pass Yd', color: '#2563eb', bg: 'rgba(37,99,235,0.08)',   border: 'rgba(37,99,235,0.22)',  flashKey: 'passing',   deltaText: d => `+${d}yd` });
+  if (t.passingTds      > 0) chips.push({ value: String(t.passingTds),    label: 'Pass TD', color: '#92400e', bg: 'rgba(251,191,36,0.16)',  border: 'rgba(217,119,6,0.38)',  flashKey: 'passingTd', deltaText: () => 'TD!',  isTd: true });
+  if (t.rushingYards    > 0) chips.push({ value: String(t.rushingYards),  label: 'Rush Yd', color: '#059669', bg: 'rgba(5,150,105,0.08)',   border: 'rgba(5,150,105,0.22)',  flashKey: 'rushing',   deltaText: d => `+${d}yd` });
+  if (t.rushingTds      > 0) chips.push({ value: String(t.rushingTds),    label: 'Rush TD', color: '#92400e', bg: 'rgba(251,191,36,0.16)',  border: 'rgba(217,119,6,0.38)',  flashKey: 'rushingTd', deltaText: () => 'TD!',  isTd: true });
+  if (t.receptions      > 0) chips.push({ value: `${t.receptions} · ${t.receivingYards}yd`, label: 'Rec', color: '#7c3aed', bg: 'rgba(124,58,237,0.08)', border: 'rgba(124,58,237,0.22)', flashKey: 'rec', deltaText: d => `+${d}yd` });
+  if (t.receivingTds    > 0) chips.push({ value: String(t.receivingTds),  label: 'Rec TD',  color: '#92400e', bg: 'rgba(251,191,36,0.16)',  border: 'rgba(217,119,6,0.38)',  flashKey: 'recTd',     deltaText: () => 'TD!',  isTd: true });
+  if (t.interceptions   > 0) chips.push({ value: String(t.interceptions), label: 'INT',     color: '#dc2626', bg: 'rgba(220,38,38,0.08)',   border: 'rgba(220,38,38,0.22)',  flashKey: 'int',       deltaText: d => `+${d}`, isNeg: true });
+  if (t.fumblesLost     > 0) chips.push({ value: String(t.fumblesLost),   label: 'FL',      color: '#dc2626', bg: 'rgba(220,38,38,0.08)',   border: 'rgba(220,38,38,0.22)',  flashKey: 'fl',        deltaText: d => `+${d}`, isNeg: true });
+  if (t.twoPtConversions > 0) chips.push({ value: String(t.twoPtConversions), label: '2PT', color: '#0369a1', bg: 'rgba(3,105,161,0.08)',  border: 'rgba(3,105,161,0.22)',  flashKey: 'twopt',     deltaText: () => '2PT!', isTd: true });
 
   const fgMade = (t.fg0_39 ?? 0) + (t.fg40_49 ?? 0) + (t.fg50Plus ?? 0);
   const fgAtt  = fgMade + (t.fgMissed ?? 0);
-  if (fgAtt  > 0) chips.push({ value: `${fgMade}/${fgAtt}`,                        label: 'FG',    color: '#b45309', bg: 'rgba(180,83,9,0.08)',     border: 'rgba(180,83,9,0.22)'    });
-  if (t.xpMade > 0) chips.push({ value: String(t.xpMade),                          label: 'XP',    color: '#78350f', bg: 'rgba(120,53,15,0.07)',    border: 'rgba(120,53,15,0.18)'   });
+  if (fgAtt  > 0) chips.push({ value: `${fgMade}/${fgAtt}`, label: 'FG', color: '#b45309', bg: 'rgba(180,83,9,0.08)', border: 'rgba(180,83,9,0.22)', flashKey: 'fg', deltaText: () => 'FG!', isTd: true });
+  if (t.xpMade > 0) chips.push({ value: String(t.xpMade),   label: 'XP', color: '#78350f', bg: 'rgba(120,53,15,0.07)', border: 'rgba(120,53,15,0.18)', flashKey: 'xp', deltaText: () => 'XP!' });
 
-  if (chips.length === 0) return null;
+  if (!chips.length) return null;
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 5 }}>
-      {chips.map((chip, i) => (
-        <span
-          key={i}
-          style={{
-            display: 'inline-flex', alignItems: 'baseline', gap: 3,
-            padding: '2px 6px',
-            borderRadius: 4,
-            border: `1px solid ${chip.border}`,
-            background: chip.bg,
-            color: chip.color,
-            animation: chip.flash ? 'td-flash 0.7s ease-out' : undefined,
-          }}
-        >
-          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
-            {chip.value}
+      {chips.map((chip, i) => {
+        const flash = flashes[chip.flashKey];
+        return (
+          <span
+            key={i}
+            style={{
+              position: 'relative',
+              display: 'inline-flex', alignItems: 'baseline', gap: 3,
+              padding: '2px 6px', borderRadius: 4,
+              border: `1px solid ${chip.border}`,
+              background: chip.bg, color: chip.color,
+            }}
+          >
+            {/* Glow overlay — key forces remount to restart animation on each new flash */}
+            {flash && (
+              <span
+                key={flash.id}
+                aria-hidden
+                style={{
+                  position: 'absolute', inset: -1, borderRadius: 4,
+                  border: `1.5px solid ${chip.color}`,
+                  pointerEvents: 'none',
+                  animation: chip.isTd
+                    ? 'chip-td-surge 0.9s ease-out forwards'
+                    : chip.isNeg
+                      ? 'chip-neg-flash 0.65s ease-out forwards'
+                      : 'chip-yard-flash 0.65s ease-out forwards',
+                }}
+              />
+            )}
+            {/* Delta badge — floats upward and fades */}
+            {flash && (
+              <span
+                key={`d-${flash.id}`}
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  bottom: '100%', left: '50%',
+                  fontSize: chip.isTd ? 9.5 : 8.5,
+                  fontWeight: 900,
+                  letterSpacing: chip.isTd ? '0.03em' : '-0.01em',
+                  color: chip.isTd ? '#f59e0b' : chip.isNeg ? '#ef4444' : chip.color,
+                  whiteSpace: 'nowrap',
+                  pointerEvents: 'none',
+                  zIndex: 20,
+                  fontVariantNumeric: 'tabular-nums',
+                  textShadow: chip.isTd ? '0 1px 8px rgba(251,191,36,0.8)' : 'none',
+                  animation: chip.isTd
+                    ? 'delta-td-rise 1.5s cubic-bezier(0.16,1,0.3,1) forwards'
+                    : chip.isNeg
+                      ? 'delta-neg-rise 1.0s ease-out forwards'
+                      : 'delta-rise 1.1s cubic-bezier(0.16,1,0.3,1) forwards',
+                }}
+              >
+                {chip.deltaText(flash.delta)}
+              </span>
+            )}
+            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', position: 'relative' }}>
+              {chip.value}
+            </span>
+            <span style={{ fontSize: 8.5, fontWeight: 700, opacity: 0.65, letterSpacing: '0.04em', textTransform: 'uppercase', position: 'relative' }}>
+              {chip.label}
+            </span>
           </span>
-          <span style={{ fontSize: 8.5, fontWeight: 700, opacity: 0.65, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            {chip.label}
-          </span>
-        </span>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -257,7 +348,7 @@ function SellModal({
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ background: col.bar, color: '#fff', borderRadius: 20, padding: '1px 6px', fontSize: 9, fontWeight: 800 }}>{player.position}</span>
               <span>{player.team_code}</span>
-              <span>· Week {week}</span>
+              <span>· {formatWeekLong(week)}</span>
             </div>
           </div>
 
@@ -290,7 +381,7 @@ function SellModal({
               {
                 label: 'Acquired at',
                 value: formatPrice(purchasePrice),
-                sub: `Week ${player.acquired_week}`,
+                sub: formatWeekLong(player.acquired_week),
                 valueColor: '#475569',
               },
               {
@@ -486,13 +577,12 @@ const PlayerRow = memo(function PlayerRow({
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0,
               padding: '1px 6px', borderRadius: 20,
-              background: 'linear-gradient(135deg, #0f172a 0%, #064e3b 100%)',
-              fontSize: 8.5, fontWeight: 800, color: '#fff',
+              background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)',
+              fontSize: 8.5, fontWeight: 800, color: '#059669',
               letterSpacing: '0.06em', textTransform: 'uppercase',
-              boxShadow: '0 1px 4px rgba(5,150,105,0.4)',
             }}>
               <span style={{
-                width: 5, height: 5, borderRadius: '50%', background: '#34d399', flexShrink: 0,
+                width: 5, height: 5, borderRadius: '50%', background: '#10b981', flexShrink: 0,
                 animation: 'live-pulse 1.4s ease-in-out infinite',
               }} />
               LIVE
@@ -500,9 +590,6 @@ const PlayerRow = memo(function PlayerRow({
           )}
         </div>
         <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ background: col.bar, color: '#fff', borderRadius: 20, padding: '1px 5px', fontSize: 8.5, fontWeight: 800 }}>
-            {p.position}
-          </span>
           <span>{p.team_code}</span>
           {isBench && <span style={{ fontSize: 9, color: '#cbd5e1', fontWeight: 600 }}>· BENCH</span>}
         </div>
@@ -550,7 +637,7 @@ const PlayerRow = memo(function PlayerRow({
           Sell
         </button>
         <Link
-          href={`/player/${p.id}`}
+          href={`/players/${p.id}`}
           onClick={e => e.stopPropagation()}
           style={{
             width: 26, height: 26, borderRadius: 7, border: '1px solid #f1f5f9',
@@ -843,10 +930,38 @@ export default function RosterList({ roster, teamId, currentWeek, budgetRemainin
           0%, 100% { opacity: 1; transform: scale(1); }
           50%       { opacity: 0.5; transform: scale(0.8); }
         }
-        @keyframes td-flash {
-          0%   { background: rgba(251,191,36,0.45); transform: scale(1.08); }
-          60%  { background: rgba(251,191,36,0.22); transform: scale(1.02); }
-          100% { background: rgba(251,191,36,0.16); transform: scale(1); }
+        /* Chip glow overlays */
+        @keyframes chip-yard-flash {
+          0%   { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        @keyframes chip-neg-flash {
+          0%   { opacity: 1; box-shadow: 0 0 6px rgba(220,38,38,0.45); }
+          100% { opacity: 0; box-shadow: none; }
+        }
+        @keyframes chip-td-surge {
+          0%   { opacity: 1; transform: scale(1.08); box-shadow: 0 0 0 3px rgba(245,158,11,0.45), 0 0 12px rgba(245,158,11,0.3); }
+          50%  { opacity: 0.75; transform: scale(1.03); box-shadow: 0 0 0 5px rgba(245,158,11,0.15); }
+          100% { opacity: 0; transform: scale(1); box-shadow: none; }
+        }
+        /* Delta badges rising upward */
+        @keyframes delta-rise {
+          0%   { opacity: 0; transform: translateX(-50%) translateY(3px); }
+          12%  { opacity: 1; transform: translateX(-50%) translateY(-1px); }
+          70%  { opacity: 0.85; transform: translateX(-50%) translateY(-13px); }
+          100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        }
+        @keyframes delta-td-rise {
+          0%   { opacity: 0; transform: translateX(-50%) translateY(3px) scale(0.7); }
+          14%  { opacity: 1; transform: translateX(-50%) translateY(-3px) scale(1.2); }
+          55%  { opacity: 1; transform: translateX(-50%) translateY(-15px) scale(1.05); }
+          100% { opacity: 0; transform: translateX(-50%) translateY(-24px) scale(0.9); }
+        }
+        @keyframes delta-neg-rise {
+          0%   { opacity: 0; transform: translateX(-50%) translateY(3px); }
+          12%  { opacity: 1; transform: translateX(-50%) translateY(-1px); }
+          70%  { opacity: 0.7; transform: translateX(-50%) translateY(-11px); }
+          100% { opacity: 0; transform: translateX(-50%) translateY(-17px); }
         }
       `}</style>
 

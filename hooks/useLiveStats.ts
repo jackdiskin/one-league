@@ -203,7 +203,7 @@ export function getLiveStatLine(
   if (t.passingTds)     parts.push(`${t.passingTds} PaTD`);
   if (t.rushingYards)   parts.push(`${t.rushingYards} RuYd`);
   if (t.rushingTds)     parts.push(`${t.rushingTds} RuTD`);
-  if (t.receptions)     parts.push(`${t.receptions} Rec, ${t.receivingYards} Yds`);
+  if (t.receptions)     parts.push(`${t.receptions}/${t.receivingYards} Rec`);
   if (t.receivingTds)   parts.push(`${t.receivingTds} RecTD`);
   if (t.interceptions)  parts.push(`${t.interceptions} INT`);
   if (t.fumblesLost)    parts.push(`${t.fumblesLost} FL`);

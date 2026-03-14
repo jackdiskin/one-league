@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { formatPoints } from '@/lib/format';
+import { formatPoints, formatWeekLong } from '@/lib/format';
 
 export type TeamWeekScore = {
   fantasy_team_id: number;
@@ -251,7 +251,7 @@ export default function LeagueChart({
           pointerEvents: 'none', zIndex: 20, minWidth: 150,
         }}>
           <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
-            Week {hoveredWeek}
+            {formatWeekLong(hoveredWeek)}
           </div>
           {tooltipData.map(({ team, pts, color }, rank) => (
             <div key={team.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>

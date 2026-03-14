@@ -14,3 +14,20 @@ export function formatPct(pct: number): string {
 export function formatPoints(pts: number): string {
   return Number(pts).toFixed(1);
 }
+
+const PLAYOFF_WEEKS: Record<number, string> = {
+  19: 'Wildcard',
+  20: 'Divisional',
+  21: 'Conference',
+  22: 'Super Bowl',
+};
+
+/** Returns "Wk 5" for regular season weeks, or "Wildcard" / "Divisional" / etc. for playoffs. */
+export function formatWeek(week: number): string {
+  return PLAYOFF_WEEKS[week] ?? `Wk ${week}`;
+}
+
+/** Same as formatWeek but with the full "Week" prefix for regular season, e.g. "Week 5" or "Wildcard". */
+export function formatWeekLong(week: number): string {
+  return PLAYOFF_WEEKS[week] ?? `Week ${week}`;
+}

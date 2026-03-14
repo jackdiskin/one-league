@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
-import { formatPoints, formatPrice } from '@/lib/format';
+import { formatPoints, formatPrice, formatWeek, formatWeekLong } from '@/lib/format';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import PlayerCatalog, { type CatalogPlayer } from './_components/PlayerCatalog';
 
@@ -10,7 +10,7 @@ const SEASON = 2025;
 
 async function fetchCurrentWeek(): Promise<number> {
   const [row] = await query<{ w: number }>(
-    `SELECT MAX(week) AS w FROM player_price_weeks WHERE season_year = ?`, [SEASON]
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [SEASON]
   );
   return row?.w ?? 1;
 }
@@ -116,7 +116,7 @@ export default async function PlayersPage() {
               borderRadius: 20, background: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 12px',
             }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>Season {SEASON} · Week {currentWeek}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>Season {SEASON} · {formatWeekLong(currentWeek)}</span>
             </div>
             <div style={{
               width: 32, height: 32, borderRadius: '50%', background: '#0f172a', color: '#fff',
@@ -152,7 +152,7 @@ export default async function PlayersPage() {
               { label: 'Total Players',  value: totalPlayers.toLocaleString(),             sub: 'in catalog' },
               { label: 'Avg Price',      value: formatPrice(avgPrice),                     sub: 'across all positions' },
               { label: 'Most Owned',     value: mostOwned?.full_name ?? '—',               sub: mostOwned ? `${mostOwned.owner_count} team${mostOwned.owner_count !== 1 ? 's' : ''}` : 'no data' },
-              { label: 'Scoring Week',   value: `Week ${lastScoreWeek}`,                   sub: 'latest results', accent: true },
+              { label: 'Scoring Week',   value: formatWeekLong(lastScoreWeek),                   sub: 'latest results', accent: true },
             ].map(tile => (
               <div key={tile.label} style={{
                 borderRadius: 16, background: '#fff', border: '1px solid #e2e8f0',
@@ -160,7 +160,7 @@ export default async function PlayersPage() {
               }}>
                 <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{tile.label}</p>
                 <p style={{
-                  fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1,
+                  fontSize: tile.value.length > 8 ? 14 : 18, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1,
                   color: (tile as any).accent ? '#059669' : '#0f172a',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
