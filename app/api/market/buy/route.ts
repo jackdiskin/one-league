@@ -18,20 +18,22 @@ export async function POST(request: NextRequest) {
   }
 
   // Verify the user owns this fantasy team
-  const [team] = await query<{ id: number; budget_remaining: number; league_id: number }>(
-    `SELECT id, budget_remaining, league_id FROM fantasy_teams WHERE id = ? AND user_id = ?`,
+  const [team] = await query<{ id: number; budget_remaining: number; league_id: number; season_year: number }>(
+    `SELECT id, budget_remaining, league_id, season_year FROM fantasy_teams WHERE id = ? AND user_id = ?`,
     [fantasy_team_id, userId]
   );
   if (!team) return NextResponse.json({ error: 'Fantasy team not found' }, { status: 404 });
 
-  // Get current market state
-  const [marketState] = await query<{ current_price: number; season_year: number }>(
-    `SELECT current_price, season_year FROM player_market_state WHERE player_id = ?`,
-    [player_id]
+  const season_year = team.season_year;
+
+  // Get current market state scoped to this team's season
+  const [marketState] = await query<{ current_price: number }>(
+    `SELECT current_price FROM player_market_state WHERE player_id = ? AND season_year = ?`,
+    [player_id, season_year]
   );
   if (!marketState) return NextResponse.json({ error: 'Player has no active market state' }, { status: 404 });
 
-  const { current_price: executionPrice, season_year } = marketState;
+  const { current_price: executionPrice } = marketState;
 
   if (team.budget_remaining < executionPrice) {
     return NextResponse.json({ error: 'Insufficient budget' }, { status: 400 });

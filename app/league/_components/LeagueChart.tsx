@@ -63,10 +63,11 @@ export default function LeagueChart({
 
   const series = useMemo(() => teams.map(team => {
     let cum = 0;
-    return allWeeks.map(w => {
+    const pts = allWeeks.map(w => {
       cum += Number(team.weeklyPts.get(w) ?? 0);
       return { week: w, pts: cum };
     });
+    return [{ week: 0, pts: 0 }, ...pts];
   }), [teams, allWeeks]);
 
   // Determine medal positions: rank teams by their final cumulative total
@@ -87,14 +88,14 @@ export default function LeagueChart({
   const maxPts = Math.max(...allPts, 1);
 
   const xScale = (w: number) =>
-    PAD.left + ((w - 1) / Math.max(weeks - 1, 1)) * (W - PAD.left - PAD.right);
+    PAD.left + (w / Math.max(weeks, 1)) * (W - PAD.left - PAD.right);
   const yScale = (p: number) =>
     PAD.top + (1 - p / maxPts) * (H - PAD.top - PAD.bottom);
 
-  const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(maxPts * f / 100) * 100);
+  const yTicks = [...new Set([0, 0.25, 0.5, 0.75, 1].map(f => Math.round(maxPts * f / 100) * 100))];
 
   const tooltipData = hoveredWeek !== null
-    ? teams.map((t, i) => ({ team: t, pts: series[i][hoveredWeek - 1]?.pts ?? 0, color: PALETTE[i % PALETTE.length] }))
+    ? teams.map((t, i) => ({ team: t, pts: series[i][hoveredWeek]?.pts ?? 0, color: PALETTE[i % PALETTE.length] }))
         .sort((a, b) => b.pts - a.pts)
     : null;
 
@@ -106,8 +107,8 @@ export default function LeagueChart({
         onMouseLeave={() => { setHoveredWeek(null); setHoveredTeam(null); }}
       >
         {/* Y grid lines */}
-        {yTicks.map(tick => (
-          <g key={tick}>
+        {yTicks.map((tick, i) => (
+          <g key={`ytick-${i}`}>
             <line
               x1={PAD.left} y1={yScale(tick)} x2={W - PAD.right} y2={yScale(tick)}
               stroke="rgba(255,255,255,0.08)" strokeWidth="1"
@@ -190,9 +191,9 @@ export default function LeagueChart({
                 </>
               )}
               {/* Hover dots */}
-              {hoveredWeek !== null && svgPts[hoveredWeek - 1] && (
+              {hoveredWeek !== null && svgPts[hoveredWeek] && (
                 <circle
-                  cx={svgPts[hoveredWeek - 1].x} cy={svgPts[hoveredWeek - 1].y}
+                  cx={svgPts[hoveredWeek].x} cy={svgPts[hoveredWeek].y}
                   r={4} fill={color} stroke="rgba(0,0,0,0.4)" strokeWidth="1.5"
                   fillOpacity={isDimmed ? 0.15 : 1}
                 />

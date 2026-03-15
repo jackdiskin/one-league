@@ -23,6 +23,7 @@ Usage (from repo root):
 from __future__ import annotations
 
 import argparse
+import importlib.machinery
 import importlib.util
 import math
 import os
@@ -47,9 +48,11 @@ _PIPELINE_PATH = Path(__file__).parent / "espn_live_pipeline-5.py"
 if not _PIPELINE_PATH.exists():
     sys.exit(f"ERROR: pipeline not found at {_PIPELINE_PATH}")
 
-_spec = importlib.util.spec_from_file_location("pipeline", _PIPELINE_PATH)
-_pl   = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_pl)                               # type: ignore[union-attr]
+_loader = importlib.machinery.SourceFileLoader("pipeline", str(_PIPELINE_PATH))
+_spec   = importlib.util.spec_from_file_location("pipeline", _PIPELINE_PATH, loader=_loader)
+_pl     = importlib.util.module_from_spec(_spec)
+sys.modules["pipeline"] = _pl   # required so @dataclass can resolve cls.__module__
+_loader.exec_module(_pl)
 
 PipelineConfig      = _pl.PipelineConfig
 MySQLWriter         = _pl.MySQLWriter

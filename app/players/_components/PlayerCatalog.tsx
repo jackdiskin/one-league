@@ -19,6 +19,11 @@ export interface CatalogPlayer {
   owner_count: number;
 }
 
+interface Props {
+  players: CatalogPlayer[];
+  season?: number;
+}
+
 const POS_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
   QB: { bg: '#eff6ff', text: '#3b82f6', bar: '#3b82f6' },
   RB: { bg: '#f0fdf4', text: '#10b981', bar: '#10b981' },
@@ -31,7 +36,8 @@ const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K'];
 
 type SortKey = 'current_price' | 'last_week_points' | 'season_points' | 'owner_count' | 'price_delta';
 
-export default function PlayerCatalog({ players }: { players: CatalogPlayer[] }) {
+export default function PlayerCatalog({ players, season }: Props) {
+  const seasonSuffix = season ? `?season=${season}` : '';
   const [pos, setPos]           = useState('ALL');
   const [search, setSearch]     = useState('');
   const [sortKey, setSortKey]   = useState<SortKey>('current_price');
@@ -184,7 +190,7 @@ export default function PlayerCatalog({ players }: { players: CatalogPlayer[] })
         return (
           <Link
             key={p.id}
-            href={`/players/${p.id}`}
+            href={`/players/${p.id}${seasonSuffix}`}
             style={{ textDecoration: 'none', display: 'block' }}
           >
             <div style={{

@@ -8,6 +8,8 @@ import Image from 'next/image';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import LeagueChart, { type TeamWeekScore } from './_components/LeagueChart';
 import SeasonRecapWrapper from './_components/SeasonRecapWrapper';
+import WeeklyRecapWrapper from './_components/WeeklyRecapWrapper';
+import { computeWeeklyBadges } from '@/lib/weeklyRecapBadges';
 
 const PREV_SEASON = 2025;
 
@@ -237,6 +239,136 @@ async function fetchRosterValues(season: number, leagueId: number): Promise<Valu
   );
 }
 
+type RecapFlagRow = { league_id: number; season_year: number; week: number; is_active: boolean };
+
+async function fetchActiveRecapFlag(season: number, leagueId: number): Promise<RecapFlagRow | null> {
+  const rows = await query<RecapFlagRow>(
+    `SELECT league_id, season_year, week, is_active
+     FROM weekly_recap_flags
+     WHERE league_id = ? AND season_year = ? AND is_active = TRUE
+     ORDER BY week DESC LIMIT 1`,
+    [leagueId, season]
+  );
+  return rows[0] ?? null;
+}
+
+// Previous week's rank — cumulative points through (week-1) to compute rank before this week's results
+async function fetchPreviousRank(season: number, leagueId: number, week: number, fantasyTeamId: number): Promise<number> {
+  if (week <= 1) return 0;
+  const rows = await query<{ prev_rank: number }>(
+    `SELECT prev_rank FROM (
+       SELECT ft.id AS fantasy_team_id,
+              RANK() OVER (ORDER BY COALESCE(SUM(ftws.points), 0) DESC) AS prev_rank
+       FROM fantasy_teams ft
+       JOIN league_members lm ON lm.user_id = ft.user_id AND lm.league_id = ?
+       LEFT JOIN fantasy_team_weekly_scores ftws
+         ON ftws.fantasy_team_id = ft.id AND ftws.season_year = ? AND ftws.week < ?
+       WHERE ft.season_year = ?
+       GROUP BY ft.id
+     ) ranked
+     WHERE fantasy_team_id = ?`,
+    [leagueId, season, week, season, fantasyTeamId]
+  );
+  return rows[0]?.prev_rank ?? 0;
+}
+
+// Consecutive weekly wins for a team ending at the given week
+async function fetchConsecutiveWins(season: number, leagueId: number, week: number, fantasyTeamId: number): Promise<number> {
+  // Get weekly winners for the last 8 weeks descending
+  const rows = await query<{ week: number; winner_team_id: number }>(
+    `SELECT leaders.week, leaders.fantasy_team_id AS winner_team_id
+     FROM (
+       SELECT ftws.week, ftws.fantasy_team_id,
+              ROW_NUMBER() OVER (PARTITION BY ftws.week ORDER BY ftws.points DESC) AS rn
+       FROM fantasy_team_weekly_scores ftws
+       JOIN fantasy_teams ft ON ft.id = ftws.fantasy_team_id
+       JOIN league_members lm ON lm.user_id = ft.user_id AND lm.league_id = ?
+       WHERE ftws.season_year = ? AND ftws.week <= ?
+     ) leaders
+     WHERE leaders.rn = 1
+     ORDER BY leaders.week DESC LIMIT 8`,
+    [leagueId, season, week]
+  );
+
+  let streak = 0;
+  for (const row of rows) {
+    if (row.winner_team_id === fantasyTeamId) streak++;
+    else break;
+  }
+  return streak;
+}
+
+// Weekly winner for a specific week
+async function fetchWeekWinner(season: number, leagueId: number, week: number): Promise<{ fantasy_team_id: number; points: number } | null> {
+  const rows = await query<{ fantasy_team_id: number; points: number }>(
+    `SELECT ftws.fantasy_team_id, ftws.points
+     FROM fantasy_team_weekly_scores ftws
+     JOIN fantasy_teams ft ON ft.id = ftws.fantasy_team_id
+     JOIN league_members lm ON lm.user_id = ft.user_id AND lm.league_id = ?
+     WHERE ftws.season_year = ? AND ftws.week = ?
+     ORDER BY ftws.points DESC LIMIT 1`,
+    [leagueId, season, week]
+  );
+  return rows[0] ?? null;
+}
+
+// My points for a specific week
+async function fetchMyWeekPoints(season: number, week: number, fantasyTeamId: number): Promise<number> {
+  const rows = await query<{ points: number }>(
+    `SELECT points FROM fantasy_team_weekly_scores
+     WHERE fantasy_team_id = ? AND season_year = ? AND week = ?`,
+    [fantasyTeamId, season, week]
+  );
+  return Number(rows[0]?.points ?? 0);
+}
+
+// League average points for a specific week
+async function fetchLeagueAvgForWeek(season: number, leagueId: number, week: number): Promise<number> {
+  const rows = await query<{ avg_pts: number }>(
+    `SELECT AVG(ftws.points) AS avg_pts
+     FROM fantasy_team_weekly_scores ftws
+     JOIN fantasy_teams ft ON ft.id = ftws.fantasy_team_id
+     JOIN league_members lm ON lm.user_id = ft.user_id AND lm.league_id = ?
+     WHERE ftws.season_year = ? AND ftws.week = ?`,
+    [leagueId, season, week]
+  );
+  return Number(rows[0]?.avg_pts ?? 0);
+}
+
+// Highest roster value team id
+async function fetchHighestValueTeamId(season: number, leagueId: number): Promise<number | null> {
+  const rows = await query<{ fantasy_team_id: number }>(
+    `SELECT ft.id AS fantasy_team_id
+     FROM fantasy_teams ft
+     JOIN league_members lm ON lm.user_id = ft.user_id AND lm.league_id = ?
+     LEFT JOIN fantasy_team_roster ftr ON ftr.fantasy_team_id = ft.id AND ftr.is_active = TRUE
+     LEFT JOIN player_market_state pms ON pms.player_id = ftr.player_id AND pms.season_year = ?
+     WHERE ft.season_year = ?
+     GROUP BY ft.id
+     ORDER BY COALESCE(SUM(pms.current_price), 0) DESC LIMIT 1`,
+    [leagueId, season, season]
+  );
+  return rows[0]?.fantasy_team_id ?? null;
+}
+
+// My projected points for a specific week
+async function fetchMyProjectedPoints(season: number, week: number, fantasyTeamId: number): Promise<number | null> {
+  const rows = await query<{ projected: number }>(
+    `SELECT SUM(pwp.expected_points) AS projected
+     FROM player_weekly_projections pwp
+     JOIN fantasy_team_roster ftr ON ftr.player_id = pwp.player_id
+     WHERE ftr.fantasy_team_id = ?
+       AND pwp.season_year = ?
+       AND pwp.week = ?
+       AND ftr.roster_slot != 'BENCH'
+       AND ftr.acquired_week <= ?
+       AND (ftr.is_active = TRUE OR ftr.sold_week > ?)`,
+    [fantasyTeamId, season, week, week, week]
+  );
+  const val = Number(rows[0]?.projected ?? 0);
+  return val > 0 ? val : null;
+}
+
 // ── Sub-components ─────────────────────────────────────────────────────────
 function SectionCard({ title, sub, badge, children }: {
   title: string; sub?: string; badge?: string; children: React.ReactNode;
@@ -309,16 +441,43 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
     );
   }
 
-  const [standings, weeklyScores, transactions, weeklyWinners, rosterValues] = await Promise.all([
+  const [standings, weeklyScores, transactions, weeklyWinners, rosterValues, recapFlag] = await Promise.all([
     fetchStandings(SEASON, league.id, lastScoreWeek),
     fetchTeamWeeklyScores(SEASON, league.id),
     fetchTransactions(SEASON, league.id),
     fetchWeeklyWinners(SEASON, league.id),
     fetchRosterValues(SEASON, league.id),
+    fetchActiveRecapFlag(SEASON, league.id),
   ]);
 
   const leaderPoints = Number(standings[0]?.total_points ?? 0);
   const myStanding   = standings.find(r => r.user_id === userId) ?? null;
+
+  // ── Weekly recap data (only fetched when a recap flag is active) ──────────
+  let weeklyRecapData: {
+    myPoints: number; avgPoints: number; previousRank: number;
+    weekWinner: { fantasy_team_id: number; points: number } | null;
+    highestValueTeamId: number | null; consecutiveWins: number;
+    projectedPoints: number | null;
+  } | null = null;
+
+  if (recapFlag && myStanding) {
+    const recapWeek = recapFlag.week;
+    const [myPts, avgPts, prevRank, weekWinner, highValTeamId, consWins, projPts] = await Promise.all([
+      fetchMyWeekPoints(SEASON, recapWeek, myStanding.fantasy_team_id),
+      fetchLeagueAvgForWeek(SEASON, league.id, recapWeek),
+      fetchPreviousRank(SEASON, league.id, recapWeek, myStanding.fantasy_team_id),
+      fetchWeekWinner(SEASON, league.id, recapWeek),
+      fetchHighestValueTeamId(SEASON, league.id),
+      fetchConsecutiveWins(SEASON, league.id, recapWeek, myStanding.fantasy_team_id),
+      fetchMyProjectedPoints(SEASON, recapWeek, myStanding.fantasy_team_id),
+    ]);
+    weeklyRecapData = {
+      myPoints: myPts, avgPoints: avgPts, previousRank: prevRank,
+      weekWinner, highestValueTeamId: highValTeamId,
+      consecutiveWins: consWins, projectedPoints: projPts,
+    };
+  }
   const secondPlace  = standings[1] ?? null;
   const avgPoints    = standings.length
     ? standings.reduce((s, r) => s + Number(r.total_points), 0) / standings.length : 0;
@@ -760,6 +919,53 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
           standings={standings}
         />
       )}
+
+      {/* Weekly recap — shown when admin triggers it after a game week ends.
+          Lasts until dismissed per-session or until admin deactivates (next week's kickoff). */}
+      {recapFlag && myStanding && weeklyRecapData && (() => {
+        const badges = computeWeeklyBadges({
+          userId,
+          myTeamId: myStanding.fantasy_team_id,
+          myPoints: weeklyRecapData.myPoints,
+          avgPoints: weeklyRecapData.avgPoints,
+          currentRank: myStanding.rank,
+          previousRank: weeklyRecapData.previousRank,
+          rosterValue: myStanding.roster_value,
+          weeklyWinner: weeklyRecapData.weekWinner,
+          highestValueTeamId: weeklyRecapData.highestValueTeamId,
+          consecutiveWins: weeklyRecapData.consecutiveWins,
+          projectedPoints: weeklyRecapData.projectedPoints,
+          allStandings: standings.map(s => ({ fantasy_team_id: s.fantasy_team_id })),
+        });
+
+        return (
+          <WeeklyRecapWrapper
+            dismissKey={`weekly-recap-${league.id}-${SEASON}-${recapFlag.week}`}
+            week={recapFlag.week}
+            season={SEASON}
+            myTeamName={myStanding.team_name}
+            myPoints={weeklyRecapData.myPoints}
+            avgPoints={weeklyRecapData.avgPoints}
+            currentRank={myStanding.rank}
+            previousRank={weeklyRecapData.previousRank}
+            totalTeams={standings.length}
+            badges={badges}
+            weeklyLeader={{
+              team_name: weeklyRecapData.weekWinner
+                ? (standings.find(s => s.fantasy_team_id === weeklyRecapData!.weekWinner!.fantasy_team_id)?.team_name ?? '')
+                : '',
+              points: weeklyRecapData.weekWinner?.points ?? 0,
+            }}
+            myStanding={{
+              rank: myStanding.rank,
+              total_points: myStanding.total_points,
+              roster_value: myStanding.roster_value,
+              trade_count: myStanding.trade_count,
+              team_name: myStanding.team_name,
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }

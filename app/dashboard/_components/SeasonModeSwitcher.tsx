@@ -91,8 +91,8 @@ export default function SeasonModeSwitcher({ season, currentWeek }: Props) {
         </span>
       </div>
 
-      {/* Forward button — only shown on 2025 post-season */}
-      {isPostSeason && !isNextSeason && (
+      {/* Forward button — shown whenever viewing the previous season */}
+      {!isNextSeason && (
         <>
           <div style={{ width: 1, height: 18, background: '#e2e8f0', flexShrink: 0 }} />
           <button

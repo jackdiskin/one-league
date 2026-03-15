@@ -13,7 +13,7 @@ import LivePlayerHeroStats from './_components/LivePlayerHeroStats';
 import WeeklyStatsTable, { type WeekScore, type StatCol } from './_components/WeeklyStatsTable';
 import FinalPlayerHeroStats from './_components/FinalPlayerHeroStats';
 
-const SEASON = 2025;
+const PREV_SEASON = 2025;
 const CURRENT_SEASON = 2026;
 
 const POS_COLORS: Record<string, { pill: string; color: string }> = {
@@ -57,9 +57,9 @@ const STAT_COLS: Record<string, { key: string; label: string }[]> = {
   ],
 };
 
-async function fetchCurrentWeek() {
+async function fetchCurrentWeek(season: number) {
   const [r] = await query<{ w: number }>(
-    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [SEASON]
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [season]
   );
   return r?.w ?? 1;
 }
@@ -79,7 +79,13 @@ async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
   );
 }
 
-export default async function PlayerPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PlayerPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ season?: string }>;
+}) {
   const { id } = await params;
   const playerId = parseInt(id, 10);
   if (isNaN(playerId)) notFound();
@@ -88,8 +94,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   if (!session) redirect('/auth/sign-in');
   const userId = session.user.id;
 
+  const { season: seasonParam } = await searchParams;
+  const SEASON = seasonParam ? parseInt(seasonParam, 10) : PREV_SEASON;
+
   const [currentWeek, userLeagues] = await Promise.all([
-    fetchCurrentWeek(),
+    fetchCurrentWeek(SEASON),
     fetchUserLeagues(userId),
   ]);
 
@@ -212,7 +221,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
   const [weeklyScores, currentSeasonScores, liveGameStateRows, maxLiveWeekRows] = await Promise.all([
     weeklyScoresQuery(SEASON),
-    weeklyScoresQuery(CURRENT_SEASON),
+    SEASON !== CURRENT_SEASON ? weeklyScoresQuery(CURRENT_SEASON) : Promise.resolve([]),
     liveGameStateQuery,
     maxLiveWeekQuery,
   ]);
@@ -240,7 +249,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
       <Sidebar
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-        leagues={userLeagues} currentWeek={currentWeek} season={SEASON}
+        leagues={userLeagues} currentWeek={currentWeek} season={PREV_SEASON}
         logoUri={String(process.env.LOGO_URI)}
       />
 
@@ -248,7 +257,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         {/* Header */}
         <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
           <div className="flex items-center justify-between px-6 py-3">
-            <BackLink href="/team" label="My Team" />
+            <BackLink href={SEASON !== PREV_SEASON ? `/team?season=${SEASON}` : '/team'} label="My Team" />
             <div className="flex items-center gap-3 ml-auto">
               <SeasonModeSwitcher season={SEASON} currentWeek={currentWeek} />
               <div className="h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">

@@ -173,7 +173,7 @@ export default async function PlayersPage({
           </div>
 
           {/* Player catalog table */}
-          <PlayerCatalog players={players} />
+          <PlayerCatalog players={players} season={SEASON} />
 
         </main>
       </div>

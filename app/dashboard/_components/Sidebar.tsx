@@ -80,6 +80,8 @@ export default function Sidebar({ user, leagues, currentWeek, season, logoUri }:
   const searchParams = useSearchParams();
   const initials = user.name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
   const selectedLeagueId = Number(searchParams.get('leagueId')) || leagues[0]?.id || null;
+  const seasonParam = searchParams.get('season');
+  const seasonSuffix = seasonParam ? `?season=${seasonParam}` : '';
 
   async function handleSignOut() {
     await authClient.signOut();
@@ -132,7 +134,7 @@ export default function Sidebar({ user, leagues, currentWeek, season, logoUri }:
         {NAV.map(item => {
           const isActive = pathname === item.href;
           return (
-          <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
+          <Link key={item.href} href={`${item.href}${seasonSuffix}`} style={{ textDecoration: 'none' }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '8px 10px', borderRadius: 10,
