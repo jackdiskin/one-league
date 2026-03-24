@@ -8,6 +8,8 @@ import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import MyTeamSummary from '@/app/dashboard/_components/MyTeamSummary';
 import RosterList,   { type RosterPlayer }   from './_components/RosterList';
+import LiveWeekScore       from './_components/LiveWeekScore';
+import LiveTotalPointsTile from './_components/LiveTotalPointsTile';
 import CapBreakdown  from './_components/CapBreakdown';
 import WeeklyPerformance, { type PerfPlayer } from './_components/WeeklyPerformance';
 import AvailablePlayers, { type AvailablePlayer } from './_components/AvailablePlayers';
@@ -258,13 +260,16 @@ export default async function TeamPage({
             </p>
           </div>
 
+          {/* Live week score — emphatic current-week total */}
+          <LiveWeekScore roster={roster} currentWeek={currentWeek} />
+
           {/* Quick stat tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+            <LiveTotalPointsTile roster={roster} seasonBasePoints={team.total_points} />
             {[
-              { label: 'Total Points',   value: formatPoints(team.total_points),   sub: 'season total',      accent: false },
-              { label: 'League Rank',    value: rankLabel,                          sub: `of ${team.league_size} teams`, accent: team.rank <= 3 },
-              { label: 'Roster Value',   value: formatPrice(totalValue),            sub: 'at market price',   accent: false },
-              { label: 'Budget Left',    value: formatPrice(team.budget_remaining), sub: 'cap space',         accent: true  },
+              { label: 'League Rank',  value: rankLabel,                          sub: `of ${team.league_size} teams`, accent: team.rank <= 3 },
+              { label: 'Roster Value', value: formatPrice(totalValue),            sub: 'at market price',   accent: false },
+              { label: 'Budget Left',  value: formatPrice(team.budget_remaining), sub: 'cap space',         accent: true  },
             ].map(tile => (
               <div key={tile.label} className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm" style={{ padding: '14px 16px' }}>
                 <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{tile.label}</p>

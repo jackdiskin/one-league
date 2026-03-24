@@ -7,6 +7,7 @@ import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Image from 'next/image';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import LeagueChart, { type TeamWeekScore } from './_components/LeagueChart';
+import LiveStandings, { type StandingRow as LiveStandingRow } from './_components/LiveStandings';
 import SeasonRecapWrapper from './_components/SeasonRecapWrapper';
 import WeeklyRecapWrapper from './_components/WeeklyRecapWrapper';
 import { computeWeeklyBadges } from '@/lib/weeklyRecapBadges';
@@ -634,97 +635,14 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
             ))}
           </div>
 
-          {/* ── Standings (full width) ── */}
-          <SectionCard title="Standings" sub="Season totals · sorted by points" badge={`${standings.length} teams`}>
-            {/* Column header */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: '44px 1fr 80px 76px 84px 52px',
-              padding: '7px 18px', background: '#fafafa', borderBottom: '1px solid #f1f5f9',
-              fontSize: 9, fontWeight: 700, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.1em',
-            }}>
-              <span>#</span><span>Team</span>
-              <span style={{ textAlign: 'right' }}>Points</span>
-              <span style={{ textAlign: 'right' }}>Last Wk</span>
-              <span style={{ textAlign: 'right' }}>Value</span>
-              <span style={{ textAlign: 'right' }}>Moves</span>
-            </div>
-            {standings.length === 0 && <Empty msg="No teams in this league yet." />}
-            {standings.map((row, i) => {
-              const isMe  = row.user_id === userId;
-              const gap   = leaderPoints > 0 ? ((leaderPoints - Number(row.total_points)) / leaderPoints) * 100 : 0;
-              const medal = row.rank === 1 ? '🥇' : row.rank === 2 ? '🥈' : row.rank === 3 ? '🥉' : null;
-
-              return (
-                <div key={row.fantasy_team_id} style={{
-                  display: 'grid', gridTemplateColumns: '44px 1fr 80px 76px 84px 52px',
-                  alignItems: 'center', padding: '10px 18px',
-                  borderBottom: i < standings.length - 1 ? '1px solid #f8fafc' : 'none',
-                  background: isMe ? 'linear-gradient(90deg, rgba(16,185,129,0.06), rgba(240,253,250,0.3))' : 'transparent',
-                }}>
-                  {/* Rank */}
-                  <div>
-                    {medal
-                      ? <span style={{ fontSize: 16 }}>{medal}</span>
-                      : (
-                        <div style={{
-                          width: 26, height: 26, borderRadius: 8,
-                          background: isMe ? '#f0fdf4' : '#f8fafc',
-                          border: `1px solid ${isMe ? '#bbf7d0' : '#e2e8f0'}`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 11, fontWeight: 800, color: isMe ? '#059669' : '#94a3b8',
-                        }}>
-                          {row.rank}
-                        </div>
-                      )
-                    }
-                  </div>
-
-                  {/* Team + progress */}
-                  <div style={{ paddingRight: 16, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {row.team_name}
-                      </span>
-                      {isMe && (
-                        <span style={{
-                          fontSize: 8, fontWeight: 800, color: '#059669', background: '#d1fae5',
-                          borderRadius: 20, padding: '1px 6px', textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0,
-                        }}>
-                          You
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 5 }}>{row.user_name}</div>
-                    <div style={{ height: 3, borderRadius: 99, background: '#f1f5f9', overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%', borderRadius: 99, width: `${Math.max(6, 100 - gap)}%`,
-                        background: isMe ? 'linear-gradient(90deg,#10b981,#059669)' : 'linear-gradient(90deg,#94a3b8,#cbd5e1)',
-                      }} />
-                    </div>
-                  </div>
-
-                  <div style={{ textAlign: 'right', fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
-                    {formatPoints(row.total_points)}
-                  </div>
-                  <div style={{
-                    textAlign: 'right', fontSize: 12, fontWeight: 700,
-                    color: Number(row.last_week_points) > 0 ? '#10b981' : '#94a3b8',
-                  }}>
-                    {Number(row.last_week_points) > 0 ? formatPoints(row.last_week_points) : '—'}
-                  </div>
-                  <div style={{ textAlign: 'right', fontSize: 11, color: '#475569' }}>
-                    {formatPrice(row.roster_value)}
-                  </div>
-                  <div style={{
-                    textAlign: 'right', fontSize: 12, fontWeight: 700,
-                    color: row.trade_count > 0 ? '#f59e0b' : '#cbd5e1',
-                  }}>
-                    {row.trade_count > 0 ? row.trade_count : '—'}
-                  </div>
-                </div>
-              );
-            })}
-          </SectionCard>
+          {/* ── Standings (full width) — live-updating client component ── */}
+          <LiveStandings
+            leagueId={league.id}
+            currentWeek={currentWeek}
+            initialStandings={standings as LiveStandingRow[]}
+            userId={userId}
+            leaderPoints={leaderPoints}
+          />
 
           {/* ── Three-column insight row ── */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>

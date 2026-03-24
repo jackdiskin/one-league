@@ -1,17 +1,12 @@
 'use client';
 
 import { formatPoints } from '@/lib/format';
-import type { StatCol } from './WeeklyStatsTable';
+import type { StatCol, WeekScore } from './WeeklyStatsTable';
 
 interface Props {
   position: string;
   statCols: StatCol[];
-  score: {
-    fantasy_points: number;
-    field_goals_made: number;
-    extra_points_made: number;
-    [key: string]: number;
-  };
+  score: WeekScore;
 }
 
 /**
