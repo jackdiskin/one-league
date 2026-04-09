@@ -24,7 +24,7 @@ export interface PublicLeague {
 }
 
 // ─── Quotas ───────────────────────────────────────────────────────────────────
-const CAP          = 200_000_000;
+const CAP          = 100_000_000;
 const QUOTA        = { QB: 2, RB: 3, FLEX: 5, K: 1 }; // FLEX = WR+TE combined
 const TOTAL_SLOTS  = 11;
 
@@ -222,7 +222,7 @@ const WELCOME_STEPS = [
     icon: '📋',
     eyebrow: 'Step 1',
     title: 'Draft Your Squad',
-    subtitle: '11 players. $200M cap. One shot.',
+    subtitle: '11 players. $100M cap. One shot.',
     body: null,
     bullets: [
       { icon: '🔵', label: '2 Quarterbacks', sub: 'Your franchise signal-callers' },
@@ -237,7 +237,7 @@ const WELCOME_STEPS = [
     eyebrow: 'Step 2',
     title: 'Trade the Market',
     subtitle: 'Prices move in real time — buy low, sell high.',
-    body: 'Every buy pushes a player\'s price up; every sell pushes it down. Weekly prices also reset based on performance vs. projections and momentum. Your market cap starts at $200M, but grows or shrinks with your P&L.',
+    body: 'Every buy pushes a player\'s price up; every sell pushes it down. Weekly prices also reset based on performance vs. projections and momentum. Your market cap starts at $100M, but grows or shrinks with your P&L.',
     callout: {
       label: 'P&L Example',
       text: 'Buy a player for $5M → sell for $8M → your cap grows by $3M. Lose on a trade and your cap shrinks.',

@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   const {
     name,
     season_year,
-    salary_cap = 200_000_000,
+    salary_cap = 100_000_000,
     is_public = false,
     invite_code = null,
     max_members = 12,

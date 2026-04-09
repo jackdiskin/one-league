@@ -9,7 +9,7 @@ const POS_COLORS: Record<string, { bar: string; label: string }> = {
   K:  { bar: '#94a3b8', label: 'Kicker' },
 };
 
-const TOTAL_CAP = 200_000_000;
+const TOTAL_CAP = 100_000_000;
 
 export default function CapBreakdown({
   roster,

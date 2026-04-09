@@ -37,7 +37,7 @@ MARKET_WEEK = 1      # Starting current_week in player_market_state
 
 VALID_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 
-# Prices in dollars (contract-value scale, $200M salary cap)
+# Prices in dollars (contract-value scale, $100M salary cap)
 # base = price for a player at the position average
 # season_avg = expected PPR points for an average starter over a full season
 PRICE_CONFIG = {

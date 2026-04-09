@@ -89,7 +89,7 @@ def seed_league(cursor, users):
         """
         INSERT INTO leagues (name, owner_user_id, season_year, salary_cap,
                              is_public, max_members)
-        VALUES (%s, %s, %s, 200000000.00, TRUE, 12)
+        VALUES (%s, %s, %s, 100000000.00, TRUE, 12)
         """,
         ("OneLeague Alpha", owner["id"], SEASON),
     )
@@ -122,7 +122,7 @@ def seed_fantasy_teams(cursor, league_id, users):
             """
             INSERT INTO fantasy_teams
                 (league_id, user_id, team_name, season_year, budget_remaining)
-            VALUES (%s, %s, %s, %s, 200000000.00)
+            VALUES (%s, %s, %s, %s, 100000000.00)
             """,
             (league_id, user["id"], name, SEASON),
         )

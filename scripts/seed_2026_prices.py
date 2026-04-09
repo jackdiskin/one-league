@@ -7,18 +7,18 @@ performance data (weeks 1–18 only, matching fantasy scoring).
 
 Pricing Design
 ──────────────
-Goal: the $200M salary cap should be genuinely constraining. A team built with
-median players at every position should cost exactly $200M. Elite players are
+Goal: the $100M salary cap should be genuinely constraining. A team built with
+median players at every position should cost exactly $100M. Elite players are
 significantly more expensive; bargain players are significantly cheaper.
 
-Slot budgets (× required starters = $200M total):
-  QB  $22M  × 2 = $ 44M
-  RB  $17M  × 3 = $ 51M
-  WR  $19M  × 4 = $ 76M   ┐ (WR/TE fill 5 FLEX slots)
-  TE  $19M  × 1 = $ 19M   ┘
-  K   $10M  × 1 = $ 10M
+Slot budgets (× required starters = $100M total):
+  QB  $11M  × 2 = $ 22M
+  RB  $8.5M × 3 = $ 25.5M
+  WR  $9.5M × 4 = $ 38M   ┐ (WR/TE fill 5 FLEX slots)
+  TE  $9.5M × 1 = $ 9.5M  ┘
+  K   $5M   × 1 = $ 5M
   ────────────────────────
-  Total           $200M  ✓
+  Total           $100M  ✓
 
 Price formula (percentile-based, anchored to median = slot budget):
   price = floor + range × percentile
@@ -34,9 +34,9 @@ Price formula (percentile-based, anchored to median = slot budget):
   Players with no 2025 scoring data receive the floor price.
 
 Results:
-  • Median squad   ≈ $200M  (at the cap — must make tradeoffs)
-  • Elite squad    ≈ $320M  (every elite player — impossible to afford)
-  • Bargain squad  ≈ $ 80M  (all floor players)
+  • Median squad   ≈ $100M  (at the cap — must make tradeoffs)
+  • Elite squad    ≈ $160M  (every elite player — impossible to afford)
+  • Bargain squad  ≈ $ 40M  (all floor players)
 
 Safety
 ──────
@@ -66,14 +66,14 @@ SEASON_2026  = 2026
 DRAFT_WEEK   = 1          # current_week must be >= 1 per DB constraint
 MAX_REG_WEEK = 18         # fantasy scoring stops after regular season
 
-# Slot budgets — calibrated so median squad = $200M cap
-# (2 QB × $22M) + (3 RB × $17M) + (4 WR × $19M) + (1 TE × $19M) + (1 K × $10M) = $200M
+# Slot budgets — calibrated so median squad = $100M cap
+# (2 QB × $11M) + (3 RB × $8.5M) + (4 WR × $9.5M) + (1 TE × $9.5M) + (1 K × $5M) = $100M
 SLOT_BUDGET = {
-    'QB': 22_000_000,
-    'RB': 17_000_000,
-    'WR': 19_000_000,
-    'TE': 19_000_000,
-    'K':  10_000_000,
+    'QB': 11_000_000,
+    'RB':  8_500_000,
+    'WR':  9_500_000,
+    'TE':  9_500_000,
+    'K':   5_000_000,
 }
 
 # Price range: floor = 40% of budget, ceiling = 160% of budget
@@ -185,7 +185,7 @@ def main():
         total_median_cost += slot_cost
         print(f'  {pos} ×{count}  median=${median_price/1e6:.2f}M  → ${slot_cost/1e6:.1f}M')
     print(f'  {"─"*40}')
-    print(f'  Total median squad cost: ${total_median_cost/1e6:.1f}M  (cap = $200M)')
+    print(f'  Total median squad cost: ${total_median_cost/1e6:.1f}M  (cap = $100M)')
 
     # 5. Check for existing 2026 rows
     cursor.execute(
