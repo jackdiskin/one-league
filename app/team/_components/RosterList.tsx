@@ -20,7 +20,7 @@ export interface RosterPlayer {
   roster_slot: string;
   last_week_points: number | null;
   season_points: number | null;
-  espn_athlete_id: string | null;
+  external_player_id: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -680,13 +680,13 @@ export default function RosterList({ roster, teamId, currentWeek, budgetRemainin
   const [swapping, setSwapping]     = useState<Set<number>>(new Set());
   const [sellTarget, setSellTarget] = useState<RosterPlayer | null>(null);
 
-  // Live stats via WebSocket — subscribe to all players on roster who have an ESPN ID
-  const espnIds = useMemo(
-    () => roster.map(p => p.espn_athlete_id).filter(Boolean) as string[],
+  // Live stats via WebSocket — subscribe to all players on roster by SportsDataIO PlayerID
+  const playerIds = useMemo(
+    () => roster.map(p => p.external_player_id).filter(Boolean) as string[],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [roster.map(p => p.espn_athlete_id).join(',')],
+    [roster.map(p => p.external_player_id).join(',')],
   );
-  const liveStats = useLiveStats(espnIds);
+  const liveStats = useLiveStats(playerIds);
 
   const handlePlayerClick = useCallback((p: RosterPlayer) => {
     if (swapping.has(p.id)) return;
@@ -1072,7 +1072,7 @@ export default function RosterList({ roster, teamId, currentWeek, budgetRemainin
                 <PlayerRow
                   key={p.id} p={p}
                   selected={selected} swapping={swapping}
-                  liveData={liveStats.get(p.espn_athlete_id ?? '') ?? undefined}
+                  liveData={liveStats.get(p.external_player_id ?? '') ?? undefined}
                   onPlayerClick={handlePlayerClick}
                   onSellClick={handleSellClick}
                 />
@@ -1150,7 +1150,7 @@ export default function RosterList({ roster, teamId, currentWeek, budgetRemainin
                 <PlayerRow
                   key={p.id} p={p}
                   selected={selected} swapping={swapping}
-                  liveData={liveStats.get(p.espn_athlete_id ?? '') ?? undefined}
+                  liveData={liveStats.get(p.external_player_id ?? '') ?? undefined}
                   onPlayerClick={handlePlayerClick}
                   onSellClick={handleSellClick}
                 />

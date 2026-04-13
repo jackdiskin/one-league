@@ -83,7 +83,7 @@ export async function GET(
        JOIN live_game_states lgs
          ON lgs.event_id = lps.event_id AND lgs.week_num = ? AND lgs.season = ?
        WHERE lgs.game_state = 'in'
-     ) live ON live.player_id = p.espn_athlete_id
+     ) live ON live.player_id = p.external_player_id
      LEFT JOIN player_weekly_scores pws
        ON pws.player_id = ftr.player_id
       AND pws.season_year = ?

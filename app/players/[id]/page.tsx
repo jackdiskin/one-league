@@ -105,11 +105,11 @@ export default async function PlayerPage({
   // Player + market state
   const [player] = await query<{
     id: number; full_name: string; position: string; team_code: string;
-    headshot_url: string | null; espn_athlete_id: string | null;
+    headshot_url: string | null; external_player_id: string | null;
     current_price: number; base_weekly_price: number;
     intraday_high: number; intraday_low: number; net_order_flow: number;
   }>(
-    `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url, p.espn_athlete_id,
+    `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url, p.external_player_id,
             COALESCE(pms.current_price, 0)       AS current_price,
             COALESCE(pms.base_weekly_price, 0)   AS base_weekly_price,
             COALESCE(pms.intraday_high, 0)       AS intraday_high,
@@ -202,7 +202,7 @@ export default async function PlayerPage({
 
   // Game state for the player's most recent live event + the max active week
   // Both are needed to avoid showing LIVE/FINAL badges for old completed seasons.
-  const liveGameStateQuery = player.espn_athlete_id
+  const liveGameStateQuery = player.external_player_id
     ? query<{ game_state: string; week_num: number }>(
         `SELECT lgs.game_state, lgs.week_num
          FROM live_game_states lgs
@@ -210,7 +210,7 @@ export default async function PlayerPage({
          WHERE lps.player_id = ?
          ORDER BY lgs.updated_at DESC
          LIMIT 1`,
-        [player.espn_athlete_id],
+        [player.external_player_id],
       )
     : Promise.resolve([]);
 
@@ -367,7 +367,7 @@ export default async function PlayerPage({
                     ) : null;
                   })()
                 : <LivePlayerHeroStats
-                    espnAthleteId={player.espn_athlete_id}
+                    playerId={player.external_player_id}
                     position={player.position}
                   />
             )}

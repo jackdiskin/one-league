@@ -51,30 +51,28 @@ export interface LiveStatMessage {
 const WS_URL = process.env.NEXT_PUBLIC_LIVE_WS_URL ?? 'ws://localhost:8765';
 
 /**
- * Subscribe to live stat updates for a set of ESPN athlete IDs.
+ * Subscribe to live stat updates for a set of SportsDataIO PlayerIDs.
  *
- * @param espnIds - Array of ESPN athlete ID strings (from players.espn_athlete_id).
- *                  Pass an empty array or null to skip connecting.
- * @returns Map of espnId → LivePlayerStats (continuously updated as deltas arrive)
+ * @param playerIds - Array of SportsDataIO PlayerID strings (players.external_player_id).
+ *                    Pass an empty array or null to skip connecting.
+ * @returns Map of playerId → LivePlayerStats (continuously updated as deltas arrive)
  *
  * Usage:
- *   const liveStats = useLiveStats(['4361741', '3117251']);
- *   const mccaffreyStats = liveStats.get('3117251');
+ *   const liveStats = useLiveStats(['23189', '21831']);
+ *   const bijanStats = liveStats.get('23189');
  */
 export function useLiveStats(
-  espnIds: string[] | null | undefined,
+  playerIds: string[] | null | undefined,
 ): Map<string, LivePlayerStats> {
   const [statsMap, setStatsMap] = useState<Map<string, LivePlayerStats>>(new Map());
 
-  // Stable ref so the WebSocket handler always sees the latest IDs
-  const espnIdsRef  = useRef<string[]>([]);
-  const wsRef       = useRef<WebSocket | null>(null);
-  const mountedRef  = useRef(true);
+  const playerIdsRef = useRef<string[]>([]);
+  const wsRef        = useRef<WebSocket | null>(null);
+  const mountedRef   = useRef(true);
 
-  // Update ref when IDs change
   useEffect(() => {
-    espnIdsRef.current = espnIds ?? [];
-  }, [espnIds]);
+    playerIdsRef.current = playerIds ?? [];
+  }, [playerIds]);
 
   const handleMessage = useCallback((event: MessageEvent) => {
     try {
@@ -98,7 +96,7 @@ export function useLiveStats(
   }, []);
 
   useEffect(() => {
-    const ids = espnIds ?? [];
+    const ids = playerIds ?? [];
     if (ids.length === 0) return;
 
     mountedRef.current = true;
@@ -112,15 +110,13 @@ export function useLiveStats(
         wsRef.current = ws;
 
         ws.onopen = () => {
-          // Subscribe to current player IDs
-          ws?.send(JSON.stringify({ subscribe: espnIdsRef.current }));
+          ws?.send(JSON.stringify({ subscribe: playerIdsRef.current }));
         };
 
         ws.onmessage = handleMessage;
 
         ws.onclose = () => {
           if (mountedRef.current) {
-            // Reconnect after 3 seconds on unexpected close
             reconnectTimer = setTimeout(connect, 3_000);
           }
         };
@@ -144,21 +140,21 @@ export function useLiveStats(
       wsRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify((espnIds ?? []).slice().sort())]);
+  }, [JSON.stringify((playerIds ?? []).slice().sort())]);
 
   // When subscribed IDs change on an existing connection, send updated subscription
   useEffect(() => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    const ids = espnIds ?? [];
+    const ids = playerIds ?? [];
     if (ids.length > 0) {
       ws.send(JSON.stringify({ subscribe: ids }));
     }
-  }, [espnIds]);
+  }, [playerIds]);
 
   // Clean up stats for players no longer in scope
   useEffect(() => {
-    const ids = new Set(espnIds ?? []);
+    const ids = new Set(playerIds ?? []);
     setStatsMap(prev => {
       let changed = false;
       const next = new Map(prev);
@@ -170,7 +166,7 @@ export function useLiveStats(
       }
       return changed ? next : prev;
     });
-  }, [espnIds]);
+  }, [playerIds]);
 
   return statsMap;
 }
@@ -182,19 +178,19 @@ export function useLiveStats(
 /** Returns the live fantasy points total for a player, or null if no live data. */
 export function getLivePoints(
   liveStats: Map<string, LivePlayerStats>,
-  espnId: string | null | undefined,
+  playerId: string | null | undefined,
 ): number | null {
-  if (!espnId) return null;
-  return liveStats.get(espnId)?.totals.fantasyPointsTotal ?? null;
+  if (!playerId) return null;
+  return liveStats.get(playerId)?.totals.fantasyPointsTotal ?? null;
 }
 
 /** Returns a short stat-line string like "22 RuYd  1 TD" for a player. */
 export function getLiveStatLine(
   liveStats: Map<string, LivePlayerStats>,
-  espnId: string | null | undefined,
+  playerId: string | null | undefined,
 ): string {
-  if (!espnId) return '';
-  const s = liveStats.get(espnId);
+  if (!playerId) return '';
+  const s = liveStats.get(playerId);
   if (!s) return '';
   const t = s.totals;
   const parts: string[] = [];

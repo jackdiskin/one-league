@@ -15,15 +15,15 @@ interface Props {
  * Replaces the static server-rendered tile so the season total stays current.
  */
 export default function LiveTotalPointsTile({ roster, seasonBasePoints }: Props) {
-  const espnIds = useMemo(
-    () => roster.map(p => p.espn_athlete_id).filter(Boolean) as string[],
+  const playerIds = useMemo(
+    () => roster.map(p => p.external_player_id).filter(Boolean) as string[],
     [roster],
   );
-  const liveStats = useLiveStats(espnIds);
+  const liveStats = useLiveStats(playerIds);
 
   const weekTotal = useMemo(() => {
     return roster.reduce((sum, p) => {
-      const live = p.espn_athlete_id ? liveStats.get(p.espn_athlete_id) : undefined;
+      const live = p.external_player_id ? liveStats.get(p.external_player_id) : undefined;
       const pts  = live
         ? Number(live.totals.fantasyPointsTotal)
         : Number(p.last_week_points ?? 0);
@@ -32,7 +32,7 @@ export default function LiveTotalPointsTile({ roster, seasonBasePoints }: Props)
   }, [roster, liveStats]);
 
   const total   = Number(seasonBasePoints) + weekTotal;
-  const anyLive = espnIds.some(id => liveStats.has(id));
+  const anyLive = playerIds.some(id => liveStats.has(id));
 
   return (
     <div className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm" style={{ padding: '14px 16px' }}>

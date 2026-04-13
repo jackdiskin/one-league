@@ -11,7 +11,7 @@ export interface FieldPlayer {
   team_code: string;
   current_price: number;
   headshot_url: string | null;
-  espn_athlete_id: string | null;
+  external_player_id: string | null;
 }
 
 export interface FieldSlot {
@@ -415,12 +415,12 @@ export default function LiveTeamField({ positions, losY }: {
   positions: FieldSlot[];
   losY: number;
 }) {
-  const espnIds = useMemo(
-    () => positions.flatMap(s => s.player?.espn_athlete_id ? [s.player.espn_athlete_id] : []),
+  const playerIds = useMemo(
+    () => positions.flatMap(s => s.player?.external_player_id ? [s.player.external_player_id] : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [positions.map(s => s.player?.espn_athlete_id).join(',')],
+    [positions.map(s => s.player?.external_player_id).join(',')],
   );
-  const liveStats = useLiveStats(espnIds);
+  const liveStats = useLiveStats(playerIds);
 
   const [modal, setModal] = useState<{ player: FieldPlayer; stats: LivePlayerStats } | null>(null);
 
@@ -479,8 +479,7 @@ export default function LiveTeamField({ positions, losY }: {
         {/* Players */}
         {positions.map(({ player, pos, x, y }, i) => {
           if (!player) return <EmptySlotCard key={`empty-${pos}-${i}`} pos={pos} x={x} y={y} />;
-          const espnId = player.espn_athlete_id ?? '';
-          const liveData = liveStats.get(espnId);
+          const liveData = liveStats.get(player.external_player_id ?? '');
           const livePoints = liveData?.totals.fantasyPointsTotal ?? null;
           return (
             <PlayerCard

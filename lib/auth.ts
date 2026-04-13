@@ -24,7 +24,9 @@ export const auth = betterAuth({
   socialProviders,
   trustedOrigins: [
     "http://localhost:3000",
-    "https://*.vercel.app"
+    "https://*.vercel.app",
+    "https://playoneleague.com",
+    "https://www.playoneleague.com"
   ],
   database: createPool({
     host: process.env.MYSQL_HOST!,

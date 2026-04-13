@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Aggregate final stats per DB player from all "post" games this week.
-  // live_player_stats.player_id is an ESPN athlete ID; bridge via players.espn_athlete_id.
+  // live_player_stats.player_id is a SportsDataIO PlayerID; bridge via players.external_player_id.
   const liveRows = await query<LiveRow>(
     `SELECT p.id                                              AS player_id,
             SUM(lps.passing_yards)                           AS passing_yards,
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
             SUM(lps.fantasy_points_total)                    AS fantasy_points
      FROM live_game_states lgs
      JOIN live_player_stats lps ON lps.event_id = lgs.event_id
-     JOIN players p              ON p.espn_athlete_id = lps.player_id
+     JOIN players p              ON p.external_player_id = lps.player_id
      WHERE lgs.game_state = 'post'
        AND lgs.season    = ?
        AND lgs.week_num  = ?

@@ -20,16 +20,16 @@ interface Props {
  * Season total (base + this week) is shown in the LiveTotalPointsTile stat card.
  */
 export default function LiveWeekScore({ roster, currentWeek }: Props) {
-  const espnIds = useMemo(
-    () => roster.map(p => p.espn_athlete_id).filter(Boolean) as string[],
+  const playerIds = useMemo(
+    () => roster.map(p => p.external_player_id).filter(Boolean) as string[],
     [roster],
   );
 
-  const liveStats = useLiveStats(espnIds);
+  const liveStats = useLiveStats(playerIds);
 
   const players = useMemo(() => {
     return roster.map(p => {
-      const live     = p.espn_athlete_id ? liveStats.get(p.espn_athlete_id) : undefined;
+      const live     = p.external_player_id ? liveStats.get(p.external_player_id) : undefined;
       const isLive   = !!live;
       const pts      = live
         ? Number(live.totals.fantasyPointsTotal)

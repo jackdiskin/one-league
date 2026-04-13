@@ -40,14 +40,14 @@ const POS_STATS: Record<string, Array<{ key: keyof LiveStatDelta; label: string 
 };
 
 export default function LivePlayerHeroStats({
-  espnAthleteId,
+  playerId,
   position,
 }: {
-  espnAthleteId: string | null;
+  playerId: string | null;
   position: string;
 }) {
-  const liveStats = useLiveStats(espnAthleteId ? [espnAthleteId] : []);
-  const data = espnAthleteId ? liveStats.get(espnAthleteId) : undefined;
+  const liveStats = useLiveStats(playerId ? [playerId] : []);
+  const data = playerId ? liveStats.get(playerId) : undefined;
 
   if (!data) return null;
 

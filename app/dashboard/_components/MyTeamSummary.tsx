@@ -75,7 +75,7 @@ export default async function MyTeamSummary({ userId, seasonYear }: Props) {
   }
 
   const starters = await query<Player>(
-    `SELECT p.full_name, p.position, p.team_code, pms.current_price, p.headshot_url, p.espn_athlete_id
+    `SELECT p.full_name, p.position, p.team_code, pms.current_price, p.headshot_url, p.external_player_id
      FROM fantasy_team_roster ftr
      JOIN players p ON p.id = ftr.player_id
      JOIN player_market_state pms ON pms.player_id = ftr.player_id AND pms.season_year = ?
