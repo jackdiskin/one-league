@@ -96,6 +96,8 @@ STAT_FIELDS: List[Tuple[str, str]] = [
     ("xp_made",              "xpMade"),
     ("xp_missed",            "xpMissed"),
     ("two_pt_conversions",   "twoPtConversions"),
+    ("long_td_bonus_count",  "longTdBonusCount"),
+    ("return_tds",           "returnTds"),
     ("fantasy_points_total", "fantasyPointsTotal"),
 ]
 
@@ -132,7 +134,7 @@ class PipelineConfig:
     pts_int:         float = float(os.getenv("PTS_INT",         "-2"))
     pts_rush_yd:     float = float(os.getenv("PTS_RUSH_YD",     "0.1"))
     pts_rush_td:     float = float(os.getenv("PTS_RUSH_TD",     "6"))
-    pts_rec:         float = float(os.getenv("PTS_REC",         "1"))
+    pts_rec:         float = float(os.getenv("PTS_REC",         "0.5"))  # half-PPR
     pts_rec_yd:      float = float(os.getenv("PTS_REC_YD",      "0.1"))
     pts_rec_td:      float = float(os.getenv("PTS_REC_TD",      "6"))
     pts_fumble_lost: float = float(os.getenv("PTS_FUMBLE_LOST", "-2"))
@@ -143,6 +145,13 @@ class PipelineConfig:
     pts_xp_made:     float = float(os.getenv("PTS_XP_MADE",     "1"))
     pts_xp_missed:   float = float(os.getenv("PTS_XP_MISSED",   "0"))
     pts_two_pt:      float = float(os.getenv("PTS_TWO_PT",      "2"))
+    # Milestone bonuses (half-PPR ruleset per CLAUDE.md)
+    pts_pass_300_bonus: float = float(os.getenv("PTS_PASS_300_BONUS", "2"))
+    pts_rush_100_bonus: float = float(os.getenv("PTS_RUSH_100_BONUS", "2"))
+    pts_rush_150_bonus: float = float(os.getenv("PTS_RUSH_150_BONUS", "2"))
+    pts_rec_100_bonus:  float = float(os.getenv("PTS_REC_100_BONUS",  "2"))
+    pts_long_td_bonus:  float = float(os.getenv("PTS_LONG_TD_BONUS",  "2"))  # 40+ yard TD, any position
+    pts_return_td:      float = float(os.getenv("PTS_RETURN_TD",      "6"))  # kick/punt return TD
 
     def get_scores_date(self) -> str:
         return self.scores_date or date.today().strftime("%Y-%m-%d")
@@ -204,6 +213,24 @@ class FantasyScorer:
         total += float(row.get("xp_made",            0.0)) * c.pts_xp_made
         total += float(row.get("xp_missed",          0.0)) * c.pts_xp_missed
         total += float(row.get("two_pt_conversions", 0.0)) * c.pts_two_pt
+
+        # Milestone bonuses. Rushing 100/150yd tiers are exclusive (150+ pays
+        # only the 150 bonus, not both); pass/rec/long-TD/return-TD bonuses
+        # are independent of each other.
+        passing_yards   = float(row.get("passing_yards",   0.0))
+        rushing_yards   = float(row.get("rushing_yards",   0.0))
+        receiving_yards = float(row.get("receiving_yards", 0.0))
+        if passing_yards >= 300:
+            total += c.pts_pass_300_bonus
+        if rushing_yards >= 150:
+            total += c.pts_rush_150_bonus
+        elif rushing_yards >= 100:
+            total += c.pts_rush_100_bonus
+        if receiving_yards >= 100:
+            total += c.pts_rec_100_bonus
+        total += float(row.get("long_td_bonus_count", 0.0)) * c.pts_long_td_bonus
+        total += float(row.get("return_tds",          0.0)) * c.pts_return_td
+
         return round(total, 4)
 
 
@@ -253,9 +280,11 @@ class BoxScoreParser:
         player_games: List[Dict[str, Any]],
         snapshot_ts: datetime,
         scorer: FantasyScorer,
+        scoring_details: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Dict[str, Any]]:
         event_id = str(score["ScoreID"])
         rows: List[Dict[str, Any]] = []
+        bonus_by_player = _scoring_bonuses_by_player(scoring_details or [])
 
         for pg in player_games:
             player_id = pg.get("PlayerID")
@@ -278,6 +307,10 @@ class BoxScoreParser:
                 _f(pg, "TwoPointConversionPasses")
                 + _f(pg, "TwoPointConversionRuns")
                 + _f(pg, "TwoPointConversionReceptions")
+            )
+
+            bonus = bonus_by_player.get(
+                str(player_id), {"long_td_bonus_count": 0.0, "return_tds": 0.0}
             )
 
             row: Dict[str, Any] = {
@@ -307,6 +340,9 @@ class BoxScoreParser:
                 "xp_missed":           xp_missed,
                 # 2PT
                 "two_pt_conversions":  two_pt,
+                # Milestone-bonus inputs, derived from this box's ScoringDetails
+                "long_td_bonus_count": bonus["long_td_bonus_count"],
+                "return_tds":          bonus["return_tds"],
                 # Fantasy points — computed from our own scoring coefficients
                 "fantasy_points_total": 0.0,
             }
@@ -435,6 +471,26 @@ class MySQLWriter:
     def close(self) -> None:
         self.conn.close()
 
+    def ensure_columns(self) -> None:
+        """Idempotently adds columns for the milestone-bonus fields if this DB predates them."""
+        self._add_column_if_missing("live_player_stats", "long_td_bonus_count", "DOUBLE NOT NULL DEFAULT 0")
+        self._add_column_if_missing("live_player_stats", "return_tds",          "DOUBLE NOT NULL DEFAULT 0")
+
+    def _add_column_if_missing(self, table: str, column: str, definition: str) -> None:
+        cur = self.conn.cursor()
+        try:
+            cur.execute(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+                (self.config.mysql_database, table, column),
+            )
+            if cur.fetchone()[0] == 0:
+                cur.execute(f"ALTER TABLE `{table}` ADD COLUMN `{column}` {definition}")
+                self.conn.commit()
+                print(f"[db] added column {table}.{column}")
+        finally:
+            cur.close()
+
     def upsert_game_state(self, row: Dict[str, Any]) -> None:
         # Strip internal-only keys before writing
         clean = {k: v for k, v in row.items() if not k.startswith("_")}
@@ -484,6 +540,7 @@ class MySQLWriter:
             fumbles_lost,
             fg_0_39, fg_40_49, fg_50_plus, fg_missed,
             xp_made, xp_missed, two_pt_conversions,
+            long_td_bonus_count, return_tds,
             fantasy_points_total
         ) VALUES (
             %(event_id)s, %(player_id)s, %(snapshot_ts)s, %(team_id)s, %(team_abbr)s,
@@ -494,6 +551,7 @@ class MySQLWriter:
             %(fumbles_lost)s,
             %(fg_0_39)s, %(fg_40_49)s, %(fg_50_plus)s, %(fg_missed)s,
             %(xp_made)s, %(xp_missed)s, %(two_pt_conversions)s,
+            %(long_td_bonus_count)s, %(return_tds)s,
             %(fantasy_points_total)s
         )
         ON DUPLICATE KEY UPDATE
@@ -518,6 +576,8 @@ class MySQLWriter:
             xp_made              = VALUES(xp_made),
             xp_missed            = VALUES(xp_missed),
             two_pt_conversions   = VALUES(two_pt_conversions),
+            long_td_bonus_count  = VALUES(long_td_bonus_count),
+            return_tds           = VALUES(return_tds),
             fantasy_points_total = VALUES(fantasy_points_total)
         """
         cur = self.conn.cursor()
@@ -656,7 +716,7 @@ class LiveIngestionPipeline:
             score       = box.get("Score", {})
             player_games = box.get("PlayerGames", [])
             player_rows  = BoxScoreParser.parse_player_rows(
-                score, player_games, snapshot_ts, self.scorer
+                score, player_games, snapshot_ts, self.scorer, box.get("ScoringDetails", [])
             )
             all_player_rows.extend(player_rows)
 
@@ -702,6 +762,7 @@ async def run(config: PipelineConfig) -> None:
             asyncio.run_coroutine_threadsafe(ws_server.broadcast_delta(delta), loop)
 
     writer        = MySQLWriter(config)
+    writer.ensure_columns()
     delta_tracker = DeltaTracker()
     pipeline      = LiveIngestionPipeline(
         config,
@@ -723,6 +784,35 @@ async def run(config: PipelineConfig) -> None:
 # ---------------------------------------------------------------------------
 # Utility functions
 # ---------------------------------------------------------------------------
+
+_RETURN_TD_TYPES = {"PuntReturnTouchdown", "KickReturnTouchdown"}
+
+
+def _scoring_bonuses_by_player(scoring_details: List[Dict[str, Any]]) -> Dict[str, Dict[str, float]]:
+    """
+    Groups a box score's top-level ScoringDetails by PlayerID.
+
+    Each scoring play produces one ScoringDetail entry per player credited
+    (e.g. a passing TD yields both a "PassingTouchdown" entry for the passer
+    and a "ReceivingTouchdown" entry for the receiver, same Length), so this
+    naturally awards the 40+ yard bonus to everyone involved.
+
+    Returns {player_id: {"long_td_bonus_count": n, "return_tds": n}}.
+    """
+    result: Dict[str, Dict[str, float]] = {}
+    for sd in scoring_details:
+        player_id = str(sd.get("PlayerID") or "")
+        if not player_id:
+            continue
+        entry = result.setdefault(player_id, {"long_td_bonus_count": 0.0, "return_tds": 0.0})
+        scoring_type = sd.get("ScoringType") or ""
+        length = sd.get("Length") or 0
+        if "Touchdown" in scoring_type and length >= 40:
+            entry["long_td_bonus_count"] += 1.0
+        if scoring_type in _RETURN_TD_TYPES:
+            entry["return_tds"] += 1.0
+    return result
+
 
 def _f(d: Dict[str, Any], key: str) -> float:
     """Safe float extraction from a SportsDataIO PlayerGame dict."""
@@ -783,6 +873,59 @@ def _parse_quarter(quarter: Any) -> Optional[int]:
 
 
 # ---------------------------------------------------------------------------
+# Demo mode — no MySQL, no WebSocket. Fetches a real season/week from the
+# SportsDataIO API and prints a scored, sorted table so you can see the
+# scoring engine's output directly.
+# ---------------------------------------------------------------------------
+
+def demo_week(config: "PipelineConfig", season: str, week: int, top_n: int = 25) -> None:
+    client = SportsDataClient(config)
+    scorer = FantasyScorer(config)
+    snapshot_ts = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    print(f"[demo] fetching boxscoresdeltav3/{season}/{week} ...")
+    boxes = client.get_box_scores_delta(season, week)
+
+    all_rows: List[Dict[str, Any]] = []
+    for box in boxes:
+        score = box.get("Score", {})
+        rows = BoxScoreParser.parse_player_rows(
+            score, box.get("PlayerGames", []), snapshot_ts, scorer, box.get("ScoringDetails", [])
+        )
+        all_rows.extend(rows)
+
+    all_rows.sort(key=lambda r: r["fantasy_points_total"], reverse=True)
+
+    header = (
+        f"{'Player':<24}{'Pts':>7}  "
+        f"{'PassYd':>7}{'RushYd':>7}{'RecYd':>7}{'Rec':>5}  {'Bonuses'}"
+    )
+    print(f"\n{header}")
+    print("-" * len(header))
+    for row in all_rows[:top_n]:
+        bonuses = []
+        if row["passing_yards"] >= 300:
+            bonuses.append("pass300")
+        if row["rushing_yards"] >= 150:
+            bonuses.append("rush150")
+        elif row["rushing_yards"] >= 100:
+            bonuses.append("rush100")
+        if row["receiving_yards"] >= 100:
+            bonuses.append("rec100")
+        if row["long_td_bonus_count"] > 0:
+            bonuses.append(f"40+ydTDx{int(row['long_td_bonus_count'])}")
+        if row["return_tds"] > 0:
+            bonuses.append(f"returnTDx{int(row['return_tds'])}")
+
+        print(
+            f"{row['player_name']:<24}{row['fantasy_points_total']:>7.2f}  "
+            f"{row['passing_yards']:>7.1f}{row['rushing_yards']:>7.1f}"
+            f"{row['receiving_yards']:>7.1f}{row['receptions']:>5.1f}  "
+            f"{', '.join(bonuses)}"
+        )
+
+
+# ---------------------------------------------------------------------------
 # __main__
 # ---------------------------------------------------------------------------
 
@@ -793,6 +936,13 @@ if __name__ == "__main__":
         config    = PipelineConfig()
         ws_server = WebSocketServer(config.ws_host, config.ws_port)
         asyncio.run(ws_server.serve())
+    elif mode == "demo":
+        config = PipelineConfig()
+        if not config.api_key:
+            raise SystemExit("SPORTSDATA_API_KEY is required.")
+        season = config.season or "2025REG"
+        week   = int(config.week) if config.week else 1
+        demo_week(config, season, week)
     else:
         # Full live/replay mode: polling + WebSocket server
         config = PipelineConfig()
