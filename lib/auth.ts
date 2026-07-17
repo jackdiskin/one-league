@@ -19,7 +19,7 @@ console.log("BetterAuth Config:", {
 export const auth = betterAuth({
   baseURL: process.env.NEXT_PUBLIC_MODE == "DEV"
   ? "http://localhost:3000"
-  : "https://one-league.vercel.app",
+  : "https://playoneleague.com",
   emailAndPassword: { enabled: true },
   socialProviders,
   trustedOrigins: [
