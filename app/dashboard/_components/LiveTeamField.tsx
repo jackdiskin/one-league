@@ -38,7 +38,6 @@ function LiveStatsModal({
   hidePrices?: boolean;
 }) {
   const t = stats.totals;
-  const color = POS_COLOR[player.position] ?? '#94a3b8';
 
   type StatRow = { label: string; value: string; highlight?: boolean };
   const rows: StatRow[] = [];
@@ -113,6 +112,7 @@ function LiveStatsModal({
                 width={48} height={48} unoptimized
                 style={{
                   width: 48, height: 48, objectFit: 'contain', display: 'block',
+                  border: '2.5px solid #10b981', borderRadius: 10,
                 }}
               />
             ) : (
@@ -125,15 +125,6 @@ function LiveStatsModal({
                 {player.full_name[0]}
               </div>
             )}
-            <div style={{
-              position: 'absolute', bottom: -1, right: -1,
-              width: 18, height: 18, borderRadius: '50%',
-              background: color, border: '2px solid #0f172a',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 6.5, fontWeight: 900, color: '#fff',
-            }}>
-              {player.position}
-            </div>
           </div>
 
           {/* Name + meta */}
@@ -254,7 +245,6 @@ function PlayerCard({
   hidePrices?: boolean;
 }) {
   const lastName = player.full_name.split(' ').slice(1).join(' ') || player.full_name;
-  const color  = POS_COLOR[player.position] ?? '#94a3b8';
   const isLive = livePoints !== null;
 
   return (
@@ -289,6 +279,11 @@ function PlayerCard({
             width={72} height={72} unoptimized
             style={{
               width: 72, height: 72, objectFit: 'contain', display: 'block',
+              border: isLive ? '3px solid #10b981' : '3px solid #fff',
+              borderRadius: 14,
+              boxShadow: isLive
+                ? '0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(16,185,129,0.45)'
+                : '0 4px 18px rgba(0,0,0,0.45)',
             }}
           />
         ) : (
@@ -304,18 +299,6 @@ function PlayerCard({
             {player.full_name[0]}
           </div>
         )}
-
-        {/* Position badge */}
-        <div style={{
-          position: 'absolute', bottom: 0, right: 0,
-          width: 22, height: 22, borderRadius: '50%',
-          background: color, border: '2.5px solid #fff',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 7, fontWeight: 900, color: '#fff',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
-        }}>
-          {player.position}
-        </div>
 
         {/* Live points overlay */}
         {isLive && (

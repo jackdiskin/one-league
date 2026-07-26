@@ -15,10 +15,6 @@ export interface PerfPlayer {
   projected_points: number | null;
 }
 
-const POS_COLORS: Record<string, string> = {
-  QB: '#3b82f6', RB: '#10b981', WR: '#f59e0b', TE: '#a855f7', K: '#94a3b8',
-};
-
 export default function WeeklyPerformance({ players, week, season }: { players: PerfPlayer[]; week: number; season?: number }) {
   const played = players.filter(p => p.last_week_points != null);
   const totalActual   = played.reduce((s, p) => s + Number(p.last_week_points ?? 0), 0);
@@ -85,7 +81,6 @@ export default function WeeklyPerformance({ players, week, season }: { players: 
             const barPct = actual != null && proj != null && proj > 0
               ? Math.min(160, (actual / proj) * 100)
               : null;
-            const posColor = POS_COLORS[p.position] ?? '#94a3b8';
 
             return (
               <ClickablePlayerRow
@@ -111,15 +106,6 @@ export default function WeeklyPerformance({ players, week, season }: { players: 
                       {p.full_name[0]}
                     </div>
                   )}
-                  <div style={{
-                    position: 'absolute', bottom: -1, right: -1,
-                    width: 14, height: 14, borderRadius: '50%',
-                    background: posColor, border: '2px solid #fff',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 6, fontWeight: 900, color: '#fff',
-                  }}>
-                    {p.position[0]}
-                  </div>
                 </div>
 
                 {/* Name */}

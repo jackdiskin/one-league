@@ -34,13 +34,6 @@ function Sparkline({ prices, up }: { prices: number[]; up: boolean }) {
   );
 }
 
-const POSITION_COLORS: Record<string, string> = {
-  QB: 'bg-blue-100 text-blue-700',
-  RB: 'bg-emerald-100 text-emerald-700',
-  WR: 'bg-amber-100 text-amber-700',
-  TE: 'bg-purple-100 text-purple-700',
-  K:  'bg-slate-100 text-slate-600',
-};
 
 async function fetchMovers(seasonYear: number, maxWeek: number, direction: 'gainers' | 'losers') {
   return query<Mover>(
@@ -83,7 +76,7 @@ function MoverRow({ mover, up, season }: { mover: Mover & { sparkPrices: number[
         )}
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold shrink-0 ${POSITION_COLORS[mover.position] ?? 'bg-slate-100 text-slate-600'}`}>
+            <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold shrink-0 bg-slate-100 text-slate-600">
               {mover.position}
             </span>
             <TeamLogo code={mover.team_code} size={12} />

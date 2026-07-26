@@ -20,14 +20,6 @@ interface Profile {
   season: number;
 }
 
-const POS_COLORS: Record<string, { bg: string; text: string }> = {
-  QB: { bg: '#eff6ff', text: '#3b82f6' },
-  RB: { bg: '#f0fdf4', text: '#10b981' },
-  WR: { bg: '#fffbeb', text: '#f59e0b' },
-  TE: { bg: '#faf5ff', text: '#a855f7' },
-  K:  { bg: '#f8fafc', text: '#64748b' },
-};
-
 export default function PlayerProfileModal({
   playerId,
   season,
@@ -58,7 +50,6 @@ export default function PlayerProfileModal({
     return () => { cancelled = true; };
   }, [playerId, season]);
 
-  const col = profile ? (POS_COLORS[profile.position] ?? POS_COLORS.K) : POS_COLORS.K;
   const seasonSuffix = season ? `?season=${season}` : '';
 
   return (
@@ -130,7 +121,7 @@ export default function PlayerProfileModal({
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                   <span style={{
-                    fontSize: 11, fontWeight: 700, color: col.text, background: col.bg,
+                    fontSize: 11, fontWeight: 700, color: '#64748b', background: '#f1f5f9',
                     borderRadius: 20, padding: '2px 8px',
                   }}>
                     {profile.position}

@@ -17,14 +17,6 @@ import TeamLogo from '@/components/TeamLogo';
 const PREV_SEASON = 2025;
 const CURRENT_SEASON = 2026;
 
-const POS_COLORS: Record<string, { pill: string; color: string }> = {
-  QB: { pill: 'bg-blue-100 text-blue-700',      color: '#3b82f6' },
-  RB: { pill: 'bg-emerald-100 text-emerald-700', color: '#10b981' },
-  WR: { pill: 'bg-amber-100 text-amber-700',     color: '#f59e0b' },
-  TE: { pill: 'bg-purple-100 text-purple-700',   color: '#a855f7' },
-  K:  { pill: 'bg-slate-100 text-slate-600',     color: '#94a3b8' },
-};
-
 const STAT_COLS: Record<string, { key: string; label: string }[]> = {
   QB: [
     { key: 'passing_yards',        label: 'Pass Yds' },
@@ -233,7 +225,6 @@ export default async function PlayerPage({
   const showLiveSection = liveGameState !== null && liveGameState.week_num === maxLiveWeek;
 
   const pos = player.position;
-  const posStyle = POS_COLORS[pos] ?? { pill: 'bg-slate-100 text-slate-600', color: '#94a3b8' };
   const statCols = STAT_COLS[pos] ?? [];
 
   const priceChange = priceHistory.length >= 2
@@ -284,21 +275,12 @@ export default async function PlayerPage({
                     {player.full_name[0]}
                   </div>
                 )}
-                <div style={{
-                  position: 'absolute', bottom: 2, right: 2,
-                  width: 26, height: 26, borderRadius: '50%',
-                  background: posStyle.color, border: '2.5px solid #fff',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 8, fontWeight: 900, color: '#fff',
-                }}>
-                  {pos}
-                </div>
               </div>
 
               {/* Name + meta */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${posStyle.pill}`}>{pos}</span>
+                  <span className="rounded-full px-2 py-0.5 text-xs font-bold bg-slate-100 text-slate-600">{pos}</span>
                   <TeamLogo code={player.team_code} size={16} />
                   <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>{player.team_code}</span>
                 </div>

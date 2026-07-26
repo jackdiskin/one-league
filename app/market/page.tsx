@@ -31,14 +31,6 @@ type RecentTx = {
   full_name: string; position: string; team_code: string; headshot_url: string | null;
 };
 
-const POS_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
-  QB: { bg: '#eff6ff', text: '#3b82f6', bar: '#3b82f6' },
-  RB: { bg: '#f0fdf4', text: '#10b981', bar: '#10b981' },
-  WR: { bg: '#fffbeb', text: '#f59e0b', bar: '#f59e0b' },
-  TE: { bg: '#faf5ff', text: '#a855f7', bar: '#a855f7' },
-  K:  { bg: '#f8fafc', text: '#64748b', bar: '#94a3b8' },
-};
-
 // ── Queries ────────────────────────────────────────────────────────────────
 async function fetchCurrentWeek(season: number): Promise<number> {
   const [row] = await query<{ w: number }>(
@@ -158,10 +150,9 @@ function formatTime(val: string) {
 }
 
 function PosBadge({ pos }: { pos: string }) {
-  const col = POS_COLORS[pos] ?? POS_COLORS.K;
   return (
     <span style={{
-      fontSize: 9, fontWeight: 700, color: col.text, background: col.bg,
+      fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9',
       borderRadius: 20, padding: '1px 5px', flexShrink: 0,
     }}>{pos}</span>
   );
@@ -363,7 +354,6 @@ export default async function MarketPage({
             <SectionCard title="Top Gainers" sub="Biggest price increases this week" badge={`${gainers.length} players`}>
               {gainers.length === 0 && <Empty msg="No price increases this week." />}
               {gainers.map((p, i) => {
-                const col  = POS_COLORS[p.position] ?? POS_COLORS.K;
                 const delta = Number(p.price_delta);
                 const pct  = Number(p.base_weekly_price) > 0 ? (delta / Number(p.base_weekly_price)) * 100 : 0;
                 return (
@@ -397,7 +387,6 @@ export default async function MarketPage({
             <SectionCard title="Biggest Drops" sub="Biggest price decreases this week" badge={`${losers.length} players`}>
               {losers.length === 0 && <Empty msg="No price drops this week." />}
               {losers.map((p, i) => {
-                const col  = POS_COLORS[p.position] ?? POS_COLORS.K;
                 const delta = Number(p.price_delta);
                 const pct  = Number(p.base_weekly_price) > 0 ? (Math.abs(delta) / Number(p.base_weekly_price)) * 100 : 0;
                 return (

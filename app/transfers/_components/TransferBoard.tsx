@@ -75,7 +75,6 @@ async function extractError(res: Response, fallback: string): Promise<string> {
 }
 
 function Avatar({ player, size = 38 }: { player: Pick<CatalogPlayer, 'headshot_url' | 'full_name' | 'position'>; size?: number }) {
-  const col = POS_COLORS[player.position] ?? POS_COLORS.K;
   return (
     <div style={{ position: 'relative', flexShrink: 0 }}>
       {player.headshot_url ? (
@@ -89,13 +88,6 @@ function Avatar({ player, size = 38 }: { player: Pick<CatalogPlayer, 'headshot_u
           fontSize: size * 0.38, fontWeight: 700, color: '#64748b',
         }}>{player.full_name[0]}</div>
       )}
-      <div style={{
-        position: 'absolute', bottom: -1, right: -1,
-        width: 14, height: 14, borderRadius: '50%',
-        background: col.bar, border: '2px solid #fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 6, fontWeight: 900, color: '#fff',
-      }}>{player.position[0]}</div>
     </div>
   );
 }
@@ -244,7 +236,6 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
               </div>
               {groupPlayers.map((p, i) => {
                 const isSelected = pending.some(t => t.key === `out-${p.id}`);
-                const pcol = POS_COLORS[p.position] ?? POS_COLORS.K;
                 return (
                   <div
                     key={p.id}
@@ -264,7 +255,7 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: pcol.text, background: pcol.bg, borderRadius: 20, padding: '1px 5px' }}>{p.position}</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 5px' }}>{p.position}</span>
                         {isSelected && (
                           <span style={{ fontSize: 9, fontWeight: 800, color: '#dc2626', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 20, padding: '1px 6px', letterSpacing: '0.04em' }}>
                             OUT
@@ -294,7 +285,7 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                         <polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
                         <polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" />
                       </svg>
-                      Move
+                      Transfer
                     </button>
                   </div>
                 );
@@ -489,7 +480,6 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                             </div>
                           )}
                           {candidates.map((p, i) => {
-                            const pcol = POS_COLORS[p.position] ?? POS_COLORS.K;
                             const canAfford = Number(p.current_price) <= available;
                             return (
                               <div key={p.id} style={{
@@ -503,7 +493,7 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                       <TeamLogo code={p.team_code} size={11} />
                                       <span style={{ fontSize: 9, color: '#94a3b8' }}>{p.team_code}</span>
-                                      <span style={{ fontSize: 8, fontWeight: 700, color: pcol.text, background: pcol.bg, borderRadius: 20, padding: '1px 4px' }}>{p.position}</span>
+                                      <span style={{ fontSize: 8, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 4px' }}>{p.position}</span>
                                     </div>
                                   </div>
                                 </div>

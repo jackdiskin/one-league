@@ -206,7 +206,7 @@ interface PlayerRowProps {
   onProfileClick: (p: RosterPlayer) => void;
 }
 
-function Avatar({ player, size = 40, col }: { player: RosterPlayer; size?: number; col: typeof POS_COLORS[string] }) {
+function Avatar({ player, size = 40 }: { player: RosterPlayer; size?: number }) {
   return (
     <div style={{ position: 'relative', flexShrink: 0, marginRight: 12 }}>
       {player.headshot_url ? (
@@ -224,15 +224,6 @@ function Avatar({ player, size = 40, col }: { player: RosterPlayer; size?: numbe
           {player.full_name[0]}
         </div>
       )}
-      <div style={{
-        position: 'absolute', bottom: -1, right: -1,
-        width: 16, height: 16, borderRadius: '50%',
-        background: col.bar, border: '2px solid #fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 6, fontWeight: 900, color: '#fff',
-      }}>
-        {player.position[0]}
-      </div>
     </div>
   );
 }
@@ -247,6 +238,9 @@ const PlayerRow = memo(function PlayerRow({
   const isBench    = p.roster_slot === 'BENCH';
   const isLive     = liveData != null;
   const livePoints = liveData?.totals.fantasyPointsTotal ?? null;
+  // While a swap is in progress, dim/gray out anyone who isn't a valid target
+  // (wrong position group) so it's obvious at a glance who can be subbed in.
+  const dimmed     = selected != null && !isSelected && !eligible;
 
   const currentPrice  = Number(p.current_price);
   const purchasePrice = Number(p.purchase_price);
@@ -273,8 +267,9 @@ const PlayerRow = memo(function PlayerRow({
             : 'none',
         outlineOffset: '-2px',
         borderRadius: (isSelected || eligible) ? 10 : 0,
-        transition: 'background 0.15s',
-        opacity: isSwapping ? 0.6 : 1,
+        transition: 'background 0.15s, opacity 0.15s, filter 0.15s',
+        opacity: isSwapping ? 0.6 : dimmed ? 0.4 : 1,
+        filter: dimmed ? 'grayscale(1)' : 'none',
       }}
     >
       {/* Live left-rail accent */}
@@ -293,7 +288,7 @@ const PlayerRow = memo(function PlayerRow({
         }} />
       )}
 
-      <Avatar player={p} col={col} />
+      <Avatar player={p} />
 
       {/* Name / position / live chips */}
       <div style={{ flex: 1, minWidth: 0 }}>

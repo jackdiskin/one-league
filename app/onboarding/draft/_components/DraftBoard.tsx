@@ -105,7 +105,6 @@ function PlayerAvatar({ player, size = 48 }: { player: DraftPlayer; size?: numbe
 
 // ─── Field slot: filled ────────────────────────────────────────────────────────
 function FilledSlot({ player, onRemove }: { player: DraftPlayer; onRemove: () => void }) {
-  const col = POS_COLORS[player.position] ?? POS_COLORS.K;
   const lastName = player.full_name.split(' ').slice(1).join(' ') || player.full_name;
 
   return (
@@ -144,15 +143,6 @@ function FilledSlot({ player, onRemove }: { player: DraftPlayer; onRemove: () =>
               {player.full_name[0]}
             </div>
           )}
-          <div style={{
-            position: 'absolute', bottom: -1, right: -1,
-            width: 18, height: 18, borderRadius: '50%',
-            background: col.bar, border: '2px solid #fff',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 7, fontWeight: 900, color: '#fff',
-          }}>
-            {player.position}
-          </div>
         </div>
         {/* Remove X overlay on hover */}
         <div style={{
@@ -937,7 +927,7 @@ export default function DraftBoard({
                     {player.full_name}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: col.text, background: col.bg, borderRadius: 20, padding: '1px 5px' }}>{player.position}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 5px' }}>{player.position}</span>
                     <TeamLogo code={player.team_code} size={11} />
                     <span style={{ fontSize: 10, color: '#94a3b8' }}>{player.team_code}</span>
                   </div>
