@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
   const result = await withTransaction(async (conn) => {
     const [res] = await conn.execute<ResultSetHeader>(
       `INSERT INTO leagues (name, season_year, salary_cap, max_members, is_public, invite_code, owner_user_id)
-       VALUES (?, ?, 100.00, 20, ?, ?, ?)`,
-      [name.trim(), SEASON, isPublic ? 1 : 0, invite_code, session.user.id]
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [name.trim(), SEASON, 100_000_000, 20, isPublic ? 1 : 0, invite_code, session.user.id]
     );
     const leagueId = res.insertId;
 
