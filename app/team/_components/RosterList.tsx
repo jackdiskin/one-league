@@ -299,6 +299,8 @@ const PlayerRow = memo(function PlayerRow({
           <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {p.full_name}
           </span>
+          <TeamLogo code={p.team_code} size={12} />
+          <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
           {isLive && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0,
@@ -316,8 +318,6 @@ const PlayerRow = memo(function PlayerRow({
           )}
         </div>
         <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-          <TeamLogo code={p.team_code} size={12} />
-          <span>{p.team_code}</span>
           <MatchupBadge matchup={matchups[p.team_code]} />
           {isBench && <span style={{ fontSize: 9, color: '#cbd5e1', fontWeight: 600 }}>· BENCH</span>}
         </div>

@@ -809,17 +809,21 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
                         padding: '1px 6px', textTransform: 'uppercase', letterSpacing: '0.08em',
                       }}>{tx.transaction_type}</span>
                     </div>
-                    <div style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>
-                      {isBuy ? 'Added ' : 'Sold '}
-                      <span style={{ fontWeight: 700, color: '#0f172a' }}>{tx.full_name}</span>
-                      <span style={{
-                        marginLeft: 5, fontSize: 9, fontWeight: 700, color: '#64748b',
-                        background: '#f1f5f9', borderRadius: 20, padding: '1px 5px', textTransform: 'uppercase',
-                        display: 'inline-flex', alignItems: 'center', gap: 3, verticalAlign: 'middle',
-                      }}>
-                        <TeamLogo code={tx.team_code} size={10} />
-                        {tx.position} · {tx.team_code}
+                    <div style={{ fontSize: 12, color: '#475569', marginTop: 2, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 5 }}>
+                      <span>
+                        {isBuy ? 'Added ' : 'Sold '}
+                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{tx.full_name}</span>
                       </span>
+                      <TeamLogo code={tx.team_code} size={10} />
+                      <span style={{ fontSize: 10, color: '#94a3b8' }}>{tx.team_code}</span>
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, color: '#64748b',
+                        background: '#f1f5f9', borderRadius: 20, padding: '1px 5px', textTransform: 'uppercase',
+                      }}>
+                        {tx.position}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                       <MatchupBadge matchup={matchups[tx.team_code]} />
                     </div>
                     <div style={{ display: 'flex', gap: 12, marginTop: 3, fontSize: 10, color: '#94a3b8' }}>

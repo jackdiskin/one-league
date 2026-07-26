@@ -5,7 +5,6 @@ import { useMemo, useState } from 'react';
 import { useLiveStats, type LivePlayerStats } from '@/hooks/useLiveStats';
 import { formatPrice, formatPoints } from '@/lib/format';
 import TeamLogo from '@/components/TeamLogo';
-import MatchupBadge from '@/components/MatchupBadge';
 import type { Matchup } from '@/lib/schedule';
 
 export interface FieldPlayer {
@@ -332,10 +331,6 @@ function PlayerCard({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, marginTop: 1 }}>
           <TeamLogo code={player.team_code} size={10} />
           <span style={{ fontSize: 10, fontWeight: 600, color: '#64748b' }}>{player.team_code}</span>
-          {!isLive && matchup && (
-            <span style={{ fontSize: 9, color: '#cbd5e1' }}>·</span>
-          )}
-          {!isLive && <MatchupBadge matchup={matchup} size={9} />}
           {isLive && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 2,

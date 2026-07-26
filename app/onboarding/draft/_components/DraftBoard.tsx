@@ -927,13 +927,15 @@ export default function DraftBoard({
 
                 {/* Name / meta */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {player.full_name}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {player.full_name}
+                    </span>
+                    <TeamLogo code={player.team_code} size={11} />
+                    <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{player.team_code}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 5px' }}>{player.position}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 5px' }}>{player.position}</span>
-                    <TeamLogo code={player.team_code} size={11} />
-                    <span style={{ fontSize: 10, color: '#94a3b8' }}>{player.team_code}</span>
                     <MatchupBadge matchup={matchups[player.team_code]} />
                   </div>
                 </div>

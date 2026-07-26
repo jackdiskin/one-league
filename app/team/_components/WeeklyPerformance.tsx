@@ -114,12 +114,14 @@ export default function WeeklyPerformance({ players, week, season, matchups }: {
 
                 {/* Name */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {p.full_name}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {p.full_name}
+                    </span>
+                    <TeamLogo code={p.team_code} size={11} />
+                    <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
                   </div>
                   <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <TeamLogo code={p.team_code} size={11} />
-                    {p.team_code}
                     <MatchupBadge matchup={matchups[p.team_code]} />
                   </div>
                 </div>

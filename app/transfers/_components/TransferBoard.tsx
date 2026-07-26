@@ -258,6 +258,8 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
+                        <TeamLogo code={p.team_code} size={12} />
+                        <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
                         <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 5px' }}>{p.position}</span>
                         {isSelected && (
                           <span style={{ fontSize: 9, fontWeight: 800, color: '#dc2626', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 20, padding: '1px 6px', letterSpacing: '0.04em' }}>
@@ -266,9 +268,8 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                         )}
                       </div>
                       <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <TeamLogo code={p.team_code} size={12} />
-                        <span>{p.team_code} · {p.last_week_points != null ? `${formatPoints(p.last_week_points)} last wk` : 'no game yet'}</span>
                         <MatchupBadge matchup={matchups[p.team_code]} />
+                        <span>· {p.last_week_points != null ? `${formatPoints(p.last_week_points)} last wk` : 'no game yet'}</span>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -493,11 +494,13 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                                 <div onClick={() => setProfileId(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1, cursor: 'pointer' }}>
                                   <Avatar player={p} size={26} />
                                   <div style={{ minWidth: 0 }}>
-                                    <div style={{ fontSize: 11.5, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                      <span style={{ fontSize: 11.5, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
                                       <TeamLogo code={p.team_code} size={11} />
                                       <span style={{ fontSize: 9, color: '#94a3b8' }}>{p.team_code}</span>
                                       <span style={{ fontSize: 8, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 4px' }}>{p.position}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                       <MatchupBadge matchup={matchups[p.team_code]} size={9} />
                                     </div>
                                   </div>
