@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import { useLiveStats, type LivePlayerStats } from '@/hooks/useLiveStats';
 import { formatPrice, formatPoints } from '@/lib/format';
+import TeamLogo from '@/components/TeamLogo';
 
 export interface FieldPlayer {
   full_name: string;
@@ -150,7 +151,8 @@ function LiveStatsModal({
                 }} />
                 LIVE
               </span>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <TeamLogo code={player.team_code} size={12} />
                 {player.team_code}
               </span>
             </div>
@@ -341,7 +343,8 @@ function PlayerCard({
         <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {lastName}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, marginTop: 1 }}>
+          <TeamLogo code={player.team_code} size={10} />
           <span style={{ fontSize: 10, fontWeight: 600, color: '#64748b' }}>{player.team_code}</span>
           {isLive && (
             <span style={{

@@ -2,6 +2,8 @@
 
 import Image from 'next/image';
 import { formatPoints, formatWeekLong } from '@/lib/format';
+import ClickablePlayerRow from '@/components/ClickablePlayerRow';
+import TeamLogo from '@/components/TeamLogo';
 
 export interface PerfPlayer {
   id: number;
@@ -17,7 +19,7 @@ const POS_COLORS: Record<string, string> = {
   QB: '#3b82f6', RB: '#10b981', WR: '#f59e0b', TE: '#a855f7', K: '#94a3b8',
 };
 
-export default function WeeklyPerformance({ players, week }: { players: PerfPlayer[]; week: number }) {
+export default function WeeklyPerformance({ players, week, season }: { players: PerfPlayer[]; week: number; season?: number }) {
   const played = players.filter(p => p.last_week_points != null);
   const totalActual   = played.reduce((s, p) => s + Number(p.last_week_points ?? 0), 0);
   const totalExpected = played.reduce((s, p) => s + Number(p.projected_points ?? 0), 0);
@@ -86,12 +88,15 @@ export default function WeeklyPerformance({ players, week }: { players: PerfPlay
             const posColor = POS_COLORS[p.position] ?? '#94a3b8';
 
             return (
-              <div key={p.id} style={{
-                display: 'flex', alignItems: 'center',
-                padding: '10px 20px',
-                borderBottom: '1px solid #f8fafc',
-                cursor: 'pointer',
-              }}
+              <ClickablePlayerRow
+                key={p.id}
+                playerId={p.id}
+                season={season}
+                style={{
+                  display: 'flex', alignItems: 'center',
+                  padding: '10px 20px',
+                  borderBottom: '1px solid #f8fafc',
+                }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#fafafa'}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
               >
@@ -122,7 +127,10 @@ export default function WeeklyPerformance({ players, week }: { players: PerfPlay
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {p.full_name}
                   </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{p.team_code}</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <TeamLogo code={p.team_code} size={11} />
+                    {p.team_code}
+                  </div>
                 </div>
 
                 {/* Projected */}
@@ -169,7 +177,7 @@ export default function WeeklyPerformance({ players, week }: { players: PerfPlay
                     <span style={{ fontSize: 10, color: '#e2e8f0' }}>No data</span>
                   )}
                 </div>
-              </div>
+              </ClickablePlayerRow>
             );
           })}
       </div>

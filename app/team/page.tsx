@@ -275,7 +275,7 @@ export default async function TeamPage({
           />
 
           {/* Weekly performance */}
-          <WeeklyPerformance players={weeklyPerf} week={lastScoreWeek} />
+          <WeeklyPerformance players={weeklyPerf} week={lastScoreWeek} season={SEASON} />
 
         </main>
       </div>

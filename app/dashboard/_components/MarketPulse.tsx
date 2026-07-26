@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { query } from '@/lib/mysql';
 import { formatPrice } from '@/lib/format';
+import ClickablePlayerRow from '@/components/ClickablePlayerRow';
 
 interface Props { seasonYear: number }
 
@@ -16,10 +17,10 @@ export default async function MarketPulse({ seasonYear }: Props) {
   // Use actual transaction ledger for counts so this renders even when
   // market_state order counters haven't been incremented (e.g. after direct seeding).
   const players = await query<{
-    full_name: string; position: string; team_code: string; headshot_url: string | null;
+    player_id: number; full_name: string; position: string; team_code: string; headshot_url: string | null;
     current_price: number; buy_orders_count: number; sell_orders_count: number; net_order_flow: number;
   }>(
-    `SELECT p.full_name, p.position, p.team_code, p.headshot_url,
+    `SELECT p.id AS player_id, p.full_name, p.position, p.team_code, p.headshot_url,
             pms.current_price,
             COALESCE(SUM(pt.transaction_type = 'buy'),  0) AS buy_orders_count,
             COALESCE(SUM(pt.transaction_type = 'sell'), 0) AS sell_orders_count,
@@ -53,15 +54,20 @@ export default async function MarketPulse({ seasonYear }: Props) {
           const lastName = p.full_name.split(' ').slice(1).join(' ') || p.full_name;
 
           return (
-            <div key={p.full_name} className="flex items-center gap-3 rounded-xl px-2 py-1.5 cursor-pointer hover:bg-slate-50 transition-colors -mx-2">
+            <ClickablePlayerRow
+              key={p.player_id}
+              playerId={p.player_id}
+              season={seasonYear}
+              className="flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-slate-50 transition-colors -mx-2"
+            >
               {p.headshot_url ? (
                 <Image src={p.headshot_url} alt={p.full_name}
                   width={36} height={36}
-                  className="h-9 w-9 rounded-full object-cover border border-slate-100 shrink-0"
+                  className="h-9 w-9 object-contain shrink-0"
                   unoptimized
                 />
               ) : (
-                <div className="h-9 w-9 rounded-full bg-slate-100 ring-1 ring-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">
+                <div className="h-9 w-9 rounded-lg bg-slate-100 ring-1 ring-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">
                   {p.full_name[0]}
                 </div>
               )}
@@ -87,7 +93,7 @@ export default async function MarketPulse({ seasonYear }: Props) {
                     style={{ width: `${buyPct}%` }} />
                 </div>
               </div>
-            </div>
+            </ClickablePlayerRow>
           );
         })}
       </div>

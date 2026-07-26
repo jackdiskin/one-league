@@ -1,6 +1,8 @@
 import Image from 'next/image';
 import { query } from '@/lib/mysql';
 import { formatPrice, formatPct, formatWeek } from '@/lib/format';
+import ClickablePlayerRow from '@/components/ClickablePlayerRow';
+import TeamLogo from '@/components/TeamLogo';
 
 interface Props { seasonYear: number }
 
@@ -59,19 +61,23 @@ async function fetchMovers(seasonYear: number, maxWeek: number, direction: 'gain
   );
 }
 
-function MoverRow({ mover, up }: { mover: Mover & { sparkPrices: number[] }; up: boolean }) {
+function MoverRow({ mover, up, season }: { mover: Mover & { sparkPrices: number[] }; up: boolean; season: number }) {
   const lastName = mover.full_name.split(' ').slice(1).join(' ') || mover.full_name;
   return (
-    <div className="group flex items-center justify-between rounded-2xl bg-white p-4 ring-1 ring-slate-200 cursor-pointer hover:ring-slate-200 hover:shadow-sm transition-all">
+    <ClickablePlayerRow
+      playerId={mover.player_id}
+      season={season}
+      className="group flex items-center justify-between rounded-2xl bg-white p-4 ring-1 ring-slate-200 hover:ring-slate-200 hover:shadow-sm transition-all"
+    >
       <div className="flex items-center gap-3 min-w-0">
         {mover.headshot_url ? (
           <Image src={mover.headshot_url} alt={mover.full_name}
             width={48} height={48}
-            className="h-12 w-12 rounded-full object-cover border border-slate-100 shrink-0"
+            className="h-12 w-12 object-contain shrink-0"
             unoptimized
           />
         ) : (
-          <div className="h-12 w-12 rounded-full bg-slate-100 ring-1 ring-slate-200 flex items-center justify-center text-sm font-bold text-slate-500 shrink-0">
+          <div className="h-12 w-12 rounded-lg bg-slate-100 ring-1 ring-slate-200 flex items-center justify-center text-sm font-bold text-slate-500 shrink-0">
             {mover.full_name[0]}
           </div>
         )}
@@ -80,6 +86,7 @@ function MoverRow({ mover, up }: { mover: Mover & { sparkPrices: number[] }; up:
             <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold shrink-0 ${POSITION_COLORS[mover.position] ?? 'bg-slate-100 text-slate-600'}`}>
               {mover.position}
             </span>
+            <TeamLogo code={mover.team_code} size={12} />
             <span className="text-xs text-slate-500 shrink-0">{mover.team_code}</span>
           </div>
           <p className="text-sm font-semibold text-slate-900 truncate group-hover:text-emerald-700 transition-colors">{lastName}</p>
@@ -99,7 +106,7 @@ function MoverRow({ mover, up }: { mover: Mover & { sparkPrices: number[] }; up:
           {up ? '↗' : '↘'}
         </div>
       </div>
-    </div>
+    </ClickablePlayerRow>
   );
 }
 
@@ -150,7 +157,7 @@ export default async function TopMovers({ seasonYear }: Props) {
           <span className="ml-auto text-xs text-slate-400">{formatWeek(maxWeek)}</span>
         </div>
         <div className="space-y-2">
-          {gainers.map((m) => <MoverRow key={m.player_id} mover={enrich(m)} up={true} />)}
+          {gainers.map((m) => <MoverRow key={m.player_id} mover={enrich(m)} up={true} season={seasonYear} />)}
         </div>
       </div>
 
@@ -162,7 +169,7 @@ export default async function TopMovers({ seasonYear }: Props) {
           <span className="ml-auto text-xs text-slate-400">{formatWeek(maxWeek)}</span>
         </div>
         <div className="space-y-2">
-          {losers.map((m) => <MoverRow key={m.player_id} mover={enrich(m)} up={false} />)}
+          {losers.map((m) => <MoverRow key={m.player_id} mover={enrich(m)} up={false} season={seasonYear} />)}
         </div>
       </div>
     </div>

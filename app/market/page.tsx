@@ -1,5 +1,4 @@
 import Image from 'next/image';
-import Link from 'next/link';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
@@ -7,6 +6,8 @@ import { query } from '@/lib/mysql';
 import { formatPrice, formatPoints, formatWeekLong } from '@/lib/format';
 import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
+import ClickablePlayerRow from '@/components/ClickablePlayerRow';
+import TeamLogo from '@/components/TeamLogo';
 
 const PREV_SEASON = 2025;
 
@@ -366,7 +367,7 @@ export default async function MarketPage({
                 const delta = Number(p.price_delta);
                 const pct  = Number(p.base_weekly_price) > 0 ? (delta / Number(p.base_weekly_price)) * 100 : 0;
                 return (
-                  <Link key={p.id} href={`/players/${p.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+                  <ClickablePlayerRow key={p.id} playerId={p.id} season={SEASON} style={{ display: 'block' }}>
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: 10, padding: '9px 18px',
                       borderBottom: i < gainers.length - 1 ? '1px solid #f8fafc' : 'none',
@@ -377,8 +378,9 @@ export default async function MarketPage({
                           <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
                           <PosBadge pos={p.position} />
                         </div>
-                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>
-                          {p.team_code} · {formatPrice(p.current_price)} · {p.buy_orders_count} buys
+                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <TeamLogo code={p.team_code} size={11} />
+                          <span>{p.team_code} · {formatPrice(p.current_price)} · {p.buy_orders_count} buys</span>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -386,7 +388,7 @@ export default async function MarketPage({
                         <div style={{ fontSize: 9, color: '#10b981' }}>▲ {pct.toFixed(1)}%</div>
                       </div>
                     </div>
-                  </Link>
+                  </ClickablePlayerRow>
                 );
               })}
             </SectionCard>
@@ -399,7 +401,7 @@ export default async function MarketPage({
                 const delta = Number(p.price_delta);
                 const pct  = Number(p.base_weekly_price) > 0 ? (Math.abs(delta) / Number(p.base_weekly_price)) * 100 : 0;
                 return (
-                  <Link key={p.id} href={`/players/${p.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+                  <ClickablePlayerRow key={p.id} playerId={p.id} season={SEASON} style={{ display: 'block' }}>
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: 10, padding: '9px 18px',
                       borderBottom: i < losers.length - 1 ? '1px solid #f8fafc' : 'none',
@@ -410,8 +412,9 @@ export default async function MarketPage({
                           <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
                           <PosBadge pos={p.position} />
                         </div>
-                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>
-                          {p.team_code} · {formatPrice(p.current_price)} · {p.sell_orders_count} sells
+                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <TeamLogo code={p.team_code} size={11} />
+                          <span>{p.team_code} · {formatPrice(p.current_price)} · {p.sell_orders_count} sells</span>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -419,7 +422,7 @@ export default async function MarketPage({
                         <div style={{ fontSize: 9, color: '#f43f5e' }}>▼ {pct.toFixed(1)}%</div>
                       </div>
                     </div>
-                  </Link>
+                  </ClickablePlayerRow>
                 );
               })}
             </SectionCard>
@@ -435,7 +438,7 @@ export default async function MarketPage({
                 const maxFlow = Number(highDemand[0]?.net_order_flow ?? 1);
                 const pct = (Number(p.net_order_flow) / maxFlow) * 100;
                 return (
-                  <Link key={p.id} href={`/players/${p.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+                  <ClickablePlayerRow key={p.id} playerId={p.id} season={SEASON} style={{ display: 'block' }}>
                     <div style={{
                       padding: '9px 16px',
                       borderBottom: i < highDemand.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
@@ -448,7 +451,10 @@ export default async function MarketPage({
                             <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
                             <PosBadge pos={p.position} />
                           </div>
-                          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{p.team_code} · {formatPrice(p.current_price)}</span>
+                          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <TeamLogo code={p.team_code} size={11} />
+                            {p.team_code} · {formatPrice(p.current_price)}
+                          </span>
                         </div>
                         <div style={{ fontSize: 12, fontWeight: 800, color: '#34d399', flexShrink: 0 }}>
                           +{p.net_order_flow}
@@ -458,7 +464,7 @@ export default async function MarketPage({
                         <div style={{ height: '100%', borderRadius: 99, width: `${pct}%`, background: 'linear-gradient(90deg,#10b981,#34d399)' }} />
                       </div>
                     </div>
-                  </Link>
+                  </ClickablePlayerRow>
                 );
               })}
             </SectionCard>
@@ -470,7 +476,7 @@ export default async function MarketPage({
                 const maxFlow = Math.abs(Number(sellPressure[0]?.net_order_flow ?? 1));
                 const pct = (Math.abs(Number(p.net_order_flow)) / maxFlow) * 100;
                 return (
-                  <Link key={p.id} href={`/players/${p.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+                  <ClickablePlayerRow key={p.id} playerId={p.id} season={SEASON} style={{ display: 'block' }}>
                     <div style={{
                       padding: '9px 16px',
                       borderBottom: i < sellPressure.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
@@ -483,7 +489,10 @@ export default async function MarketPage({
                             <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
                             <PosBadge pos={p.position} />
                           </div>
-                          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{p.team_code} · {formatPrice(p.current_price)}</span>
+                          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <TeamLogo code={p.team_code} size={11} />
+                            {p.team_code} · {formatPrice(p.current_price)}
+                          </span>
                         </div>
                         <div style={{ fontSize: 12, fontWeight: 800, color: '#fb7185', flexShrink: 0 }}>
                           {p.net_order_flow}
@@ -493,7 +502,7 @@ export default async function MarketPage({
                         <div style={{ height: '100%', borderRadius: 99, width: `${pct}%`, background: 'linear-gradient(90deg,#f43f5e,#fb7185)' }} />
                       </div>
                     </div>
-                  </Link>
+                  </ClickablePlayerRow>
                 );
               })}
             </SectionCard>
@@ -507,7 +516,7 @@ export default async function MarketPage({
                 const buyPct  = total > 0 ? (Number(p.buy_orders_count) / total) * 100 : 50;
                 const barPct  = (total / maxTotal) * 100;
                 return (
-                  <Link key={p.id} href={`/players/${p.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+                  <ClickablePlayerRow key={p.id} playerId={p.id} season={SEASON} style={{ display: 'block' }}>
                     <div style={{
                       padding: '9px 18px',
                       borderBottom: i < mostTraded.length - 1 ? '1px solid #f8fafc' : 'none',
@@ -533,7 +542,7 @@ export default async function MarketPage({
                         }} />
                       </div>
                     </div>
-                  </Link>
+                  </ClickablePlayerRow>
                 );
               })}
             </SectionCard>
@@ -579,15 +588,18 @@ export default async function MarketPage({
 
                   {/* Player */}
                   <div style={{ paddingLeft: 8, minWidth: 0 }}>
-                    <Link href={`/players/${tx.id}`} style={{ textDecoration: 'none' }}>
+                    <ClickablePlayerRow playerId={tx.id} season={SEASON}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {tx.full_name}
                         </span>
                         <PosBadge pos={tx.position} />
                       </div>
-                    </Link>
-                    <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>{tx.team_code}</div>
+                    </ClickablePlayerRow>
+                    <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <TeamLogo code={tx.team_code} size={11} />
+                      {tx.team_code}
+                    </div>
                   </div>
 
                   {/* Fantasy team */}

@@ -1,11 +1,12 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 import { useState, useTransition, useMemo, useCallback, memo, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatPrice, formatPoints } from '@/lib/format';
 import { useLiveStats, getLivePoints, type LiveStatDelta } from '@/hooks/useLiveStats';
+import TeamLogo from '@/components/TeamLogo';
+import PlayerProfileModal from '@/components/PlayerProfileModal';
 
 export interface RosterPlayer {
   id: number;
@@ -202,6 +203,7 @@ interface PlayerRowProps {
   swapping: Set<number>;
   liveData: import('@/hooks/useLiveStats').LivePlayerStats | undefined;
   onPlayerClick: (p: RosterPlayer) => void;
+  onProfileClick: (p: RosterPlayer) => void;
 }
 
 function Avatar({ player, size = 40, col }: { player: RosterPlayer; size?: number; col: typeof POS_COLORS[string] }) {
@@ -236,7 +238,7 @@ function Avatar({ player, size = 40, col }: { player: RosterPlayer; size?: numbe
 }
 
 const PlayerRow = memo(function PlayerRow({
-  p, selected, swapping, liveData, onPlayerClick,
+  p, selected, swapping, liveData, onPlayerClick, onProfileClick,
 }: PlayerRowProps) {
   const col        = POS_COLORS[p.position] ?? POS_COLORS.K;
   const isSelected = selected?.id === p.id;
@@ -253,7 +255,7 @@ const PlayerRow = memo(function PlayerRow({
 
   return (
     <div
-      onClick={() => { if (!isSwapping) onPlayerClick(p); }}
+      onClick={() => { if (!isSwapping) onProfileClick(p); }}
       style={{
         display: 'flex', alignItems: 'center',
         padding: '9px 20px',
@@ -315,7 +317,8 @@ const PlayerRow = memo(function PlayerRow({
             </span>
           )}
         </div>
-        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <TeamLogo code={p.team_code} size={12} />
           <span>{p.team_code}</span>
           {isBench && <span style={{ fontSize: 9, color: '#cbd5e1', fontWeight: 600 }}>· BENCH</span>}
         </div>
@@ -349,22 +352,27 @@ const PlayerRow = memo(function PlayerRow({
         </div>
       </div>
 
-      {/* Link to player profile (34px) */}
-      <div style={{ width: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-        <Link
-          href={`/players/${p.id}`}
-          onClick={e => e.stopPropagation()}
+      {/* Move (select for starter/bench swap) — 64px */}
+      <div style={{ width: 64, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+        <button
+          onClick={e => { e.stopPropagation(); if (!isSwapping) onPlayerClick(p); }}
+          disabled={isSwapping}
           style={{
-            width: 26, height: 26, borderRadius: 7, border: '1px solid #f1f5f9',
-            background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#94a3b8', flexShrink: 0, textDecoration: 'none',
+            padding: '5px 10px', borderRadius: 8,
+            border: isSelected ? `1px solid ${col.ring}` : '1px solid #e2e8f0',
+            background: isSelected ? col.light : '#fff',
+            color: isSelected ? col.ring : '#475569',
+            fontSize: 11, fontWeight: 700,
+            cursor: isSwapping ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', gap: 4,
           }}
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-            <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+            <polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
+            <polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" />
           </svg>
-        </Link>
+          Move
+        </button>
       </div>
 
       {/* Swap overlay */}
@@ -391,6 +399,7 @@ export default function RosterList({ roster, teamId }: {
 
   const [selected, setSelected]     = useState<RosterPlayer | null>(null);
   const [swapping, setSwapping]     = useState<Set<number>>(new Set());
+  const [profileId, setProfileId]   = useState<number | null>(null);
 
   // Live stats via WebSocket — subscribe to all players on roster by SportsDataIO PlayerID
   const playerIds = useMemo(
@@ -686,7 +695,7 @@ export default function RosterList({ roster, teamId }: {
           <span style={{ width: 60, textAlign: 'right' }}>P&amp;L</span>
           <span style={{ width: 68, textAlign: 'right' }}>Live / Wk</span>
           <span style={{ width: 72, textAlign: 'right' }}>Season</span>
-          <span style={{ width: 34, flexShrink: 0 }} />
+          <span style={{ width: 64, flexShrink: 0 }} />
         </div>
       </div>
 
@@ -780,6 +789,7 @@ export default function RosterList({ roster, teamId }: {
                   selected={selected} swapping={swapping}
                   liveData={liveStats.get(p.external_player_id ?? '') ?? undefined}
                   onPlayerClick={handlePlayerClick}
+                  onProfileClick={p => setProfileId(p.id)}
                 />
               ))}
               {emptySlots.map(slot => (
@@ -857,6 +867,7 @@ export default function RosterList({ roster, teamId }: {
                   selected={selected} swapping={swapping}
                   liveData={liveStats.get(p.external_player_id ?? '') ?? undefined}
                   onPlayerClick={handlePlayerClick}
+                  onProfileClick={p => setProfileId(p.id)}
                 />
               ))}
             </div>
@@ -869,6 +880,10 @@ export default function RosterList({ roster, teamId }: {
           onMove={() => selected && executeMove(selected, 'BENCH')}
         />
       </>
+
+      {profileId != null && (
+        <PlayerProfileModal playerId={profileId} onClose={() => setProfileId(null)} />
+      )}
     </div>
   );
 }

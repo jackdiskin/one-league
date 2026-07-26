@@ -11,6 +11,8 @@ import LiveStandings, { type StandingRow as LiveStandingRow } from './_component
 import SeasonRecapWrapper from './_components/SeasonRecapWrapper';
 import WeeklyRecapWrapper from './_components/WeeklyRecapWrapper';
 import { computeWeeklyBadges } from '@/lib/weeklyRecapBadges';
+import ClickablePlayerRow from '@/components/ClickablePlayerRow';
+import TeamLogo from '@/components/TeamLogo';
 
 const PREV_SEASON = 2025;
 
@@ -33,7 +35,7 @@ type StandingRow = {
 type TransactionRow = {
   id: number; transaction_type: 'buy' | 'sell'; week: number;
   price: number; price_before: number; price_after: number; created_at: string;
-  team_name: string; user_name: string; full_name: string; position: string; team_code: string;
+  team_name: string; user_name: string; player_id: number; full_name: string; position: string; team_code: string;
   headshot_url: string | null;
 };
 
@@ -193,7 +195,7 @@ async function fetchTeamWeeklyScores(season: number, leagueId: number): Promise<
 async function fetchTransactions(season: number, leagueId: number): Promise<TransactionRow[]> {
   return query<TransactionRow>(
     `SELECT pt.id, pt.transaction_type, pt.week, pt.price, pt.price_before, pt.price_after, pt.created_at,
-            ft.team_name, u.name AS user_name, p.full_name, p.position, p.team_code, p.headshot_url
+            ft.team_name, u.name AS user_name, p.id AS player_id, p.full_name, p.position, p.team_code, p.headshot_url
      FROM player_transactions pt
      JOIN fantasy_teams ft ON ft.id = pt.fantasy_team_id
      JOIN \`user\` u ON u.id = ft.user_id
@@ -763,7 +765,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
               const isBuy      = tx.transaction_type === 'buy';
               const priceDelta = Number(tx.price_after) - Number(tx.price_before);
               return (
-                <div key={tx.id} style={{
+                <ClickablePlayerRow key={tx.id} playerId={tx.player_id} season={SEASON} style={{
                   display: 'flex', alignItems: 'flex-start', gap: 12,
                   padding: '9px 18px',
                   borderBottom: i < transactions.length - 1 ? '1px solid #f8fafc' : 'none',
@@ -808,7 +810,11 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
                       <span style={{
                         marginLeft: 5, fontSize: 9, fontWeight: 700, color: '#64748b',
                         background: '#f1f5f9', borderRadius: 20, padding: '1px 5px', textTransform: 'uppercase',
-                      }}>{tx.position} · {tx.team_code}</span>
+                        display: 'inline-flex', alignItems: 'center', gap: 3, verticalAlign: 'middle',
+                      }}>
+                        <TeamLogo code={tx.team_code} size={10} />
+                        {tx.position} · {tx.team_code}
+                      </span>
                     </div>
                     <div style={{ display: 'flex', gap: 12, marginTop: 3, fontSize: 10, color: '#94a3b8' }}>
                       <span>{formatPrice(tx.price)}</span>
@@ -819,7 +825,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
                       <span style={{ marginLeft: 'auto' }}>{formatTransactionTime(tx.created_at)}</span>
                     </div>
                   </div>
-                </div>
+                </ClickablePlayerRow>
               );
             })}
           </SectionCard>

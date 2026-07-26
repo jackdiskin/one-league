@@ -12,6 +12,7 @@ import BackLink from './_components/BackLink';
 import LivePlayerHeroStats from './_components/LivePlayerHeroStats';
 import WeeklyStatsTable, { type WeekScore, type StatCol } from './_components/WeeklyStatsTable';
 import FinalPlayerHeroStats from './_components/FinalPlayerHeroStats';
+import TeamLogo from '@/components/TeamLogo';
 
 const PREV_SEASON = 2025;
 const CURRENT_SEASON = 2026;
@@ -298,6 +299,7 @@ export default async function PlayerPage({
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${posStyle.pill}`}>{pos}</span>
+                  <TeamLogo code={player.team_code} size={16} />
                   <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>{player.team_code}</span>
                 </div>
                 <h1 style={{

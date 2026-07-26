@@ -4,6 +4,8 @@ import Image from 'next/image';
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatPrice } from '@/lib/format';
+import TeamLogo from '@/components/TeamLogo';
+import PlayerProfileModal from '@/components/PlayerProfileModal';
 
 export interface DraftPlayer {
   id: number;
@@ -692,6 +694,7 @@ export default function DraftBoard({
   const [pos, setPos]               = useState('ALL');
   const [search, setSearch]         = useState('');
   const [page, setPage]             = useState(1);
+  const [profileId, setProfileId]   = useState<number | null>(null);
   const [showModal, setShowModal]   = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
   const [justAdded, setJustAdded]   = useState<number | null>(null);
@@ -896,6 +899,7 @@ export default function DraftBoard({
             return (
               <div
                 key={player.id}
+                onClick={() => setProfileId(player.id)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   padding: '7px 14px',
@@ -903,6 +907,7 @@ export default function DraftBoard({
                   opacity: !isAdded && !addable && selected.length > 0 ? 0.45 : 1,
                   transition: 'all 0.15s',
                   background: isAdded ? col.bg : 'transparent',
+                  cursor: 'pointer',
                 }}
                 onMouseEnter={e => { if (!isAdded) (e.currentTarget as HTMLElement).style.background = '#fafafa'; }}
                 onMouseLeave={e => { if (!isAdded) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
@@ -933,6 +938,7 @@ export default function DraftBoard({
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
                     <span style={{ fontSize: 9, fontWeight: 700, color: col.text, background: col.bg, borderRadius: 20, padding: '1px 5px' }}>{player.position}</span>
+                    <TeamLogo code={player.team_code} size={11} />
                     <span style={{ fontSize: 10, color: '#94a3b8' }}>{player.team_code}</span>
                   </div>
                 </div>
@@ -944,7 +950,7 @@ export default function DraftBoard({
 
                 {/* Add / Added button */}
                 <button
-                  onClick={() => isAdded ? removePlayer(player.id) : addPlayer(player)}
+                  onClick={e => { e.stopPropagation(); isAdded ? removePlayer(player.id) : addPlayer(player); }}
                   disabled={!isAdded && !addable}
                   style={{
                     width: 26, height: 26, borderRadius: 8, border: 'none', cursor: isAdded || addable ? 'pointer' : 'default',
@@ -1194,6 +1200,10 @@ export default function DraftBoard({
           userName={userName}
           onClose={() => setShowWelcome(false)}
         />
+      )}
+
+      {profileId != null && (
+        <PlayerProfileModal playerId={profileId} season={season} onClose={() => setProfileId(null)} />
       )}
     </div>
   );
