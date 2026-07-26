@@ -3,16 +3,13 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
-import { formatPrice, formatPoints, formatWeekLong } from '@/lib/format';
+import { formatWeekLong } from '@/lib/format';
 import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import MyTeamSummary from '@/app/dashboard/_components/MyTeamSummary';
 import RosterList,   { type RosterPlayer }   from './_components/RosterList';
-import LiveWeekScore       from './_components/LiveWeekScore';
 import LiveTotalPointsTile from './_components/LiveTotalPointsTile';
-import CapBreakdown  from './_components/CapBreakdown';
 import WeeklyPerformance, { type PerfPlayer } from './_components/WeeklyPerformance';
-import AvailablePlayers, { type AvailablePlayer } from './_components/AvailablePlayers';
 
 const PREV_SEASON = 2025;
 
@@ -143,25 +140,6 @@ async function fetchWeeklyPerf(season: number, teamId: number, lastWeek: number)
   );
 }
 
-async function fetchAvailable(season: number, teamId: number, lastWeek: number): Promise<AvailablePlayer[]> {
-  return query<AvailablePlayer>(
-    `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url,
-            COALESCE(pms.current_price, 0) AS current_price,
-            pws.fantasy_points AS last_week_points
-     FROM players p
-     LEFT JOIN player_market_state pms ON pms.player_id = p.id AND pms.season_year = ?
-     LEFT JOIN player_weekly_scores pws
-       ON pws.player_id = p.id AND pws.season_year = ? AND pws.week = ?
-     WHERE p.id NOT IN (
-       SELECT player_id FROM fantasy_team_roster
-       WHERE fantasy_team_id = ? AND is_active = TRUE
-     )
-     AND p.position IN ('QB','RB','WR','TE','K')
-     ORDER BY COALESCE(pms.current_price, 0) DESC`,
-    [season, season, lastWeek, teamId]
-  );
-}
-
 export default async function TeamPage({
   searchParams,
 }: {
@@ -201,14 +179,12 @@ export default async function TeamPage({
     );
   }
 
-  const [roster, weeklyPerf, available] = await Promise.all([
+  const [roster, weeklyPerf] = await Promise.all([
     fetchRoster(SEASON, team.id, lastScoreWeek),
     fetchWeeklyPerf(SEASON, team.id, lastScoreWeek),
-    fetchAvailable(SEASON, team.id, lastScoreWeek),
   ]);
 
   const rankLabel = team.rank === 1 ? '1st' : team.rank === 2 ? '2nd' : team.rank === 3 ? '3rd' : `${team.rank}th`;
-  const totalValue = roster.reduce((s, p) => s + Number(p.current_price), 0);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
@@ -260,16 +236,11 @@ export default async function TeamPage({
             </p>
           </div>
 
-          {/* Live week score — emphatic current-week total */}
-          <LiveWeekScore roster={roster} currentWeek={currentWeek} />
-
           {/* Quick stat tiles */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
             <LiveTotalPointsTile roster={roster} seasonBasePoints={team.total_points} />
             {[
-              { label: 'League Rank',  value: rankLabel,                          sub: `of ${team.league_size} teams`, accent: team.rank <= 3 },
-              { label: 'Roster Value', value: formatPrice(totalValue),            sub: 'at market price',   accent: false },
-              { label: 'Budget Left',  value: formatPrice(team.budget_remaining), sub: 'cap space',         accent: true  },
+              { label: 'League Rank',  value: rankLabel, sub: `of ${team.league_size} teams`, accent: team.rank <= 3 },
             ].map(tile => (
               <div key={tile.label} className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm" style={{ padding: '14px 16px' }}>
                 <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{tile.label}</p>
@@ -284,27 +255,19 @@ export default async function TeamPage({
             ))}
           </div>
 
-          {/* Formation + Cap side by side */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16, alignItems: 'stretch' }}>
-            <Suspense fallback={<Skeleton h={580} />}>
-              <MyTeamSummary userId={userId} seasonYear={SEASON} />
-            </Suspense>
-            <CapBreakdown roster={roster} budgetRemaining={team.budget_remaining} />
-          </div>
+          {/* Formation */}
+          <Suspense fallback={<Skeleton h={580} />}>
+            <MyTeamSummary userId={userId} seasonYear={SEASON} />
+          </Suspense>
 
-          {/* Roster list */}
+          {/* Roster list — starters/bench lineup management only */}
           <RosterList
             roster={roster}
             teamId={team.id}
-            currentWeek={currentWeek}
-            budgetRemaining={team.budget_remaining}
           />
 
           {/* Weekly performance */}
           <WeeklyPerformance players={weeklyPerf} week={lastScoreWeek} />
-
-          {/* Available players */}
-          <AvailablePlayers players={available} budgetRemaining={team.budget_remaining} />
 
         </main>
       </div>

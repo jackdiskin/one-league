@@ -6,6 +6,7 @@ import { Suspense } from 'react';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
 import MyTeamSummary   from './_components/MyTeamSummary';
+import WeekScoreSection from './_components/WeekScoreSection';
 import TopMovers       from './_components/TopMovers';
 import StandingsCard   from './_components/StandingsCard';
 import DiscoverLeagues from './_components/DiscoverLeagues';
@@ -165,6 +166,11 @@ export default async function DashboardPage({
               {formatWeekLong(currentWeek)} · {SEASON} NFL season
             </p>
           </div>
+
+          {/* Current week score — live once games kick off, projected until then */}
+          <Suspense fallback={<Skeleton className="h-40" />}>
+            <WeekScoreSection teamId={teamCheck.id} season={SEASON} currentWeek={currentWeek} />
+          </Suspense>
 
           {/* My Team */}
           <Suspense fallback={<Skeleton className="h-48" />}>

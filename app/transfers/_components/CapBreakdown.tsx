@@ -1,5 +1,9 @@
 import { formatPrice } from '@/lib/format';
-import type { RosterPlayer } from './RosterList';
+
+export interface CapPlayer {
+  position: string;
+  current_price: number;
+}
 
 const POS_COLORS: Record<string, { bar: string; label: string }> = {
   QB: { bar: '#3b82f6', label: 'Quarterback' },
@@ -15,7 +19,7 @@ export default function CapBreakdown({
   roster,
   budgetRemaining,
 }: {
-  roster: RosterPlayer[];
+  roster: CapPlayer[];
   budgetRemaining: number;
 }) {
   const totalSpent = TOTAL_CAP - Number(budgetRemaining);

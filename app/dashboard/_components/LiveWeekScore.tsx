@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useLiveStats } from '@/hooks/useLiveStats';
-import type { RosterPlayer } from './RosterList';
+import type { RosterPlayer } from '@/app/team/_components/RosterList';
 
 interface Props {
   roster:      RosterPlayer[];
