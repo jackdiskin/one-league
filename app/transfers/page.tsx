@@ -10,6 +10,14 @@ import CapBreakdown from './_components/CapBreakdown';
 
 const PREV_SEASON = 2025;
 
+async function detectUserSeason(userId: string): Promise<number> {
+  const [row] = await query<{ season_year: number }>(
+    `SELECT MAX(season_year) AS season_year FROM fantasy_teams WHERE user_id = ?`,
+    [userId]
+  );
+  return row?.season_year ?? PREV_SEASON;
+}
+
 async function fetchCurrentWeek(season: number): Promise<number> {
   const [row] = await query<{ w: number }>(
     `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [season]
@@ -91,7 +99,7 @@ export default async function TransfersPage({
 
   const userId = session.user.id;
   const { season: seasonParam } = await searchParams;
-  const SEASON = seasonParam ? parseInt(seasonParam, 10) : PREV_SEASON;
+  const SEASON = seasonParam ? parseInt(seasonParam, 10) : await detectUserSeason(userId);
 
   const [currentWeek, lastScoreWeek, userLeagues, team] = await Promise.all([
     fetchCurrentWeek(SEASON),

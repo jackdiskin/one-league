@@ -17,6 +17,14 @@ function Skeleton({ h = 200 }: { h?: number }) {
   return <div className="rounded-2xl bg-slate-100 animate-pulse" style={{ height: h }} />;
 }
 
+async function detectUserSeason(userId: string): Promise<number> {
+  const [row] = await query<{ season_year: number }>(
+    `SELECT MAX(season_year) AS season_year FROM fantasy_teams WHERE user_id = ?`,
+    [userId]
+  );
+  return row?.season_year ?? PREV_SEASON;
+}
+
 async function fetchCurrentWeek(season: number): Promise<number> {
   const [row] = await query<{ w: number }>(
     `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [season]
@@ -150,7 +158,7 @@ export default async function TeamPage({
 
   const userId = session.user.id;
   const { season: seasonParam } = await searchParams;
-  const SEASON = seasonParam ? parseInt(seasonParam, 10) : PREV_SEASON;
+  const SEASON = seasonParam ? parseInt(seasonParam, 10) : await detectUserSeason(userId);
 
   const [currentWeek, lastScoreWeek, userLeagues, team] = await Promise.all([
     fetchCurrentWeek(SEASON),

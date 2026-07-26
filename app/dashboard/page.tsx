@@ -174,7 +174,7 @@ export default async function DashboardPage({
 
           {/* My Team */}
           <Suspense fallback={<Skeleton className="h-48" />}>
-            <MyTeamSummary userId={userId} seasonYear={SEASON} />
+            <MyTeamSummary userId={userId} seasonYear={SEASON} hidePrices />
           </Suspense>
 
           {/* Top Movers */}

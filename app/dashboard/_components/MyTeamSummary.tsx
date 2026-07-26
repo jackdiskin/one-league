@@ -2,7 +2,7 @@ import { query } from '@/lib/mysql';
 import { formatPrice, formatPoints } from '@/lib/format';
 import LiveTeamField, { type FieldPlayer, type FieldSlot } from './LiveTeamField';
 
-interface Props { userId: string; seasonYear: number }
+interface Props { userId: string; seasonYear: number; hidePrices?: boolean }
 
 type Player = FieldPlayer;
 
@@ -31,7 +31,7 @@ function getPositions(wrs: Player[], tes: Player[], qbs: Player[], rbs: Player[]
 }
 
 
-export default async function MyTeamSummary({ userId, seasonYear }: Props) {
+export default async function MyTeamSummary({ userId, seasonYear, hidePrices = false }: Props) {
   const [team] = await query<{
     id: number; team_name: string; total_points: number; budget_remaining: number;
     league_name: string; rank: number; league_size: number;
@@ -122,7 +122,7 @@ export default async function MyTeamSummary({ userId, seasonYear }: Props) {
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           {[
             { label: 'Points', value: formatPoints(team.total_points), bg: '#f8fafc', border: '#e2e8f0', color: '#0f172a', labelColor: '#94a3b8' },
-            { label: 'Cap Space', value: formatPrice(team.budget_remaining), bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d', labelColor: '#16a34a' },
+            ...(hidePrices ? [] : [{ label: 'Cap Space', value: formatPrice(team.budget_remaining), bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d', labelColor: '#16a34a' }]),
             { label: 'Rank',   value: `${rankMedal ?? ''}${rankLabel}`,  bg: team.rank <= 3 ? '#fffbeb' : '#f8fafc', border: team.rank <= 3 ? '#fde68a' : '#e2e8f0', color: '#0f172a', labelColor: '#94a3b8' },
           ].map(s => (
             <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 12, padding: '6px 12px', textAlign: 'center' }}>
@@ -134,7 +134,7 @@ export default async function MyTeamSummary({ userId, seasonYear }: Props) {
       </div>
 
       {/* ── Field ── */}
-      <LiveTeamField positions={positions} losY={losY} />
+      <LiveTeamField positions={positions} losY={losY} hidePrices={hidePrices} />
     </div>
   );
 }

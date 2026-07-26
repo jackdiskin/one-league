@@ -29,11 +29,12 @@ const POS_COLOR: Record<string, string> = {
 // Live stats modal
 // ---------------------------------------------------------------------------
 function LiveStatsModal({
-  player, stats, onClose,
+  player, stats, onClose, hidePrices = false,
 }: {
   player: FieldPlayer;
   stats: LivePlayerStats;
   onClose: () => void;
+  hidePrices?: boolean;
 }) {
   const t = stats.totals;
   const color = POS_COLOR[player.position] ?? '#94a3b8';
@@ -225,16 +226,18 @@ function LiveStatsModal({
         </div>
 
         {/* Footer — price */}
-        <div style={{
-          padding: '10px 18px 14px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          borderTop: '1px solid #f1f5f9',
-        }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8' }}>Market price</span>
-          <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
-            {formatPrice(player.current_price)}
-          </span>
-        </div>
+        {!hidePrices && (
+          <div style={{
+            padding: '10px 18px 14px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            borderTop: '1px solid #f1f5f9',
+          }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8' }}>Market price</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
+              {formatPrice(player.current_price)}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -244,10 +247,11 @@ function LiveStatsModal({
 // PlayerCard
 // ---------------------------------------------------------------------------
 function PlayerCard({
-  player, x, y, livePoints, onClick,
+  player, x, y, livePoints, onClick, hidePrices = false,
 }: {
   player: FieldPlayer; x: number; y: number; livePoints: number | null;
   onClick?: () => void;
+  hidePrices?: boolean;
 }) {
   const lastName = player.full_name.split(' ').slice(1).join(' ') || player.full_name;
   const color  = POS_COLOR[player.position] ?? '#94a3b8';
@@ -265,15 +269,17 @@ function PlayerCard({
       }}
     >
       {/* Price chip */}
-      <div style={{
-        background: 'rgba(15,23,42,0.75)', backdropFilter: 'blur(8px)',
-        borderRadius: 20, padding: '3px 9px',
-        fontSize: 11, fontWeight: 700, color: '#fff',
-        border: '1px solid rgba(255,255,255,0.2)',
-        whiteSpace: 'nowrap', letterSpacing: '-0.01em',
-      }}>
-        {formatPrice(player.current_price)}
-      </div>
+      {!hidePrices && (
+        <div style={{
+          background: 'rgba(15,23,42,0.75)', backdropFilter: 'blur(8px)',
+          borderRadius: 20, padding: '3px 9px',
+          fontSize: 11, fontWeight: 700, color: '#fff',
+          border: '1px solid rgba(255,255,255,0.2)',
+          whiteSpace: 'nowrap', letterSpacing: '-0.01em',
+        }}>
+          {formatPrice(player.current_price)}
+        </div>
+      )}
 
       {/* Avatar */}
       <div style={{ position: 'relative' }}>
@@ -411,9 +417,10 @@ function EmptySlotCard({ pos, x, y }: { pos: string; x: number; y: number }) {
 // ---------------------------------------------------------------------------
 // Main field component
 // ---------------------------------------------------------------------------
-export default function LiveTeamField({ positions, losY }: {
+export default function LiveTeamField({ positions, losY, hidePrices = false }: {
   positions: FieldSlot[];
   losY: number;
+  hidePrices?: boolean;
 }) {
   const playerIds = useMemo(
     () => positions.flatMap(s => s.player?.external_player_id ? [s.player.external_player_id] : []),
@@ -487,6 +494,7 @@ export default function LiveTeamField({ positions, losY }: {
               player={player} x={x} y={y}
               livePoints={livePoints}
               onClick={liveData ? () => setModal({ player, stats: liveData }) : undefined}
+              hidePrices={hidePrices}
             />
           );
         })}
@@ -498,6 +506,7 @@ export default function LiveTeamField({ positions, losY }: {
           player={modal.player}
           stats={modal.stats}
           onClose={() => setModal(null)}
+          hidePrices={hidePrices}
         />
       )}
     </>
