@@ -370,9 +370,9 @@ export default async function MarketPage({
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                           <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
+                          <PosBadge pos={p.position} />
                           <TeamLogo code={p.team_code} size={11} />
                           <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
-                          <PosBadge pos={p.position} />
                         </div>
                         <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
                           <MatchupBadge matchup={matchups[p.team_code]} />
@@ -405,9 +405,9 @@ export default async function MarketPage({
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                           <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
+                          <PosBadge pos={p.position} />
                           <TeamLogo code={p.team_code} size={11} />
                           <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
-                          <PosBadge pos={p.position} />
                         </div>
                         <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
                           <MatchupBadge matchup={matchups[p.team_code]} />
@@ -446,9 +446,9 @@ export default async function MarketPage({
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                             <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
+                            <PosBadge pos={p.position} />
                             <TeamLogo code={p.team_code} size={11} />
                             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>{p.team_code}</span>
-                            <PosBadge pos={p.position} />
                           </div>
                           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             <MatchupBadge matchup={matchups[p.team_code]} />
@@ -486,9 +486,9 @@ export default async function MarketPage({
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                             <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
+                            <PosBadge pos={p.position} />
                             <TeamLogo code={p.team_code} size={11} />
                             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>{p.team_code}</span>
-                            <PosBadge pos={p.position} />
                           </div>
                           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             <MatchupBadge matchup={matchups[p.team_code]} />
@@ -595,9 +595,9 @@ export default async function MarketPage({
                         <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {tx.full_name}
                         </span>
+                        <PosBadge pos={tx.position} />
                         <TeamLogo code={tx.team_code} size={11} />
                         <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{tx.team_code}</span>
-                        <PosBadge pos={tx.position} />
                       </div>
                     </ClickablePlayerRow>
                     <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>

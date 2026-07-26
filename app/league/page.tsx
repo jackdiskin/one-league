@@ -814,14 +814,14 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
                         {isBuy ? 'Added ' : 'Sold '}
                         <span style={{ fontWeight: 700, color: '#0f172a' }}>{tx.full_name}</span>
                       </span>
-                      <TeamLogo code={tx.team_code} size={10} />
-                      <span style={{ fontSize: 10, color: '#94a3b8' }}>{tx.team_code}</span>
                       <span style={{
                         fontSize: 9, fontWeight: 700, color: '#64748b',
                         background: '#f1f5f9', borderRadius: 20, padding: '1px 5px', textTransform: 'uppercase',
                       }}>
                         {tx.position}
                       </span>
+                      <TeamLogo code={tx.team_code} size={10} />
+                      <span style={{ fontSize: 10, color: '#94a3b8' }}>{tx.team_code}</span>
                     </div>
                     <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                       <MatchupBadge matchup={matchups[tx.team_code]} />

@@ -258,9 +258,9 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 5px' }}>{p.position}</span>
                         <TeamLogo code={p.team_code} size={12} />
                         <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 5px' }}>{p.position}</span>
                         {isSelected && (
                           <span style={{ fontSize: 9, fontWeight: 800, color: '#dc2626', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 20, padding: '1px 6px', letterSpacing: '0.04em' }}>
                             OUT
@@ -496,9 +496,9 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                                   <div style={{ minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                       <span style={{ fontSize: 11.5, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
+                                      <span style={{ fontSize: 8, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 4px' }}>{p.position}</span>
                                       <TeamLogo code={p.team_code} size={11} />
                                       <span style={{ fontSize: 9, color: '#94a3b8' }}>{p.team_code}</span>
-                                      <span style={{ fontSize: 8, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 4px' }}>{p.position}</span>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                       <MatchupBadge matchup={matchups[p.team_code]} size={9} />

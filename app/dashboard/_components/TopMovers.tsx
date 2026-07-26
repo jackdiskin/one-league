@@ -84,11 +84,11 @@ function MoverRow({ mover, up, season, matchups }: {
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
             <p className="text-sm font-semibold text-slate-900 truncate group-hover:text-emerald-700 transition-colors">{lastName}</p>
-            <TeamLogo code={mover.team_code} size={12} />
-            <span className="text-xs text-slate-500 shrink-0">{mover.team_code}</span>
             <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold shrink-0 bg-slate-100 text-slate-600">
               {mover.position}
             </span>
+            <TeamLogo code={mover.team_code} size={12} />
+            <span className="text-xs text-slate-500 shrink-0">{mover.team_code}</span>
           </div>
           <div className="flex items-center gap-1">
             <MatchupBadge matchup={matchups[mover.team_code]} />
