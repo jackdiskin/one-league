@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { formatPrice, formatPoints, formatWeek } from '@/lib/format';
 import TeamLogo from './TeamLogo';
-import type { Matchup } from '@/lib/schedule';
+import { parseNaiveDateTime, type Matchup } from '@/lib/schedule';
 
 interface Profile {
   id: number;
@@ -22,8 +22,14 @@ interface Profile {
   next_matchups: Matchup[];
 }
 
-function formatGameDate(iso: string): string {
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(iso));
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// See lib/schedule.ts parseNaiveDateTime — avoids `new Date(...)` reinterpreting
+// the naive ET kickoff time in the wrong timezone.
+function formatGameDate(raw: string): string {
+  const dt = parseNaiveDateTime(raw);
+  if (!dt) return '';
+  return `${MONTH_ABBR[dt.month - 1]} ${dt.day}`;
 }
 
 export default function PlayerProfileModal({

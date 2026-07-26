@@ -1,12 +1,20 @@
 import TeamLogo from './TeamLogo';
-import type { Matchup } from '@/lib/schedule';
+import { parseNaiveDateTime, type Matchup } from '@/lib/schedule';
 
-function formatMatchupWhen(iso: string): string {
-  const d = new Date(iso);
-  const day  = new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(d);
-  const date = new Intl.DateTimeFormat('en-US', { month: 'numeric', day: 'numeric' }).format(d);
-  const time = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(d);
-  return `${day} ${date} · ${time}`;
+// Kickoff times are naive ET wall-clock values — format from the raw
+// components directly instead of `new Date(...)`, which would silently
+// reinterpret them in whatever timezone the runtime/viewer happens to be in.
+function formatMatchupWhen(raw: string): string {
+  const dt = parseNaiveDateTime(raw);
+  if (!dt) return '';
+  const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' })
+    .format(Date.UTC(dt.year, dt.month - 1, dt.day));
+  const date = `${dt.month}/${dt.day}`;
+  let hour12 = dt.hour % 12;
+  if (hour12 === 0) hour12 = 12;
+  const period = dt.hour < 12 ? 'AM' : 'PM';
+  const time = `${hour12}:${String(dt.minute).padStart(2, '0')} ${period}`;
+  return `${weekday} ${date} · ${time}`;
 }
 
 // Renders opponent logo + @/vs abbreviation + day/date/time — meant to sit on

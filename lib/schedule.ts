@@ -7,11 +7,25 @@ export interface Matchup {
   gameDate: string;
 }
 
+// SportsDataIO's schedule times are naive Eastern wall-clock values (e.g.
+// "20:20" really means 8:20 PM ET) with no timezone info attached. mysql2
+// would otherwise hand these back as JS Date objects built from the local
+// process timezone — silently reinterpreting the ET wall clock as if it
+// were UTC/local and shifting the displayed time by several hours. Every
+// schedule query below forces DATE_FORMAT() so the driver returns a plain
+// string instead, and display code parses that string's components
+// directly rather than routing it through `new Date(...)`.
+export function parseNaiveDateTime(raw: string): { year: number; month: number; day: number; hour: number; minute: number } | null {
+  const m = raw.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  if (!m) return null;
+  return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]), hour: Number(m[4]), minute: Number(m[5]) };
+}
+
 // One query for the whole page — every team's next upcoming/in-progress game,
 // keyed by team code. Avoids an N+1 per player row across rosters/catalogs.
 export async function getNextMatchupByTeam(season: number): Promise<Record<string, Matchup>> {
   const rows = await query<{ team: string; opponent: string; week: number; game_date: string; is_home: number }>(
-    `SELECT team, opponent, week, game_date, is_home FROM (
+    `SELECT team, opponent, week, DATE_FORMAT(game_date, '%Y-%m-%d %H:%i:%s') AS game_date, is_home FROM (
        SELECT team, opponent, week, game_date, is_home,
               ROW_NUMBER() OVER (PARTITION BY team ORDER BY game_date ASC) AS rn
        FROM (
@@ -36,7 +50,7 @@ export async function getNextMatchupByTeam(season: number): Promise<Record<strin
 // Next N matchups for one team — used by the player profile popup.
 export async function getUpcomingMatchups(teamCode: string, season: number, limit = 5): Promise<Matchup[]> {
   const rows = await query<{ week: number; game_date: string; opponent: string; is_home: number }>(
-    `SELECT week, game_date,
+    `SELECT week, DATE_FORMAT(game_date, '%Y-%m-%d %H:%i:%s') AS game_date,
             CASE WHEN home_team = ? THEN away_team ELSE home_team END AS opponent,
             (home_team = ?) AS is_home
      FROM nfl_schedule
