@@ -111,14 +111,12 @@ function LiveStatsModal({
                 src={player.headshot_url} alt={player.full_name}
                 width={48} height={48} unoptimized
                 style={{
-                  width: 48, height: 48, borderRadius: '50%', objectFit: 'cover',
-                  border: '2.5px solid #10b981', display: 'block',
-                  boxShadow: '0 0 12px rgba(16,185,129,0.4)',
+                  width: 48, height: 48, objectFit: 'contain', display: 'block',
                 }}
               />
             ) : (
               <div style={{
-                width: 48, height: 48, borderRadius: '50%', background: '#334155',
+                width: 48, height: 48, borderRadius: 10, background: '#334155',
                 border: '2.5px solid #10b981',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 18, fontWeight: 800, color: '#fff',
@@ -288,17 +286,12 @@ function PlayerCard({
             src={player.headshot_url} alt={player.full_name}
             width={72} height={72} unoptimized
             style={{
-              width: 72, height: 72, borderRadius: '50%', objectFit: 'cover',
-              border: isLive ? '3px solid #10b981' : '3px solid #fff',
-              boxShadow: isLive
-                ? '0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(16,185,129,0.45)'
-                : '0 4px 18px rgba(0,0,0,0.45)',
-              display: 'block', transition: 'border-color 0.3s, box-shadow 0.3s',
+              width: 72, height: 72, objectFit: 'contain', display: 'block',
             }}
           />
         ) : (
           <div style={{
-            width: 72, height: 72, borderRadius: '50%', background: '#334155',
+            width: 72, height: 72, borderRadius: 14, background: '#334155',
             border: isLive ? '3px solid #10b981' : '3px solid #fff',
             boxShadow: isLive
               ? '0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(16,185,129,0.45)'

@@ -169,11 +169,11 @@ function PosBadge({ pos }: { pos: string }) {
 function PlayerAvatar({ player, size = 32 }: { player: { headshot_url: string | null; full_name: string }; size?: number }) {
   return player.headshot_url ? (
     <Image src={player.headshot_url} alt={player.full_name} width={size} height={size} unoptimized
-      style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #f1f5f9', display: 'block', flexShrink: 0 }}
+      style={{ width: size, height: size, objectFit: 'contain', display: 'block', flexShrink: 0 }}
     />
   ) : (
     <div style={{
-      width: size, height: size, borderRadius: '50%', background: '#e2e8f0', flexShrink: 0,
+      width: size, height: size, borderRadius: 8, background: '#e2e8f0', flexShrink: 0,
       display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.38, fontWeight: 700, color: '#64748b',
     }}>
       {player.full_name[0]}

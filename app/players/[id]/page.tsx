@@ -276,10 +276,10 @@ export default async function PlayerPage({
               <div style={{ position: 'relative', flexShrink: 0 }}>
                 {player.headshot_url ? (
                   <Image src={player.headshot_url} alt={player.full_name} width={96} height={96} unoptimized
-                    style={{ width: 96, height: 96, borderRadius: '50%', objectFit: 'cover', border: '3px solid #e2e8f0', display: 'block' }}
+                    style={{ width: 96, height: 96, objectFit: 'contain', display: 'block' }}
                   />
                 ) : (
-                  <div style={{ width: 96, height: 96, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 700, color: '#94a3b8' }}>
+                  <div style={{ width: 96, height: 96, borderRadius: 10, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 700, color: '#94a3b8' }}>
                     {player.full_name[0]}
                   </div>
                 )}

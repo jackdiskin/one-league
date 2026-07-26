@@ -773,11 +773,11 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
                       <Image
                         src={tx.headshot_url} alt={tx.full_name}
                         width={32} height={32} unoptimized
-                        style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #e2e8f0', display: 'block' }}
+                        style={{ width: 32, height: 32, objectFit: 'contain', display: 'block' }}
                       />
                     ) : (
                       <div style={{
-                        width: 32, height: 32, borderRadius: '50%', background: '#e2e8f0',
+                        width: 32, height: 32, borderRadius: 8, background: '#e2e8f0',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 12, fontWeight: 700, color: '#64748b',
                       }}>

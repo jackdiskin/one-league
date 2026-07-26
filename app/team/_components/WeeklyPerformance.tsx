@@ -99,10 +99,10 @@ export default function WeeklyPerformance({ players, week }: { players: PerfPlay
                 <div style={{ position: 'relative', flexShrink: 0, marginRight: 12 }}>
                   {p.headshot_url ? (
                     <Image src={p.headshot_url} alt={p.full_name} width={38} height={38} unoptimized
-                      style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', border: '2px solid #f1f5f9', display: 'block' }}
+                      style={{ width: 38, height: 38, objectFit: 'contain', display: 'block' }}
                     />
                   ) : (
-                    <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#64748b' }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 8, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#64748b' }}>
                       {p.full_name[0]}
                     </div>
                   )}

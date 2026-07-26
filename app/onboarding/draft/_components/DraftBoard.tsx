@@ -74,11 +74,11 @@ function PlayerAvatar({ player, size = 48 }: { player: DraftPlayer; size?: numbe
         <Image
           src={player.headshot_url} alt={player.full_name}
           width={size} height={size} unoptimized
-          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.25)', display: 'block' }}
+          style={{ width: size, height: size, objectFit: 'contain', display: 'block' }}
         />
       ) : (
         <div style={{
-          width: size, height: size, borderRadius: '50%',
+          width: size, height: size, borderRadius: 8,
           background: '#334155', border: '2px solid #fff',
           boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -130,11 +130,11 @@ function FilledSlot({ player, onRemove }: { player: DraftPlayer; onRemove: () =>
             <Image
               src={player.headshot_url} alt={player.full_name}
               width={52} height={52} unoptimized
-              style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2.5px solid #fff', boxShadow: '0 4px 16px rgba(0,0,0,0.5)', display: 'block' }}
+              style={{ width: 52, height: 52, objectFit: 'contain', display: 'block' }}
             />
           ) : (
             <div style={{
-              width: 52, height: 52, borderRadius: '50%', background: '#334155',
+              width: 52, height: 52, borderRadius: 12, background: '#334155',
               border: '2.5px solid #fff', boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 18, fontWeight: 800, color: '#fff',
@@ -913,11 +913,11 @@ export default function DraftBoard({
                     <Image
                       src={player.headshot_url} alt={player.full_name}
                       width={32} height={32} unoptimized
-                      style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: `1.5px solid ${col.bar}`, display: 'block' }}
+                      style={{ width: 32, height: 32, objectFit: 'contain', display: 'block' }}
                     />
                   ) : (
                     <div style={{
-                      width: 32, height: 32, borderRadius: '50%', background: '#e2e8f0',
+                      width: 32, height: 32, borderRadius: 8, background: '#e2e8f0',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 12, fontWeight: 700, color: '#64748b',
                     }}>

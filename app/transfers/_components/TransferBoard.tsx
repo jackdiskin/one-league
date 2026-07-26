@@ -79,11 +79,11 @@ function Avatar({ player, size = 38 }: { player: Pick<CatalogPlayer, 'headshot_u
     <div style={{ position: 'relative', flexShrink: 0 }}>
       {player.headshot_url ? (
         <Image src={player.headshot_url} alt={player.full_name} width={size} height={size} unoptimized
-          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #f1f5f9', display: 'block' }}
+          style={{ width: size, height: size, objectFit: 'contain', display: 'block' }}
         />
       ) : (
         <div style={{
-          width: size, height: size, borderRadius: '50%', background: '#e2e8f0',
+          width: size, height: size, borderRadius: 8, background: '#e2e8f0',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: size * 0.38, fontWeight: 700, color: '#64748b',
         }}>{player.full_name[0]}</div>
