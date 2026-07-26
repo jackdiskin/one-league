@@ -167,7 +167,11 @@ for p in players:
     sdio_status = p.get('Status') or 'Inactive'
     db_status   = STATUS_MAP.get(sdio_status, 'inactive')
     team_code   = p.get('Team') or 'FA'
-    headshot    = p.get('UsaTodayHeadshotNoBackgroundUrl') or p.get('UsaTodayHeadshotUrl')
+    # UsaTodayHeadshotUrl/UsaTodayHeadshotNoBackgroundUrl require USA Today's own
+    # "Token Based Authentication" — they 401 for everyone, SportsDataIO's API key
+    # included. Not usable without a separate license, so left NULL; app already
+    # falls back to an initials avatar. Matches CLAUDE.md's no-headshots policy.
+    headshot    = None
 
     player_rows.append((
         str(p['PlayerID']),         # external_player_id
