@@ -19,11 +19,11 @@ export default function MatchupBadge({ matchup, size = 11 }: { matchup: Matchup 
       display: 'inline-flex', alignItems: 'center', gap: 4,
       fontSize: 9.5, fontWeight: 600, color: '#94a3b8', whiteSpace: 'nowrap',
     }}>
+      <span>{formatMatchupWhen(matchup.gameDate)}</span>
+      <span style={{ color: '#cbd5e1' }}>·</span>
       <span style={{ color: '#cbd5e1', fontWeight: 700 }}>{matchup.isHome ? 'vs' : '@'}</span>
       <TeamLogo code={matchup.opponent} size={size} />
       <span style={{ fontWeight: 700, color: '#64748b' }}>{matchup.opponent}</span>
-      <span style={{ color: '#cbd5e1' }}>·</span>
-      <span>{formatMatchupWhen(matchup.gameDate)}</span>
     </span>
   );
 }

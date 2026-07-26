@@ -269,7 +269,7 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                       </div>
                       <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
                         <MatchupBadge matchup={matchups[p.team_code]} />
-                        <span>· {p.last_week_points != null ? `${formatPoints(p.last_week_points)} last wk` : 'no game yet'}</span>
+                        {p.last_week_points != null && <span>· {formatPoints(p.last_week_points)} last wk</span>}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
