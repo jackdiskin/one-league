@@ -6,7 +6,6 @@ import { formatPrice, formatWeekLong } from '@/lib/format';
 import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import TransferBoard, { type CatalogPlayer } from './_components/TransferBoard';
-import CapBreakdown from './_components/CapBreakdown';
 
 const PREV_SEASON = 2025;
 
@@ -176,34 +175,27 @@ export default async function TransfersPage({
               <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>Join a league and create a team to start making transfers.</p>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16, alignItems: 'stretch' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div style={{
-                  borderRadius: 16, background: '#fff', border: '1px solid #e2e8f0',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: '14px 16px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                }}>
-                  <div>
-                    <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Budget Left</p>
-                    <p style={{ fontSize: 22, fontWeight: 900, color: '#059669', letterSpacing: '-0.02em' }}>{formatPrice(budgetRemaining)}</p>
-                  </div>
-                  <div>
-                    <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4, textAlign: 'right' }}>Roster</p>
-                    <p style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', textAlign: 'right' }}>{owned.length}/11</p>
-                  </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{
+                borderRadius: 16, background: '#fff', border: '1px solid #e2e8f0',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: '14px 16px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Budget Left</p>
+                  <p style={{ fontSize: 22, fontWeight: 900, color: '#059669', letterSpacing: '-0.02em' }}>{formatPrice(budgetRemaining)}</p>
                 </div>
-
-                <TransferBoard
-                  players={players}
-                  season={SEASON}
-                  fantasyTeamId={team.id}
-                  currentWeek={currentWeek}
-                  budgetRemaining={Number(budgetRemaining)}
-                />
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4, textAlign: 'right' }}>Roster</p>
+                  <p style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', textAlign: 'right' }}>{owned.length}/11</p>
+                </div>
               </div>
 
-              <CapBreakdown
-                roster={owned.map(p => ({ position: p.position, current_price: p.current_price }))}
+              <TransferBoard
+                players={players}
+                season={SEASON}
+                fantasyTeamId={team.id}
+                currentWeek={currentWeek}
                 budgetRemaining={Number(budgetRemaining)}
               />
             </div>

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
   const { current_price: executionPrice } = marketState;
 
-  if (team.budget_remaining < executionPrice) {
+  if (Number(team.budget_remaining) < Number(executionPrice)) {
     return NextResponse.json({ error: 'Insufficient budget' }, { status: 400 });
   }
 

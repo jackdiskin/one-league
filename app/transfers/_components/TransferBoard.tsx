@@ -2,10 +2,11 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatPrice, formatPoints } from '@/lib/format';
 import { sellProceeds } from '@/lib/pricing';
+import CapBreakdown from './CapBreakdown';
 
 export interface CatalogPlayer {
   id: number;
@@ -32,9 +33,15 @@ interface Props {
   budgetRemaining: number;
 }
 
+// A pending transfer slot. `outgoing` is null when it originates from an
+// already-empty roster slot (a pure buy-in, no sell attached). `incoming`
+// is null until a replacement has been chosen.
 interface PendingTransfer {
-  outgoing: CatalogPlayer;
+  key: string;
+  outgoing: CatalogPlayer | null;
   incoming: CatalogPlayer | null;
+  positions: string[];
+  groupLabel: string;
 }
 
 const POS_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
@@ -45,11 +52,8 @@ const POS_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
   K:  { bg: '#f8fafc', text: '#64748b', bar: '#94a3b8' },
 };
 
-// WR/TE share a flex pool for roster purposes — a swap between them is always
-// quota-neutral, same as a straight same-position swap. QB/RB/K only swap 1-for-1.
-function flexGroup(position: string): string[] {
-  return (position === 'WR' || position === 'TE') ? ['WR', 'TE'] : [position];
-}
+// Mirrors the quota enforced server-side in app/api/market/buy/route.ts
+const QUOTA: Record<string, number> = { QB: 2, RB: 3, FLEX: 5, K: 1 };
 
 const GROUPS: { key: string; label: string; positions: string[] }[] = [
   { key: 'QB',   label: 'Quarterbacks',  positions: ['QB'] },
@@ -87,9 +91,10 @@ function Avatar({ player, size = 38 }: { player: Pick<CatalogPlayer, 'headshot_u
 export default function TransferBoard({ players, season, fantasyTeamId, currentWeek, budgetRemaining }: Props) {
   const router = useRouter();
   const seasonSuffix = season ? `?season=${season}` : '';
+  const emptySlotCounter = useRef(0);
 
   const [pending, setPending] = useState<PendingTransfer[]>([]);
-  const [searchBySlot, setSearchBySlot] = useState<Record<number, string>>({});
+  const [searchBySlot, setSearchBySlot] = useState<Record<string, string>>({});
   const [confirming, setConfirming] = useState(false);
   const [results, setResults] = useState<{ label: string; ok: boolean; msg?: string }[] | null>(null);
 
@@ -97,46 +102,51 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
 
   // Budget available for a given slot: base budget + sell proceeds of every pending
   // outgoing player, minus the incoming price already committed on every OTHER slot.
-  const availableBudgetFor = useCallback((forOutId: number | null) => {
+  const availableBudgetFor = useCallback((forKey: string | null) => {
     let b = Number(budgetRemaining);
     for (const t of pending) {
-      b += sellProceeds(Number(t.outgoing.current_price));
-      if (t.incoming && t.outgoing.id !== forOutId) {
-        b -= Number(t.incoming.current_price);
-      }
+      if (t.outgoing) b += sellProceeds(Number(t.outgoing.current_price));
+      if (t.incoming && t.key !== forKey) b -= Number(t.incoming.current_price);
     }
     return b;
   }, [pending, budgetRemaining]);
 
   const totalBudgetAfter = availableBudgetFor(null);
-  const chosenCount = pending.filter(t => t.incoming).length;
-  const canConfirm = pending.length > 0 && chosenCount === pending.length && !confirming;
+  const actionableCount = pending.filter(t => t.outgoing || t.incoming).length;
+  const canConfirm = actionableCount > 0 && !confirming;
 
   const toggleOutgoing = useCallback((p: CatalogPlayer) => {
     setResults(null);
+    const key = `out-${p.id}`;
     setPending(prev => {
-      const exists = prev.some(t => t.outgoing.id === p.id);
-      if (exists) return prev.filter(t => t.outgoing.id !== p.id);
-      return [...prev, { outgoing: p, incoming: null }];
+      const exists = prev.some(t => t.key === key);
+      if (exists) return prev.filter(t => t.key !== key);
+      const group = GROUPS.find(g => g.positions.includes(p.position))!;
+      return [...prev, { key, outgoing: p, incoming: null, positions: group.positions, groupLabel: group.label }];
     });
   }, []);
 
-  const removeSlot = useCallback((outId: number) => {
-    setPending(prev => prev.filter(t => t.outgoing.id !== outId));
+  const addEmptySlot = useCallback((group: { positions: string[]; label: string }) => {
+    setResults(null);
+    const key = `empty-${emptySlotCounter.current++}`;
+    setPending(prev => [...prev, { key, outgoing: null, incoming: null, positions: group.positions, groupLabel: group.label }]);
   }, []);
 
-  const setSlotIncoming = useCallback((outId: number, incoming: CatalogPlayer | null) => {
-    setPending(prev => prev.map(t => t.outgoing.id === outId ? { ...t, incoming } : t));
+  const removeSlot = useCallback((key: string) => {
+    setPending(prev => prev.filter(t => t.key !== key));
   }, []);
 
-  const candidatesFor = useCallback((outgoing: CatalogPlayer) => {
-    const group = flexGroup(outgoing.position);
-    const q = (searchBySlot[outgoing.id] ?? '').trim().toLowerCase();
+  const setSlotIncoming = useCallback((key: string, incoming: CatalogPlayer | null) => {
+    setPending(prev => prev.map(t => t.key === key ? { ...t, incoming } : t));
+  }, []);
+
+  const candidatesFor = useCallback((slot: PendingTransfer) => {
+    const q = (searchBySlot[slot.key] ?? '').trim().toLowerCase();
     const alreadyChosenElsewhere = new Set(
-      pending.filter(t => t.outgoing.id !== outgoing.id && t.incoming).map(t => t.incoming!.id)
+      pending.filter(t => t.key !== slot.key && t.incoming).map(t => t.incoming!.id)
     );
     return players
-      .filter(p => !p.is_owned && group.includes(p.position))
+      .filter(p => !p.is_owned && slot.positions.includes(p.position))
       .filter(p => !alreadyChosenElsewhere.has(p.id))
       .filter(p => !q || p.full_name.toLowerCase().includes(q) || p.team_code.toLowerCase().includes(q))
       .sort((a, b) => Number(b.current_price) - Number(a.current_price));
@@ -146,28 +156,40 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
     if (!fantasyTeamId) return;
     setConfirming(true);
     const outcomes: { label: string; ok: boolean; msg?: string }[] = [];
+    const stillPending: PendingTransfer[] = [];
 
     for (const t of pending) {
-      if (!t.incoming) continue;
-      const label = `${t.outgoing.full_name} → ${t.incoming.full_name}`;
+      if (!t.outgoing && !t.incoming) {
+        stillPending.push(t); // nothing chosen yet — leave it for later
+        continue;
+      }
+      const label = t.outgoing && t.incoming
+        ? `${t.outgoing.full_name} → ${t.incoming.full_name}`
+        : t.outgoing
+          ? `Sold ${t.outgoing.full_name} — slot left open`
+          : `Signed ${t.incoming!.full_name}`;
       try {
-        const sellRes = await fetch('/api/market/sell', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fantasy_team_id: fantasyTeamId, player_id: t.outgoing.id, week: currentWeek }),
-        });
-        if (!sellRes.ok) {
-          const j = await sellRes.json();
-          throw new Error(j.error ?? 'Sell failed');
+        if (t.outgoing) {
+          const sellRes = await fetch('/api/market/sell', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fantasy_team_id: fantasyTeamId, player_id: t.outgoing.id, week: currentWeek }),
+          });
+          if (!sellRes.ok) {
+            const j = await sellRes.json();
+            throw new Error(j.error ?? 'Sell failed');
+          }
         }
-        const buyRes = await fetch('/api/market/buy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fantasy_team_id: fantasyTeamId, player_id: t.incoming.id, week: currentWeek }),
-        });
-        if (!buyRes.ok) {
-          const j = await buyRes.json();
-          throw new Error(`sold, but buy failed: ${j.error ?? 'buy failed'}`);
+        if (t.incoming) {
+          const buyRes = await fetch('/api/market/buy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fantasy_team_id: fantasyTeamId, player_id: t.incoming.id, week: currentWeek }),
+          });
+          if (!buyRes.ok) {
+            const j = await buyRes.json();
+            throw new Error(t.outgoing ? `sold, but buy failed: ${j.error ?? 'buy failed'}` : (j.error ?? 'Buy failed'));
+          }
         }
         outcomes.push({ label, ok: true });
       } catch (e) {
@@ -176,26 +198,28 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
     }
 
     setResults(outcomes);
-    setPending([]);
+    setPending(stillPending);
     setConfirming(false);
     router.refresh();
   }, [pending, fantasyTeamId, currentWeek, router]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 380px', gap: 16, alignItems: 'start' }}>
 
       {/* My Squad */}
       <div style={{ borderRadius: 16, background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid #f1f5f9' }}>
           <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>My Squad</h3>
           <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
-            Tap any number of players to transfer out — pick a replacement for each below
+            Tap any number of players (or open slots) to build your transfers
           </p>
         </div>
 
         {GROUPS.map(group => {
           const groupPlayers = owned.filter(p => group.positions.includes(p.position));
-          if (!groupPlayers.length) return null;
+          const pendingEmptyInGroup = pending.filter(t => !t.outgoing && t.groupLabel === group.label).length;
+          const openSlots = Math.max(0, QUOTA[group.key] - groupPlayers.length - pendingEmptyInGroup);
+          if (!groupPlayers.length && !openSlots) return null;
           const col = POS_COLORS[group.positions[0]] ?? POS_COLORS.K;
           return (
             <div key={group.key}>
@@ -205,11 +229,10 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
               }}>
                 <div style={{ width: 3, height: 12, borderRadius: 2, background: col.bar, flexShrink: 0 }} />
                 <span style={{ fontSize: 10, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{group.label}</span>
-                <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>· {groupPlayers.length}</span>
+                <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>· {groupPlayers.length}/{QUOTA[group.key]}</span>
               </div>
               {groupPlayers.map((p, i) => {
-                const slot = pending.find(t => t.outgoing.id === p.id);
-                const isSelected = !!slot;
+                const isSelected = pending.some(t => t.key === `out-${p.id}`);
                 const pcol = POS_COLORS[p.position] ?? POS_COLORS.K;
                 return (
                   <div
@@ -221,7 +244,7 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                       background: isSelected ? '#fef2f2' : 'transparent',
                       outline: isSelected ? '1.5px solid #fca5a5' : 'none',
                       outlineOffset: '-2px', borderRadius: isSelected ? 10 : 0,
-                      borderBottom: i < groupPlayers.length - 1 ? '1px solid #f8fafc' : 'none',
+                      borderBottom: (i < groupPlayers.length - 1 || openSlots > 0) ? '1px solid #f8fafc' : 'none',
                     }}
                     onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#fafafa'; }}
                     onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
@@ -251,238 +274,248 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                   </div>
                 );
               })}
+              {Array.from({ length: openSlots }, (_, i) => (
+                <div
+                  key={`empty-${group.key}-${i}`}
+                  onClick={() => addEmptySlot(group)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px',
+                    cursor: 'pointer', borderBottom: i < openSlots - 1 ? '1px solid #f8fafc' : 'none',
+                  }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#fafafa'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                >
+                  <div style={{
+                    width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+                    border: `2px dashed ${col.bar}`, opacity: 0.5,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={col.bar} strokeWidth="2.5" strokeLinecap="round">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', fontStyle: 'italic' }}>Open slot</div>
+                    <div style={{ fontSize: 10, color: '#cbd5e1' }}>Tap to sign a {group.label.toLowerCase().replace(/s$/, '')}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           );
         })}
       </div>
 
-      {/* Transfer results */}
-      {results && (
-        <div style={{ borderRadius: 16, background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: '14px 18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <h3 style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Transfer results</h3>
-            <button
-              onClick={() => setResults(null)}
-              style={{ border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
-            >
-              Dismiss
-            </button>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {results.map((r, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8,
-                background: r.ok ? '#f0fdf4' : '#fef2f2', border: `1px solid ${r.ok ? '#bbf7d0' : '#fecaca'}`,
-                fontSize: 12, fontWeight: 600, color: r.ok ? '#065f46' : '#991b1b',
-              }}>
-                <span>{r.ok ? '✓' : '✕'}</span>
-                <span>{r.label}</span>
-                {r.msg && !r.ok && <span style={{ color: '#dc2626', fontWeight: 500 }}>— {r.msg}</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Sidebar: results, pending transfers + replacement pickers, cap breakdown */}
+      <div style={{ position: 'sticky', top: 90, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Pending transfers */}
-      {pending.length > 0 && (
-        <div style={{ borderRadius: 16, background: '#fff', border: '1.5px solid #ef4444', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-          <div style={{
-            padding: '14px 18px', borderBottom: '1px solid #f1f5f9',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
-            position: 'sticky', top: 0, background: '#fff', zIndex: 1,
-          }}>
-            <div>
-              <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>
-                Pending Transfers ({pending.length})
-              </h3>
-              <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
-                {chosenCount}/{pending.length} replacements chosen · budget after {formatPrice(totalBudgetAfter)}
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+        {results && (
+          <div style={{ borderRadius: 16, background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: '14px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <h3 style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Transfer results</h3>
               <button
-                onClick={() => setPending([])}
-                disabled={confirming}
-                style={{
-                  padding: '8px 14px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-                  border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: confirming ? 'default' : 'pointer',
-                }}
+                onClick={() => setResults(null)}
+                style={{ border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
               >
-                Clear all
+                Dismiss
               </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {results.map((r, i) => (
+                <div key={i} style={{
+                  display: 'flex', flexDirection: 'column', gap: 2, padding: '7px 10px', borderRadius: 8,
+                  background: r.ok ? '#f0fdf4' : '#fef2f2', border: `1px solid ${r.ok ? '#bbf7d0' : '#fecaca'}`,
+                  fontSize: 11, fontWeight: 600, color: r.ok ? '#065f46' : '#991b1b',
+                }}>
+                  <span>{r.ok ? '✓' : '✕'} {r.label}</span>
+                  {r.msg && !r.ok && <span style={{ color: '#dc2626', fontWeight: 500 }}>{r.msg}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {pending.length === 0 ? (
+          <div style={{
+            borderRadius: 16, background: '#fff', border: '1px dashed #e2e8f0',
+            padding: '20px 16px', textAlign: 'center',
+          }}>
+            <p style={{ fontSize: 12, color: '#94a3b8' }}>
+              Select a player (or an open slot) on the left to start a transfer
+            </p>
+          </div>
+        ) : (
+          <div style={{ borderRadius: 16, background: '#fff', border: '1.5px solid #ef4444', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                  Transfers ({pending.length})
+                </h3>
+                <button
+                  onClick={() => setPending([])}
+                  disabled={confirming}
+                  style={{
+                    padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700,
+                    border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: confirming ? 'default' : 'pointer',
+                  }}
+                >
+                  Clear all
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+                Budget after: {formatPrice(totalBudgetAfter)}
+              </p>
               <button
                 onClick={confirmAll}
                 disabled={!canConfirm}
                 style={{
-                  padding: '8px 18px', borderRadius: 20, fontSize: 12, fontWeight: 800,
+                  marginTop: 10, width: '100%', padding: '9px 0', borderRadius: 12, fontSize: 12, fontWeight: 800,
                   border: 'none', cursor: canConfirm ? 'pointer' : 'not-allowed',
                   background: canConfirm ? 'linear-gradient(135deg, #0f172a, #1e293b)' : '#f1f5f9',
                   color: canConfirm ? '#fff' : '#cbd5e1',
                 }}
               >
-                {confirming ? 'Confirming…' : `Confirm ${pending.length} Transfer${pending.length > 1 ? 's' : ''}`}
+                {confirming ? 'Confirming…' : `Confirm ${actionableCount || ''} Transfer${actionableCount === 1 ? '' : 's'}`}
               </button>
             </div>
-          </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {pending.map((t, idx) => {
-              const outCol = POS_COLORS[t.outgoing.position] ?? POS_COLORS.K;
-              const available = availableBudgetFor(t.outgoing.id);
-              const candidates = candidatesFor(t.outgoing);
-              return (
-                <div key={t.outgoing.id} style={{ borderTop: idx > 0 ? '1px solid #f1f5f9' : 'none' }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {pending.map((t, idx) => {
+                const available = availableBudgetFor(t.key);
+                const candidates = candidatesFor(t);
+                return (
+                  <div key={t.key} style={{ borderTop: idx > 0 ? '1px solid #f1f5f9' : 'none' }}>
 
-                  {/* Slot header: outgoing → incoming (or picker) */}
-                  <div style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 10, background: '#fafafa' }}>
-                    <Avatar player={t.outgoing} size={32} />
-                    <div style={{ minWidth: 0, flex: '0 1 auto' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{t.outgoing.full_name}</span>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: outCol.text, background: outCol.bg, borderRadius: 20, padding: '1px 5px' }}>{t.outgoing.position}</span>
-                      </div>
-                      <div style={{ fontSize: 10, color: '#94a3b8' }}>sells for {formatPrice(sellProceeds(Number(t.outgoing.current_price)))}</div>
-                    </div>
-
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}>
-                      <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-                    </svg>
-
-                    {t.incoming ? (
-                      <>
-                        <Avatar player={t.incoming} size={32} />
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{t.incoming.full_name}</span>
-                            <span style={{
-                              fontSize: 9, fontWeight: 700,
-                              color: (POS_COLORS[t.incoming.position] ?? POS_COLORS.K).text,
-                              background: (POS_COLORS[t.incoming.position] ?? POS_COLORS.K).bg,
-                              borderRadius: 20, padding: '1px 5px',
-                            }}>{t.incoming.position}</span>
-                          </div>
-                          <div style={{ fontSize: 10, color: '#94a3b8' }}>{formatPrice(t.incoming.current_price)}</div>
-                        </div>
-                        <button
-                          onClick={() => setSlotIncoming(t.outgoing.id, null)}
-                          style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', flexShrink: 0 }}
-                        >
-                          Change
-                        </button>
-                      </>
-                    ) : (
-                      <div style={{ flex: 1, fontSize: 12, fontStyle: 'italic', color: '#94a3b8' }}>Choose a replacement below</div>
-                    )}
-
-                    <button
-                      onClick={() => removeSlot(t.outgoing.id)}
-                      title="Remove this transfer"
-                      style={{
-                        width: 26, height: 26, borderRadius: 8, border: '1px solid #f1f5f9', background: '#fff',
-                        color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                      }}
-                    >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  {/* Replacement picker — shown until a replacement is chosen for this slot */}
-                  {!t.incoming && (
-                    <div>
-                      <div style={{ padding: '10px 18px 0' }}>
-                        <div style={{ position: 'relative', maxWidth: 260 }}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
-                            style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)' }}>
-                            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                          </svg>
-                          <input
-                            value={searchBySlot[t.outgoing.id] ?? ''}
-                            onChange={e => setSearchBySlot(s => ({ ...s, [t.outgoing.id]: e.target.value }))}
-                            placeholder={`Search ${flexGroup(t.outgoing.position).join('/')}...`}
-                            style={{
-                              width: '100%', paddingLeft: 28, paddingRight: 12, paddingTop: 6, paddingBottom: 6,
-                              fontSize: 12, borderRadius: 20, border: '1px solid #e2e8f0',
-                              background: '#f8fafc', color: '#0f172a', outline: 'none',
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      <div style={{
-                        display: 'grid', gridTemplateColumns: '1fr 72px 72px 72px 96px',
-                        padding: '6px 18px', marginTop: 8, background: '#fafafa', borderBottom: '1px solid #f1f5f9', borderTop: '1px solid #f1f5f9',
-                        fontSize: 9, fontWeight: 700, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.1em',
-                      }}>
-                        <span>Player</span>
-                        <span style={{ textAlign: 'right' }}>Price</span>
-                        <span style={{ textAlign: 'right' }}>Last Wk</span>
-                        <span style={{ textAlign: 'right' }}>Season</span>
-                        <span />
-                      </div>
-
-                      <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-                        {candidates.length === 0 && (
-                          <div style={{ padding: '20px 18px', textAlign: 'center', fontSize: 12, color: '#94a3b8' }}>
-                            No players found
+                    {/* Slot summary */}
+                    <div style={{ padding: '10px 16px', background: '#fafafa' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {t.outgoing ? (
+                          <>
+                            <Avatar player={t.outgoing} size={28} />
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.outgoing.full_name}</div>
+                              <div style={{ fontSize: 9, color: '#94a3b8' }}>sells for {formatPrice(sellProceeds(Number(t.outgoing.current_price)))}</div>
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', fontStyle: 'italic' }}>Open {t.groupLabel.toLowerCase()} slot</div>
                           </div>
                         )}
-                        {candidates.map((p, i) => {
-                          const pcol = POS_COLORS[p.position] ?? POS_COLORS.K;
-                          const canAfford = Number(p.current_price) <= available;
-                          return (
-                            <div key={p.id} style={{
-                              display: 'grid', gridTemplateColumns: '1fr 72px 72px 72px 96px',
-                              alignItems: 'center', padding: '9px 18px',
-                              borderBottom: i < candidates.length - 1 ? '1px solid #f8fafc' : 'none',
-                            }}>
-                              <Link href={`/players/${p.id}${seasonSuffix}`} style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, textDecoration: 'none' }}>
-                                <Avatar player={p} size={30} />
-                                <div style={{ minWidth: 0 }}>
-                                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
-                                    <span style={{ fontSize: 10, color: '#94a3b8' }}>{p.team_code}</span>
-                                    <span style={{ fontSize: 9, fontWeight: 700, color: pcol.text, background: pcol.bg, borderRadius: 20, padding: '1px 5px' }}>{p.position}</span>
-                                  </div>
-                                </div>
-                              </Link>
-                              <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 800, color: canAfford ? '#0f172a' : '#cbd5e1' }}>
-                                {formatPrice(p.current_price)}
-                              </div>
-                              <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 700, color: p.last_week_points != null ? '#0f172a' : '#cbd5e1' }}>
-                                {p.last_week_points != null ? formatPoints(p.last_week_points) : '—'}
-                              </div>
-                              <div style={{ textAlign: 'right', fontSize: 12, color: '#475569' }}>
-                                {p.season_points > 0 ? formatPoints(p.season_points) : '—'}
-                              </div>
-                              <div style={{ textAlign: 'right' }}>
-                                <button
-                                  onClick={() => setSlotIncoming(t.outgoing.id, p)}
-                                  disabled={!canAfford}
-                                  style={{
-                                    padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700,
-                                    border: 'none', cursor: canAfford ? 'pointer' : 'not-allowed',
-                                    background: canAfford ? '#0f172a' : '#f1f5f9',
-                                    color: canAfford ? '#fff' : '#cbd5e1',
-                                  }}
-                                >
-                                  {canAfford ? 'Select' : "Can't afford"}
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
+                        <button
+                          onClick={() => removeSlot(t.key)}
+                          title="Remove"
+                          style={{
+                            width: 22, height: 22, borderRadius: 7, border: '1px solid #f1f5f9', background: '#fff',
+                            color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                          }}
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
                       </div>
+
+                      {t.incoming && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, paddingTop: 8, borderTop: '1px dashed #e2e8f0' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" style={{ flexShrink: 0 }}>
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          <Avatar player={t.incoming} size={28} />
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.incoming.full_name}</div>
+                            <div style={{ fontSize: 9, color: '#94a3b8' }}>{formatPrice(t.incoming.current_price)}</div>
+                          </div>
+                          <button
+                            onClick={() => setSlotIncoming(t.key, null)}
+                            style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', flexShrink: 0 }}
+                          >
+                            Change
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+
+                    {/* Replacement picker */}
+                    {!t.incoming && (
+                      <div>
+                        <div style={{ padding: '8px 16px 0' }}>
+                          <div style={{ position: 'relative' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
+                              style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)' }}>
+                              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                            </svg>
+                            <input
+                              value={searchBySlot[t.key] ?? ''}
+                              onChange={e => setSearchBySlot(s => ({ ...s, [t.key]: e.target.value }))}
+                              placeholder={`Search ${t.positions.join('/')}...`}
+                              style={{
+                                width: '100%', paddingLeft: 26, paddingRight: 10, paddingTop: 5, paddingBottom: 5,
+                                fontSize: 11, borderRadius: 20, border: '1px solid #e2e8f0',
+                                background: '#f8fafc', color: '#0f172a', outline: 'none', boxSizing: 'border-box',
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ maxHeight: 280, overflowY: 'auto', marginTop: 6 }}>
+                          {candidates.length === 0 && (
+                            <div style={{ padding: '16px', textAlign: 'center', fontSize: 11, color: '#94a3b8' }}>
+                              No players found
+                            </div>
+                          )}
+                          {candidates.map((p, i) => {
+                            const pcol = POS_COLORS[p.position] ?? POS_COLORS.K;
+                            const canAfford = Number(p.current_price) <= available;
+                            return (
+                              <div key={p.id} style={{
+                                display: 'flex', alignItems: 'center', gap: 8, padding: '7px 16px',
+                                borderTop: '1px solid #f8fafc',
+                              }}>
+                                <Link href={`/players/${p.id}${seasonSuffix}`} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1, textDecoration: 'none' }}>
+                                  <Avatar player={p} size={26} />
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontSize: 11.5, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                      <span style={{ fontSize: 9, color: '#94a3b8' }}>{p.team_code}</span>
+                                      <span style={{ fontSize: 8, fontWeight: 700, color: pcol.text, background: pcol.bg, borderRadius: 20, padding: '1px 4px' }}>{p.position}</span>
+                                    </div>
+                                  </div>
+                                </Link>
+                                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                  <div style={{ fontSize: 11, fontWeight: 800, color: canAfford ? '#0f172a' : '#cbd5e1', marginBottom: 3 }}>
+                                    {formatPrice(p.current_price)}
+                                  </div>
+                                  <button
+                                    onClick={() => setSlotIncoming(t.key, p)}
+                                    disabled={!canAfford}
+                                    style={{
+                                      padding: '3px 9px', borderRadius: 7, fontSize: 10, fontWeight: 700,
+                                      border: 'none', cursor: canAfford ? 'pointer' : 'not-allowed',
+                                      background: canAfford ? '#0f172a' : '#f1f5f9',
+                                      color: canAfford ? '#fff' : '#cbd5e1',
+                                    }}
+                                  >
+                                    {canAfford ? 'Select' : "Can't afford"}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        <CapBreakdown
+          roster={owned.map(p => ({ position: p.position, current_price: p.current_price }))}
+          budgetRemaining={Number(budgetRemaining)}
+        />
+      </div>
     </div>
   );
 }
