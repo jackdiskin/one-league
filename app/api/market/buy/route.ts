@@ -7,6 +7,15 @@ import { applyBuyImpact } from '@/lib/pricing';
 // POST /api/market/buy
 // Body: { fantasy_team_id, player_id, week }
 export async function POST(request: NextRequest) {
+  try {
+    return await handleBuy(request);
+  } catch (e) {
+    console.error('POST /api/market/buy failed:', e);
+    return NextResponse.json({ error: 'Unexpected server error' }, { status: 500 });
+  }
+}
+
+async function handleBuy(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -131,11 +140,12 @@ export async function POST(request: NextRequest) {
       [fantasy_team_id, player_id]
     );
 
-    // 6. Add player to roster
+    // 6. Add player to roster — new buys always land on the bench; the
+    // manager promotes them to a starter slot via the lineup swap UI.
     await conn.execute(
       `INSERT INTO fantasy_team_roster
-         (fantasy_team_id, player_id, acquisition_type, purchase_price, acquired_week)
-       VALUES (?, ?, 'market_buy', ?, ?)`,
+         (fantasy_team_id, player_id, roster_slot, acquisition_type, purchase_price, acquired_week)
+       VALUES (?, ?, 'BENCH', 'market_buy', ?, ?)`,
       [fantasy_team_id, player_id, executionPrice, week]
     );
 

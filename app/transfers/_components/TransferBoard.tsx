@@ -62,6 +62,17 @@ const GROUPS: { key: string; label: string; positions: string[] }[] = [
   { key: 'K',    label: 'Kicker',        positions: ['K'] },
 ];
 
+// Reads an error message from a failed fetch response without crashing if the
+// body isn't valid JSON (e.g. a raw 500 from an unhandled server exception).
+async function extractError(res: Response, fallback: string): Promise<string> {
+  try {
+    const j = await res.json();
+    return j?.error ?? `${fallback} (${res.status})`;
+  } catch {
+    return `${fallback} (${res.status})`;
+  }
+}
+
 function Avatar({ player, size = 38 }: { player: Pick<CatalogPlayer, 'headshot_url' | 'full_name' | 'position'>; size?: number }) {
   const col = POS_COLORS[player.position] ?? POS_COLORS.K;
   return (
@@ -176,8 +187,7 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
             body: JSON.stringify({ fantasy_team_id: fantasyTeamId, player_id: t.outgoing.id, week: currentWeek }),
           });
           if (!sellRes.ok) {
-            const j = await sellRes.json();
-            throw new Error(j.error ?? 'Sell failed');
+            throw new Error(await extractError(sellRes, 'Sell failed'));
           }
         }
         if (t.incoming) {
@@ -187,8 +197,8 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
             body: JSON.stringify({ fantasy_team_id: fantasyTeamId, player_id: t.incoming.id, week: currentWeek }),
           });
           if (!buyRes.ok) {
-            const j = await buyRes.json();
-            throw new Error(t.outgoing ? `sold, but buy failed: ${j.error ?? 'buy failed'}` : (j.error ?? 'Buy failed'));
+            const msg = await extractError(buyRes, 'Buy failed');
+            throw new Error(t.outgoing ? `sold, but buy failed: ${msg}` : msg);
           }
         }
         outcomes.push({ label, ok: true });

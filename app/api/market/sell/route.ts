@@ -7,6 +7,15 @@ import { applySellImpact, sellProceeds } from '@/lib/pricing';
 // POST /api/market/sell
 // Body: { fantasy_team_id, player_id, week }
 export async function POST(request: NextRequest) {
+  try {
+    return await handleSell(request);
+  } catch (e) {
+    console.error('POST /api/market/sell failed:', e);
+    return NextResponse.json({ error: 'Unexpected server error' }, { status: 500 });
+  }
+}
+
+async function handleSell(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
