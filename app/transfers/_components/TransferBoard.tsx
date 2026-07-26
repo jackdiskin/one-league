@@ -8,6 +8,8 @@ import { sellProceeds } from '@/lib/pricing';
 import CapBreakdown from './CapBreakdown';
 import TeamLogo from '@/components/TeamLogo';
 import PlayerProfileModal from '@/components/PlayerProfileModal';
+import MatchupBadge from '@/components/MatchupBadge';
+import type { Matchup } from '@/lib/schedule';
 
 export interface CatalogPlayer {
   id: number;
@@ -32,6 +34,7 @@ interface Props {
   fantasyTeamId: number | null;
   currentWeek: number;
   budgetRemaining: number;
+  matchups: Record<string, Matchup>;
 }
 
 // A pending transfer slot. `outgoing` is null when it originates from an
@@ -92,7 +95,7 @@ function Avatar({ player, size = 38 }: { player: Pick<CatalogPlayer, 'headshot_u
   );
 }
 
-export default function TransferBoard({ players, season, fantasyTeamId, currentWeek, budgetRemaining }: Props) {
+export default function TransferBoard({ players, season, fantasyTeamId, currentWeek, budgetRemaining, matchups }: Props) {
   const router = useRouter();
   const emptySlotCounter = useRef(0);
 
@@ -265,6 +268,7 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                       <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
                         <TeamLogo code={p.team_code} size={12} />
                         <span>{p.team_code} · {p.last_week_points != null ? `${formatPoints(p.last_week_points)} last wk` : 'no game yet'}</span>
+                        <MatchupBadge matchup={matchups[p.team_code]} />
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -494,6 +498,7 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                                       <TeamLogo code={p.team_code} size={11} />
                                       <span style={{ fontSize: 9, color: '#94a3b8' }}>{p.team_code}</span>
                                       <span style={{ fontSize: 8, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 4px' }}>{p.position}</span>
+                                      <MatchupBadge matchup={matchups[p.team_code]} size={9} />
                                     </div>
                                   </div>
                                 </div>

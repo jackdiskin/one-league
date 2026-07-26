@@ -6,8 +6,10 @@ import { formatPrice, formatWeekLong } from '@/lib/format';
 import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import TransferBoard, { type CatalogPlayer } from './_components/TransferBoard';
+import { getNextMatchupByTeam } from '@/lib/schedule';
 
 const PREV_SEASON = 2025;
+const SCHEDULE_SEASON = 2026;
 
 async function detectUserSeason(userId: string): Promise<number> {
   const [row] = await query<{ season_year: number }>(
@@ -100,11 +102,12 @@ export default async function TransfersPage({
   const { season: seasonParam } = await searchParams;
   const SEASON = seasonParam ? parseInt(seasonParam, 10) : await detectUserSeason(userId);
 
-  const [currentWeek, lastScoreWeek, userLeagues, team] = await Promise.all([
+  const [currentWeek, lastScoreWeek, userLeagues, team, matchups] = await Promise.all([
     fetchCurrentWeek(SEASON),
     fetchLastScoreWeek(SEASON),
     fetchUserLeagues(userId),
     fetchTeam(userId, SEASON),
+    getNextMatchupByTeam(SCHEDULE_SEASON),
   ]);
 
   const players = await fetchPlayers(SEASON, lastScoreWeek, team?.id ?? null);
@@ -197,6 +200,7 @@ export default async function TransfersPage({
                 fantasyTeamId={team.id}
                 currentWeek={currentWeek}
                 budgetRemaining={Number(budgetRemaining)}
+                matchups={matchups}
               />
             </div>
           )}

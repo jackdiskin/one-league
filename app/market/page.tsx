@@ -8,8 +8,11 @@ import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import ClickablePlayerRow from '@/components/ClickablePlayerRow';
 import TeamLogo from '@/components/TeamLogo';
+import MatchupBadge from '@/components/MatchupBadge';
+import { getNextMatchupByTeam } from '@/lib/schedule';
 
 const PREV_SEASON = 2025;
+const SCHEDULE_SEASON = 2026;
 
 type MoverRow = {
   id: number; full_name: string; position: string; team_code: string; headshot_url: string | null;
@@ -234,12 +237,13 @@ export default async function MarketPage({
     fetchUserLeagues(userId),
   ]);
 
-  const [movers, mostTraded, highDemand, sellPressure, recentTx] = await Promise.all([
+  const [movers, mostTraded, highDemand, sellPressure, recentTx, matchups] = await Promise.all([
     fetchMovers(SEASON, lastScoreWeek),
     fetchMostTraded(SEASON),
     fetchHighDemand(SEASON),
     fetchSellPressure(SEASON),
     fetchRecentTransactions(SEASON),
+    getNextMatchupByTeam(SCHEDULE_SEASON),
   ]);
 
   const gainers = movers.filter(m => Number(m.price_delta) >= 0).slice(0, 8);
@@ -367,6 +371,7 @@ export default async function MarketPage({
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                           <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
                           <PosBadge pos={p.position} />
+                          <MatchupBadge matchup={matchups[p.team_code]} />
                         </div>
                         <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
                           <TeamLogo code={p.team_code} size={11} />
@@ -400,6 +405,7 @@ export default async function MarketPage({
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                           <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
                           <PosBadge pos={p.position} />
+                          <MatchupBadge matchup={matchups[p.team_code]} />
                         </div>
                         <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
                           <TeamLogo code={p.team_code} size={11} />
@@ -439,6 +445,7 @@ export default async function MarketPage({
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                             <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
                             <PosBadge pos={p.position} />
+                            <MatchupBadge matchup={matchups[p.team_code]} />
                           </div>
                           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             <TeamLogo code={p.team_code} size={11} />
@@ -477,6 +484,7 @@ export default async function MarketPage({
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                             <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
                             <PosBadge pos={p.position} />
+                            <MatchupBadge matchup={matchups[p.team_code]} />
                           </div>
                           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             <TeamLogo code={p.team_code} size={11} />
@@ -516,6 +524,7 @@ export default async function MarketPage({
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                             <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
                             <PosBadge pos={p.position} />
+                            <MatchupBadge matchup={matchups[p.team_code]} />
                           </div>
                           <span style={{ fontSize: 10, color: '#94a3b8' }}>{p.buy_orders_count}B / {p.sell_orders_count}S</span>
                         </div>
@@ -583,6 +592,7 @@ export default async function MarketPage({
                           {tx.full_name}
                         </span>
                         <PosBadge pos={tx.position} />
+                        <MatchupBadge matchup={matchups[tx.team_code]} />
                       </div>
                     </ClickablePlayerRow>
                     <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>

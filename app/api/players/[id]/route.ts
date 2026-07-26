@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
+import { getUpcomingMatchups } from '@/lib/schedule';
 
 const DEFAULT_SEASON = 2025;
+// The schedule is always for the live/upcoming NFL season, independent of
+// whichever season's market/stats data is being viewed (2025 is the "last
+// completed season" default used throughout the app for price/stats history).
+const SCHEDULE_SEASON = 2026;
 
 // GET /api/players/[id]?season=2025 — lightweight profile summary for the
 // PlayerProfileModal popup (not the full page: no price history / weekly table).
@@ -53,6 +58,8 @@ export async function GET(
       [playerId, season]
     );
 
+    const nextMatchups = await getUpcomingMatchups(player.team_code, SCHEDULE_SEASON, 5);
+
     return NextResponse.json({
       data: {
         id: player.id,
@@ -66,6 +73,7 @@ export async function GET(
         season_points: Number(seasonRow?.total ?? 0),
         weeks_played: Number(seasonRow?.weeks ?? 0),
         season,
+        next_matchups: nextMatchups,
       },
     });
   } catch (e) {

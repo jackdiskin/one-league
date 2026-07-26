@@ -4,6 +4,8 @@ import Image from 'next/image';
 import { formatPoints, formatWeekLong } from '@/lib/format';
 import ClickablePlayerRow from '@/components/ClickablePlayerRow';
 import TeamLogo from '@/components/TeamLogo';
+import MatchupBadge from '@/components/MatchupBadge';
+import type { Matchup } from '@/lib/schedule';
 
 export interface PerfPlayer {
   id: number;
@@ -15,7 +17,9 @@ export interface PerfPlayer {
   projected_points: number | null;
 }
 
-export default function WeeklyPerformance({ players, week, season }: { players: PerfPlayer[]; week: number; season?: number }) {
+export default function WeeklyPerformance({ players, week, season, matchups }: {
+  players: PerfPlayer[]; week: number; season?: number; matchups: Record<string, Matchup>;
+}) {
   const played = players.filter(p => p.last_week_points != null);
   const totalActual   = played.reduce((s, p) => s + Number(p.last_week_points ?? 0), 0);
   const totalExpected = played.reduce((s, p) => s + Number(p.projected_points ?? 0), 0);
@@ -116,6 +120,7 @@ export default function WeeklyPerformance({ players, week, season }: { players: 
                   <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <TeamLogo code={p.team_code} size={11} />
                     {p.team_code}
+                    <MatchupBadge matchup={matchups[p.team_code]} />
                   </div>
                 </div>
 

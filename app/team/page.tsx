@@ -10,8 +10,10 @@ import MyTeamSummary from '@/app/dashboard/_components/MyTeamSummary';
 import RosterList,   { type RosterPlayer }   from './_components/RosterList';
 import LiveTotalPointsTile from './_components/LiveTotalPointsTile';
 import WeeklyPerformance, { type PerfPlayer } from './_components/WeeklyPerformance';
+import { getNextMatchupByTeam } from '@/lib/schedule';
 
 const PREV_SEASON = 2025;
+const SCHEDULE_SEASON = 2026;
 
 function Skeleton({ h = 200 }: { h?: number }) {
   return <div className="rounded-2xl bg-slate-100 animate-pulse" style={{ height: h }} />;
@@ -187,9 +189,10 @@ export default async function TeamPage({
     );
   }
 
-  const [roster, weeklyPerf] = await Promise.all([
+  const [roster, weeklyPerf, matchups] = await Promise.all([
     fetchRoster(SEASON, team.id, lastScoreWeek),
     fetchWeeklyPerf(SEASON, team.id, lastScoreWeek),
+    getNextMatchupByTeam(SCHEDULE_SEASON),
   ]);
 
   const rankLabel = team.rank === 1 ? '1st' : team.rank === 2 ? '2nd' : team.rank === 3 ? '3rd' : `${team.rank}th`;
@@ -272,10 +275,11 @@ export default async function TeamPage({
           <RosterList
             roster={roster}
             teamId={team.id}
+            matchups={matchups}
           />
 
           {/* Weekly performance */}
-          <WeeklyPerformance players={weeklyPerf} week={lastScoreWeek} season={SEASON} />
+          <WeeklyPerformance players={weeklyPerf} week={lastScoreWeek} season={SEASON} matchups={matchups} />
 
         </main>
       </div>

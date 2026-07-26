@@ -3,6 +3,10 @@ import { query } from '@/lib/mysql';
 import { formatPrice, formatPct, formatWeek } from '@/lib/format';
 import ClickablePlayerRow from '@/components/ClickablePlayerRow';
 import TeamLogo from '@/components/TeamLogo';
+import MatchupBadge from '@/components/MatchupBadge';
+import { getNextMatchupByTeam } from '@/lib/schedule';
+
+const SCHEDULE_SEASON = 2026;
 
 interface Props { seasonYear: number }
 
@@ -54,7 +58,10 @@ async function fetchMovers(seasonYear: number, maxWeek: number, direction: 'gain
   );
 }
 
-function MoverRow({ mover, up, season }: { mover: Mover & { sparkPrices: number[] }; up: boolean; season: number }) {
+function MoverRow({ mover, up, season, matchups }: {
+  mover: Mover & { sparkPrices: number[] }; up: boolean; season: number;
+  matchups: Record<string, import('@/lib/schedule').Matchup>;
+}) {
   const lastName = mover.full_name.split(' ').slice(1).join(' ') || mover.full_name;
   return (
     <ClickablePlayerRow
@@ -81,6 +88,7 @@ function MoverRow({ mover, up, season }: { mover: Mover & { sparkPrices: number[
             </span>
             <TeamLogo code={mover.team_code} size={12} />
             <span className="text-xs text-slate-500 shrink-0">{mover.team_code}</span>
+            <MatchupBadge matchup={matchups[mover.team_code]} />
           </div>
           <p className="text-sm font-semibold text-slate-900 truncate group-hover:text-emerald-700 transition-colors">{lastName}</p>
         </div>
@@ -112,9 +120,10 @@ export default async function TopMovers({ seasonYear }: Props) {
   const maxWeek = weekRow?.max_week ?? 0;
   if (maxWeek < 2) return null;
 
-  const [gainers, losers] = await Promise.all([
+  const [gainers, losers, matchups] = await Promise.all([
     fetchMovers(seasonYear, maxWeek, 'gainers'),
     fetchMovers(seasonYear, maxWeek, 'losers'),
+    getNextMatchupByTeam(SCHEDULE_SEASON),
   ]);
 
   if (!gainers.length && !losers.length) return null;
@@ -150,7 +159,7 @@ export default async function TopMovers({ seasonYear }: Props) {
           <span className="ml-auto text-xs text-slate-400">{formatWeek(maxWeek)}</span>
         </div>
         <div className="space-y-2">
-          {gainers.map((m) => <MoverRow key={m.player_id} mover={enrich(m)} up={true} season={seasonYear} />)}
+          {gainers.map((m) => <MoverRow key={m.player_id} mover={enrich(m)} up={true} season={seasonYear} matchups={matchups} />)}
         </div>
       </div>
 
@@ -162,7 +171,7 @@ export default async function TopMovers({ seasonYear }: Props) {
           <span className="ml-auto text-xs text-slate-400">{formatWeek(maxWeek)}</span>
         </div>
         <div className="space-y-2">
-          {losers.map((m) => <MoverRow key={m.player_id} mover={enrich(m)} up={false} season={seasonYear} />)}
+          {losers.map((m) => <MoverRow key={m.player_id} mover={enrich(m)} up={false} season={seasonYear} matchups={matchups} />)}
         </div>
       </div>
     </div>

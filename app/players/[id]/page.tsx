@@ -13,6 +13,10 @@ import LivePlayerHeroStats from './_components/LivePlayerHeroStats';
 import WeeklyStatsTable, { type WeekScore, type StatCol } from './_components/WeeklyStatsTable';
 import FinalPlayerHeroStats from './_components/FinalPlayerHeroStats';
 import TeamLogo from '@/components/TeamLogo';
+import MatchupBadge from '@/components/MatchupBadge';
+import { getUpcomingMatchups } from '@/lib/schedule';
+
+const SCHEDULE_SEASON = 2026;
 
 const PREV_SEASON = 2025;
 const CURRENT_SEASON = 2026;
@@ -212,11 +216,12 @@ export default async function PlayerPage({
     [CURRENT_SEASON],
   );
 
-  const [weeklyScores, currentSeasonScores, liveGameStateRows, maxLiveWeekRows] = await Promise.all([
+  const [weeklyScores, currentSeasonScores, liveGameStateRows, maxLiveWeekRows, nextMatchups] = await Promise.all([
     weeklyScoresQuery(SEASON),
     SEASON !== CURRENT_SEASON ? weeklyScoresQuery(CURRENT_SEASON) : Promise.resolve([]),
     liveGameStateQuery,
     maxLiveWeekQuery,
+    getUpcomingMatchups(player.team_code, SCHEDULE_SEASON, 5),
   ]);
 
   const liveGameState  = liveGameStateRows[0] ?? null;
@@ -283,6 +288,7 @@ export default async function PlayerPage({
                   <span className="rounded-full px-2 py-0.5 text-xs font-bold bg-slate-100 text-slate-600">{pos}</span>
                   <TeamLogo code={player.team_code} size={16} />
                   <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>{player.team_code}</span>
+                  <MatchupBadge matchup={nextMatchups[0]} size={14} />
                 </div>
                 <h1 style={{
                   fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em',
@@ -409,6 +415,30 @@ export default async function PlayerPage({
               </div>
             </div>
           </div>
+
+          {/* ── Next 5 matchups ── */}
+          {nextMatchups.length > 0 && (
+            <div className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm" style={{ padding: '20px 24px' }}>
+              <h3 style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>Next {nextMatchups.length} Matchups</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${nextMatchups.length}, 1fr)`, gap: 10 }}>
+                {nextMatchups.map((m, i) => (
+                  <div key={i} style={{
+                    borderRadius: 12, border: '1px solid #f1f5f9', background: '#f8fafc',
+                    padding: '12px 10px', textAlign: 'center',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                      {formatWeekLong(m.week)}
+                    </div>
+                    <TeamLogo code={m.opponent} size={32} />
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', marginTop: 6 }}>
+                      {m.isHome ? 'vs' : '@'} {m.opponent}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* ── Weekly stats table ── */}
           {(weeklyScores.length > 0 || currentSeasonScores.length > 0) && (

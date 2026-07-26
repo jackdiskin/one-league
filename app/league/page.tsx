@@ -13,6 +13,10 @@ import WeeklyRecapWrapper from './_components/WeeklyRecapWrapper';
 import { computeWeeklyBadges } from '@/lib/weeklyRecapBadges';
 import ClickablePlayerRow from '@/components/ClickablePlayerRow';
 import TeamLogo from '@/components/TeamLogo';
+import MatchupBadge from '@/components/MatchupBadge';
+import { getNextMatchupByTeam } from '@/lib/schedule';
+
+const SCHEDULE_SEASON = 2026;
 
 const PREV_SEASON = 2025;
 
@@ -444,13 +448,14 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
     );
   }
 
-  const [standings, weeklyScores, transactions, weeklyWinners, rosterValues, recapFlag] = await Promise.all([
+  const [standings, weeklyScores, transactions, weeklyWinners, rosterValues, recapFlag, matchups] = await Promise.all([
     fetchStandings(SEASON, league.id, lastScoreWeek),
     fetchTeamWeeklyScores(SEASON, league.id),
     fetchTransactions(SEASON, league.id),
     fetchWeeklyWinners(SEASON, league.id),
     fetchRosterValues(SEASON, league.id),
     fetchActiveRecapFlag(SEASON, league.id),
+    getNextMatchupByTeam(SCHEDULE_SEASON),
   ]);
 
   const leaderPoints = Number(standings[0]?.total_points ?? 0);
@@ -815,6 +820,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
                         <TeamLogo code={tx.team_code} size={10} />
                         {tx.position} · {tx.team_code}
                       </span>
+                      <MatchupBadge matchup={matchups[tx.team_code]} />
                     </div>
                     <div style={{ display: 'flex', gap: 12, marginTop: 3, fontSize: 10, color: '#94a3b8' }}>
                       <span>{formatPrice(tx.price)}</span>

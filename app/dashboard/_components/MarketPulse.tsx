@@ -2,6 +2,10 @@ import Image from 'next/image';
 import { query } from '@/lib/mysql';
 import { formatPrice } from '@/lib/format';
 import ClickablePlayerRow from '@/components/ClickablePlayerRow';
+import MatchupBadge from '@/components/MatchupBadge';
+import { getNextMatchupByTeam } from '@/lib/schedule';
+
+const SCHEDULE_SEASON = 2026;
 
 interface Props { seasonYear: number }
 
@@ -31,6 +35,8 @@ export default async function MarketPulse({ seasonYear }: Props) {
   );
 
   if (!players.length) return null;
+
+  const matchups = await getNextMatchupByTeam(SCHEDULE_SEASON);
 
   return (
     <div className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm p-5 h-full">
@@ -71,6 +77,7 @@ export default async function MarketPulse({ seasonYear }: Props) {
                       {p.position}
                     </span>
                     <span className="text-xs font-semibold text-slate-900 truncate">{lastName}</span>
+                    <MatchupBadge matchup={matchups[p.team_code]} />
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 ml-2">
                     <span className="text-[10px] text-emerald-600 font-medium">{p.buy_orders_count}B</span>

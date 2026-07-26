@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { formatPrice } from '@/lib/format';
 import TeamLogo from '@/components/TeamLogo';
 import PlayerProfileModal from '@/components/PlayerProfileModal';
+import MatchupBadge from '@/components/MatchupBadge';
+import type { Matchup } from '@/lib/schedule';
 
 export interface DraftPlayer {
   id: number;
@@ -674,11 +676,13 @@ export default function DraftBoard({
   publicLeagues,
   userName,
   season,
+  matchups,
 }: {
   players: DraftPlayer[];
   publicLeagues: PublicLeague[];
   userName: string;
   season: number;
+  matchups: Record<string, Matchup>;
 }) {
   const [selected, setSelected]     = useState<DraftPlayer[]>([]);
   const [pos, setPos]               = useState('ALL');
@@ -930,6 +934,7 @@ export default function DraftBoard({
                     <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 5px' }}>{player.position}</span>
                     <TeamLogo code={player.team_code} size={11} />
                     <span style={{ fontSize: 10, color: '#94a3b8' }}>{player.team_code}</span>
+                    <MatchupBadge matchup={matchups[player.team_code]} />
                   </div>
                 </div>
 

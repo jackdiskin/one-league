@@ -1,6 +1,9 @@
 import { query } from '@/lib/mysql';
 import { formatPrice, formatPoints } from '@/lib/format';
 import LiveTeamField, { type FieldPlayer, type FieldSlot } from './LiveTeamField';
+import { getNextMatchupByTeam } from '@/lib/schedule';
+
+const SCHEDULE_SEASON = 2026;
 
 interface Props { userId: string; seasonYear: number; hidePrices?: boolean }
 
@@ -74,15 +77,18 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
     );
   }
 
-  const starters = await query<Player>(
-    `SELECT p.full_name, p.position, p.team_code, pms.current_price, p.headshot_url, p.external_player_id
-     FROM fantasy_team_roster ftr
-     JOIN players p ON p.id = ftr.player_id
-     JOIN player_market_state pms ON pms.player_id = ftr.player_id AND pms.season_year = ?
-     WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE AND ftr.roster_slot != 'BENCH'
-     ORDER BY FIELD(p.position,'WR','TE','QB','RB','K'), pms.current_price DESC`,
-    [seasonYear, team.id]
-  );
+  const [starters, matchups] = await Promise.all([
+    query<Player>(
+      `SELECT p.full_name, p.position, p.team_code, pms.current_price, p.headshot_url, p.external_player_id
+       FROM fantasy_team_roster ftr
+       JOIN players p ON p.id = ftr.player_id
+       JOIN player_market_state pms ON pms.player_id = ftr.player_id AND pms.season_year = ?
+       WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE AND ftr.roster_slot != 'BENCH'
+       ORDER BY FIELD(p.position,'WR','TE','QB','RB','K'), pms.current_price DESC`,
+      [seasonYear, team.id]
+    ),
+    getNextMatchupByTeam(SCHEDULE_SEASON),
+  ]);
 
   const qbs = starters.filter(p => p.position === 'QB');
   const rbs = starters.filter(p => p.position === 'RB');
@@ -134,7 +140,7 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
       </div>
 
       {/* ── Field ── */}
-      <LiveTeamField positions={positions} losY={losY} hidePrices={hidePrices} />
+      <LiveTeamField positions={positions} losY={losY} hidePrices={hidePrices} matchups={matchups} />
     </div>
   );
 }

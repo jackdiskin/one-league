@@ -3,8 +3,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { formatPrice, formatPoints } from '@/lib/format';
+import { formatPrice, formatPoints, formatWeek } from '@/lib/format';
 import TeamLogo from './TeamLogo';
+import type { Matchup } from '@/lib/schedule';
 
 interface Profile {
   id: number;
@@ -18,6 +19,11 @@ interface Profile {
   season_points: number;
   weeks_played: number;
   season: number;
+  next_matchups: Matchup[];
+}
+
+function formatGameDate(iso: string): string {
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(iso));
 }
 
 export default function PlayerProfileModal({
@@ -151,6 +157,31 @@ export default function PlayerProfileModal({
                   </div>
                 ))}
               </div>
+
+              {profile.next_matchups.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+                    Next {profile.next_matchups.length} Matchups
+                  </div>
+                  <div style={{ border: '1px solid #f1f5f9', borderRadius: 12, overflow: 'hidden' }}>
+                    {profile.next_matchups.map((m, i) => (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 12px', background: '#f8fafc',
+                        borderBottom: i < profile.next_matchups.length - 1 ? '1px solid #f1f5f9' : 'none',
+                      }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#475569' }}>{formatWeek(m.week)}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ fontSize: 11, color: '#cbd5e1', fontWeight: 700 }}>{m.isHome ? 'vs' : '@'}</span>
+                          <TeamLogo code={m.opponent} size={14} />
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{m.opponent}</span>
+                        </div>
+                        <span style={{ fontSize: 10, color: '#94a3b8' }}>{formatGameDate(m.gameDate)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <Link
                 href={`/players/${profile.id}${seasonSuffix}`}

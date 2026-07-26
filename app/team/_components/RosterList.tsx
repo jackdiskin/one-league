@@ -7,6 +7,8 @@ import { formatPrice, formatPoints } from '@/lib/format';
 import { useLiveStats, getLivePoints, type LiveStatDelta } from '@/hooks/useLiveStats';
 import TeamLogo from '@/components/TeamLogo';
 import PlayerProfileModal from '@/components/PlayerProfileModal';
+import MatchupBadge from '@/components/MatchupBadge';
+import type { Matchup } from '@/lib/schedule';
 
 export interface RosterPlayer {
   id: number;
@@ -204,6 +206,7 @@ interface PlayerRowProps {
   liveData: import('@/hooks/useLiveStats').LivePlayerStats | undefined;
   onPlayerClick: (p: RosterPlayer) => void;
   onProfileClick: (p: RosterPlayer) => void;
+  matchups: Record<string, Matchup>;
 }
 
 function Avatar({ player, size = 40 }: { player: RosterPlayer; size?: number }) {
@@ -229,7 +232,7 @@ function Avatar({ player, size = 40 }: { player: RosterPlayer; size?: number }) 
 }
 
 const PlayerRow = memo(function PlayerRow({
-  p, selected, swapping, liveData, onPlayerClick, onProfileClick,
+  p, selected, swapping, liveData, onPlayerClick, onProfileClick, matchups,
 }: PlayerRowProps) {
   const col        = POS_COLORS[p.position] ?? POS_COLORS.K;
   const isSelected = selected?.id === p.id;
@@ -315,6 +318,7 @@ const PlayerRow = memo(function PlayerRow({
         <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
           <TeamLogo code={p.team_code} size={12} />
           <span>{p.team_code}</span>
+          <MatchupBadge matchup={matchups[p.team_code]} />
           {isBench && <span style={{ fontSize: 9, color: '#cbd5e1', fontWeight: 600 }}>· BENCH</span>}
         </div>
         {isLive && liveData && <LiveStatChips totals={liveData.totals} />}
@@ -385,9 +389,10 @@ const PlayerRow = memo(function PlayerRow({
   );
 });
 
-export default function RosterList({ roster, teamId }: {
+export default function RosterList({ roster, teamId, matchups }: {
   roster: RosterPlayer[];
   teamId: number;
+  matchups: Record<string, Matchup>;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -732,14 +737,14 @@ export default function RosterList({ roster, teamId }: {
       {/* Starters */}
       <div>
         <div style={{
-          padding: '7px 20px',
+          padding: '9px 20px',
           background: '#f8fafc',
           borderBottom: '1px solid #f1f5f9',
-          fontSize: 10, fontWeight: 800, color: '#475569',
-          textTransform: 'uppercase', letterSpacing: '0.1em',
+          fontSize: 13, fontWeight: 800, color: '#475569',
+          textTransform: 'uppercase', letterSpacing: '0.08em',
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
           Starters
@@ -785,6 +790,7 @@ export default function RosterList({ roster, teamId }: {
                   liveData={liveStats.get(p.external_player_id ?? '') ?? undefined}
                   onPlayerClick={handlePlayerClick}
                   onProfileClick={p => setProfileId(p.id)}
+                  matchups={matchups}
                 />
               ))}
               {emptySlots.map(slot => (
@@ -806,16 +812,20 @@ export default function RosterList({ roster, teamId }: {
 
       {/* Bench section — always shown so starters can be moved down */}
       <>
-        <div style={{ margin: '0 20px', borderTop: '2px dashed #e2e8f0' }} />
         <div style={{
-          padding: '7px 20px',
+          height: 6,
+          background: 'linear-gradient(90deg, #0f172a 0%, #334155 50%, #0f172a 100%)',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+        }} />
+        <div style={{
+          padding: '9px 20px',
           background: '#f8fafc',
           borderBottom: '1px solid #f1f5f9',
-          fontSize: 10, fontWeight: 800, color: '#94a3b8',
-          textTransform: 'uppercase', letterSpacing: '0.1em',
+          fontSize: 13, fontWeight: 800, color: '#64748b',
+          textTransform: 'uppercase', letterSpacing: '0.08em',
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round">
             <rect x="3" y="3" width="18" height="18" rx="2" />
             <line x1="3" y1="9" x2="21" y2="9" />
             <line x1="9" y1="21" x2="9" y2="9" />
@@ -863,6 +873,7 @@ export default function RosterList({ roster, teamId }: {
                   liveData={liveStats.get(p.external_player_id ?? '') ?? undefined}
                   onPlayerClick={handlePlayerClick}
                   onProfileClick={p => setProfileId(p.id)}
+                  matchups={matchups}
                 />
               ))}
             </div>

@@ -5,6 +5,8 @@ import { useMemo, useState } from 'react';
 import { useLiveStats, type LivePlayerStats } from '@/hooks/useLiveStats';
 import { formatPrice, formatPoints } from '@/lib/format';
 import TeamLogo from '@/components/TeamLogo';
+import MatchupBadge from '@/components/MatchupBadge';
+import type { Matchup } from '@/lib/schedule';
 
 export interface FieldPlayer {
   full_name: string;
@@ -111,13 +113,13 @@ function LiveStatsModal({
                 src={player.headshot_url} alt={player.full_name}
                 width={48} height={48} unoptimized
                 style={{
-                  width: 48, height: 48, objectFit: 'contain', display: 'block',
-                  border: '2.5px solid #10b981', borderRadius: 10,
+                  width: 48, height: 48, objectFit: 'cover', display: 'block',
+                  border: '2.5px solid #10b981', borderRadius: '50%',
                 }}
               />
             ) : (
               <div style={{
-                width: 48, height: 48, borderRadius: 10, background: '#334155',
+                width: 48, height: 48, borderRadius: '50%', background: '#334155',
                 border: '2.5px solid #10b981',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 18, fontWeight: 800, color: '#fff',
@@ -238,11 +240,12 @@ function LiveStatsModal({
 // PlayerCard
 // ---------------------------------------------------------------------------
 function PlayerCard({
-  player, x, y, livePoints, onClick, hidePrices = false,
+  player, x, y, livePoints, onClick, hidePrices = false, matchup,
 }: {
   player: FieldPlayer; x: number; y: number; livePoints: number | null;
   onClick?: () => void;
   hidePrices?: boolean;
+  matchup?: Matchup;
 }) {
   const lastName = player.full_name.split(' ').slice(1).join(' ') || player.full_name;
   const isLive = livePoints !== null;
@@ -278,9 +281,9 @@ function PlayerCard({
             src={player.headshot_url} alt={player.full_name}
             width={72} height={72} unoptimized
             style={{
-              width: 72, height: 72, objectFit: 'contain', display: 'block',
+              width: 72, height: 72, objectFit: 'cover', display: 'block',
               border: isLive ? '3px solid #10b981' : '3px solid #fff',
-              borderRadius: 14,
+              borderRadius: '50%',
               boxShadow: isLive
                 ? '0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(16,185,129,0.45)'
                 : '0 4px 18px rgba(0,0,0,0.45)',
@@ -288,7 +291,7 @@ function PlayerCard({
           />
         ) : (
           <div style={{
-            width: 72, height: 72, borderRadius: 14, background: '#334155',
+            width: 72, height: 72, borderRadius: '50%', background: '#334155',
             border: isLive ? '3px solid #10b981' : '3px solid #fff',
             boxShadow: isLive
               ? '0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(16,185,129,0.45)'
@@ -329,6 +332,10 @@ function PlayerCard({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, marginTop: 1 }}>
           <TeamLogo code={player.team_code} size={10} />
           <span style={{ fontSize: 10, fontWeight: 600, color: '#64748b' }}>{player.team_code}</span>
+          {!isLive && matchup && (
+            <span style={{ fontSize: 9, color: '#cbd5e1' }}>·</span>
+          )}
+          {!isLive && <MatchupBadge matchup={matchup} size={9} />}
           {isLive && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 2,
@@ -396,10 +403,11 @@ function EmptySlotCard({ pos, x, y }: { pos: string; x: number; y: number }) {
 // ---------------------------------------------------------------------------
 // Main field component
 // ---------------------------------------------------------------------------
-export default function LiveTeamField({ positions, losY, hidePrices = false }: {
+export default function LiveTeamField({ positions, losY, hidePrices = false, matchups = {} }: {
   positions: FieldSlot[];
   losY: number;
   hidePrices?: boolean;
+  matchups?: Record<string, Matchup>;
 }) {
   const playerIds = useMemo(
     () => positions.flatMap(s => s.player?.external_player_id ? [s.player.external_player_id] : []),
@@ -414,7 +422,11 @@ export default function LiveTeamField({ positions, losY, hidePrices = false }: {
     <>
       <div style={{
         position: 'relative', height: 580, overflow: 'hidden',
-        background: `repeating-linear-gradient(180deg, #1a7a32 0px, #1a7a32 48px, #1e8838 48px, #1e8838 96px)`,
+        background: `
+          radial-gradient(ellipse 120% 70% at 50% 0%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 55%),
+          radial-gradient(ellipse 140% 90% at 50% 50%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.32) 100%),
+          repeating-linear-gradient(180deg, #1c8a3a 0px, #1c8a3a 48px, #156b2e 48px, #156b2e 96px)
+        `,
       }}>
         <style>{`
           @keyframes live-dot-pulse {
@@ -474,6 +486,7 @@ export default function LiveTeamField({ positions, losY, hidePrices = false }: {
               livePoints={livePoints}
               onClick={liveData ? () => setModal({ player, stats: liveData }) : undefined}
               hidePrices={hidePrices}
+              matchup={matchups[player.team_code]}
             />
           );
         })}

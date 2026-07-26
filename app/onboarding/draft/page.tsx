@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
 import DraftBoard, { type DraftPlayer, type PublicLeague } from './_components/DraftBoard';
+import { getNextMatchupByTeam } from '@/lib/schedule';
 
 const SEASON = 2026;
 
@@ -46,9 +47,10 @@ export default async function OnboardingDraftPage() {
   );
   if (existing) redirect('/dashboard');
 
-  const [players, publicLeagues] = await Promise.all([
+  const [players, publicLeagues, matchups] = await Promise.all([
     fetchPlayers(),
     fetchPublicLeagues(),
+    getNextMatchupByTeam(SEASON),
   ]);
 
   return (
@@ -57,6 +59,7 @@ export default async function OnboardingDraftPage() {
       publicLeagues={publicLeagues}
       userName={session.user.name ?? 'Manager'}
       season={SEASON}
+      matchups={matchups}
     />
   );
 }
