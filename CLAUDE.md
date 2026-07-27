@@ -7,8 +7,8 @@ Claude Code reads this file automatically on startup. Keep it updated as decisio
 ## Core format
 
 - Budget: $100M per manager
-- Roster: 12 players — 2 QB, 3 RB, 5 WR/TE, 2 D/ST (expanded from 11 to fix D/ST bye week gaps)
-- Starting XI: 1 QB, 2 RB, 3 WR/TE, 1 FLEX (RB/WR/TE), 1 D/ST
+- Roster: 11 players — 2 QB, 3 RB, 5 WR/TE, 1 Kicker
+- Starting XI: 1 QB, 2 RB, 3 WR/TE, 1 FLEX (RB/WR/TE), 1 Kicker
 - Transfers: 1 free/week, max 2 banked, -8pts per extra transfer
 - Auto-subs: DNP triggers sub, position-locked, bench order priority
 
@@ -19,7 +19,6 @@ Claude Code reads this file automatically on startup. Keep it updated as decisio
 - Receiving: 0.5/reception, 0.1 pts/yard, 6 pts TD, +2 bonus 100yds
 - 40+ yard TD: +2 bonus, all positions
 - Fumble lost: -2, 2pt conversion: +2, Return TD: +6
-- D/ST: standard sack/INT/TD scoring + points/yards-allowed tiers
 - Display whole numbers, calculate in decimals internally
 
 ## Pricing system
@@ -38,7 +37,7 @@ Claude Code reads this file automatically on startup. Keep it updated as decisio
 - WR mirrors FPL midfielders — deep pool: $5M floor, $15-17M ceiling
 - TE — bifurcated, elite TE expensive, rest cheap: $4.5M floor, $13-15M ceiling
 - QB mirrors FPL defenders — budget position: $4.5M floor, $8-9M ceiling
-- D/ST mirrors FPL keepers — dirt cheap, hard cap: $3.5M floor, $5.5M ceiling
+- Kicker mirrors FPL keepers — dirt cheap, hard cap: $3.5M floor, $5.5M ceiling
 
 **Other pricing mechanics:**
 - Daily price changes from ownership % + performance + projections
@@ -70,7 +69,6 @@ WR and TE tier pricing not yet finalized. Data sources: FantasyPros 2026 consens
 ## Brand
 
 - **Name:** OneLeague. **Tagline:** "One League. Everyone In."
-- No player headshots or official logos until licensing secured; team colors/names are fine.
 - Logo direction: wordmark or single ring — clean, travels well on Reddit/Discord/mobile.
 - Palette: dark green background, white type, green accent on "One" / the ring.
 - Differentiator vs. Sleeper/ESPN/Yahoo: zero customization, everyone plays identical rules — a real meritocracy, not league-specific results.
