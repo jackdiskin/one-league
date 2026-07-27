@@ -14,12 +14,8 @@ export interface Matchup {
 // were UTC/local and shifting the displayed time by several hours. Every
 // schedule query below forces DATE_FORMAT() so the driver returns a plain
 // string instead, and display code parses that string's components
-// directly rather than routing it through `new Date(...)`.
-export function parseNaiveDateTime(raw: string): { year: number; month: number; day: number; hour: number; minute: number } | null {
-  const m = raw.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
-  if (!m) return null;
-  return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]), hour: Number(m[4]), minute: Number(m[5]) };
-}
+// directly (see parseNaiveDateTime in lib/format.ts — kept out of this
+// file so client components can use it without bundling the mysql2 driver).
 
 // One query for the whole page — every team's next upcoming/in-progress game,
 // keyed by team code. Avoids an N+1 per player row across rosters/catalogs.

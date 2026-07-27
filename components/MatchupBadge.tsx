@@ -1,5 +1,6 @@
 import TeamLogo from './TeamLogo';
-import { parseNaiveDateTime, type Matchup } from '@/lib/schedule';
+import { parseNaiveDateTime } from '@/lib/format';
+import type { Matchup } from '@/lib/schedule';
 
 // Kickoff times are naive ET wall-clock values — format from the raw
 // components directly instead of `new Date(...)`, which would silently

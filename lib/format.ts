@@ -1,3 +1,14 @@
+// Schedule/kickoff times are naive ET wall-clock values with no timezone
+// attached (see lib/schedule.ts). Parsing them into components directly
+// avoids `new Date(...)` reinterpreting them in the runtime/viewer's
+// timezone. Lives here (not lib/schedule.ts) so client components can use
+// it without pulling the mysql2 driver into the browser bundle.
+export function parseNaiveDateTime(raw: string): { year: number; month: number; day: number; hour: number; minute: number } | null {
+  const m = raw.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  if (!m) return null;
+  return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]), hour: Number(m[4]), minute: Number(m[5]) };
+}
+
 export function formatPrice(dollars: number): string {
   if (dollars >= 1_000_000)  return `$${Number((dollars / 1_000_000)).toFixed(1)}M`;
   if (dollars >= 1_000)      return `$${Number((dollars / 1_000)).toFixed(0)}K`;
