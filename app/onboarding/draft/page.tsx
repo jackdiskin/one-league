@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
-import DraftBoard, { type DraftPlayer, type PublicLeague } from './_components/DraftBoard';
+import DraftBoard, { type DraftPlayer } from './_components/DraftBoard';
 import { getNextMatchupByTeam } from '@/lib/schedule';
 
 const SEASON = 2026;
@@ -59,21 +59,6 @@ async function fetchPlayers(currentWeek: number): Promise<DraftPlayer[]> {
   );
 }
 
-async function fetchPublicLeagues(): Promise<PublicLeague[]> {
-  return query<PublicLeague>(
-    `SELECT l.id, l.name, l.season_year, l.salary_cap, l.max_members,
-            COUNT(lm.id) AS member_count
-     FROM leagues l
-     LEFT JOIN league_members lm ON lm.league_id = l.id
-     WHERE l.is_public = TRUE
-     GROUP BY l.id
-     HAVING member_count < l.max_members
-     ORDER BY member_count DESC
-     LIMIT 8`,
-    []
-  );
-}
-
 export default async function OnboardingDraftPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/auth/sign-in');
@@ -88,16 +73,14 @@ export default async function OnboardingDraftPage() {
   if (existing) redirect('/dashboard');
 
   const currentWeek = await fetchCurrentWeek();
-  const [players, publicLeagues, matchups] = await Promise.all([
+  const [players, matchups] = await Promise.all([
     fetchPlayers(currentWeek),
-    fetchPublicLeagues(),
     getNextMatchupByTeam(SEASON),
   ]);
 
   return (
     <DraftBoard
       players={players}
-      publicLeagues={publicLeagues}
       userName={session.user.name ?? 'Manager'}
       season={SEASON}
       matchups={matchups}

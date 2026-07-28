@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
 
-const SEASON = 2025;
+const SEASON = 2026;
 
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() });

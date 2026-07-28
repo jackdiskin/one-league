@@ -64,6 +64,15 @@ const NAV = [
       </svg>
     ),
   },
+  {
+    label: 'Leagues',
+    href: '/leagues',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="8" r="6" /><path d="M8.34 14.66 6 22l6-3 6 3-2.34-7.35" />
+      </svg>
+    ),
+  },
 ];
 
 function rankLabel(r: number | null) {

@@ -5,11 +5,11 @@ interface Props { userId: string; seasonYear: number }
 
 export default async function StandingsCard({ userId, seasonYear }: Props) {
   const [membership] = await query<{ league_id: number; league_name: string }>(
-    `SELECT ft.league_id, l.name AS league_name
-     FROM fantasy_teams ft JOIN leagues l ON l.id = ft.league_id
-     WHERE ft.user_id = ? AND ft.season_year = ?
-     ORDER BY ft.created_at DESC LIMIT 1`,
-    [userId, seasonYear]
+    `SELECT id AS league_id, name AS league_name
+     FROM leagues
+     WHERE season_year = ? AND is_global = 1
+     LIMIT 1`,
+    [seasonYear]
   );
   if (!membership) return null;
 
@@ -20,11 +20,12 @@ export default async function StandingsCard({ userId, seasonYear }: Props) {
     `SELECT RANK() OVER (ORDER BY ft.total_points DESC) AS \`rank\`,
             ft.team_name, u.name AS user_name,
             ft.total_points, ft.budget_remaining, ft.user_id
-     FROM fantasy_teams ft
+     FROM league_members lm
+     JOIN fantasy_teams ft ON ft.user_id = lm.user_id AND ft.season_year = ?
      JOIN \`user\` u ON u.id = ft.user_id
-     WHERE ft.league_id = ? AND ft.season_year = ?
+     WHERE lm.league_id = ?
      ORDER BY ft.total_points DESC`,
-    [membership.league_id, seasonYear]
+    [seasonYear, membership.league_id]
   );
 
   return (

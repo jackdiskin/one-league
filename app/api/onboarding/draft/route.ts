@@ -6,16 +6,20 @@ import { query, withTransaction } from '@/lib/mysql';
 const SEASON      = 2026;
 const CAP         = 100_000_000;
 const QUOTA       = { QB: 2, RB: 3, FLEX: 5 };
+const GLOBAL_LEADERBOARD_NAME = 'Global Leaderboard';
 
 // POST /api/onboarding/draft
-// Body: { team_name, player_ids[10], season_year, league_id? | invite_code? }
+// Body: { team_name, player_ids[10], season_year? }
+// One team per user per season, shared across every league (FPL model) — no
+// league selection at draft time. Every drafted team is auto-enrolled in the
+// season's Global Leaderboard; private leagues are joined separately via a code.
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
 
-  const { team_name, player_ids, season_year = SEASON, league_id, invite_code } = await request.json();
+  const { team_name, player_ids, season_year = SEASON } = await request.json();
 
   if (!team_name || typeof team_name !== 'string' || team_name.trim().length < 2) {
     return NextResponse.json({ error: 'team_name must be at least 2 characters' }, { status: 400 });
@@ -31,39 +35,6 @@ export async function POST(request: NextRequest) {
     [userId, season_year]
   );
   if (existing) return NextResponse.json({ error: 'You already have a team this season' }, { status: 409 });
-
-  // Resolve league
-  let resolvedLeagueId: number | null = null;
-
-  if (league_id) {
-    const [league] = await query<{ id: number; is_public: number; max_members: number; member_count: number }>(
-      `SELECT l.id, l.is_public, l.max_members, COUNT(lm.id) AS member_count
-       FROM leagues l
-       LEFT JOIN league_members lm ON lm.league_id = l.id
-       WHERE l.id = ?
-       GROUP BY l.id`,
-      [league_id]
-    );
-    if (!league) return NextResponse.json({ error: 'League not found' }, { status: 404 });
-    if (league.member_count >= league.max_members) return NextResponse.json({ error: 'League is full' }, { status: 409 });
-    resolvedLeagueId = league.id;
-  } else if (invite_code) {
-    const [league] = await query<{ id: number; invite_code: string; max_members: number; member_count: number }>(
-      `SELECT l.id, l.invite_code, l.max_members, COUNT(lm.id) AS member_count
-       FROM leagues l
-       LEFT JOIN league_members lm ON lm.league_id = l.id
-       WHERE l.invite_code = ?
-       GROUP BY l.id`,
-      [invite_code]
-    );
-    if (!league || league.invite_code !== invite_code) {
-      return NextResponse.json({ error: 'Invalid invite code' }, { status: 403 });
-    }
-    if (league.member_count >= league.max_members) return NextResponse.json({ error: 'League is full' }, { status: 409 });
-    resolvedLeagueId = league.id;
-  } else {
-    return NextResponse.json({ error: 'Must provide league_id or invite_code' }, { status: 400 });
-  }
 
   // Fetch player prices to validate budget and build roster slots
   const placeholders = player_ids.map(() => '?').join(',');
@@ -116,24 +87,36 @@ export async function POST(request: NextRequest) {
   const budgetRemaining = CAP - totalCost;
 
   await withTransaction(async (conn) => {
-    // Check if already a member of this league
-    const [alreadyMember] = await conn.execute<RowDataPacket[]>(
-      `SELECT id FROM league_members WHERE league_id = ? AND user_id = ?`,
-      [resolvedLeagueId, userId]
+    // Find or create this season's Global Leaderboard — every drafted team is
+    // auto-enrolled in it, no invite/selection needed. Locked with FOR UPDATE
+    // so two simultaneous first-drafts of the season can't both create one.
+    const [globalRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT id FROM leagues WHERE season_year = ? AND is_global = 1 LIMIT 1 FOR UPDATE`,
+      [season_year]
     ) as [RowDataPacket[], unknown];
 
-    if (!alreadyMember[0]) {
-      await conn.execute(
-        `INSERT INTO league_members (league_id, user_id, role) VALUES (?, ?, 'member')`,
-        [resolvedLeagueId, userId]
+    let globalLeagueId: number;
+    if (globalRows[0]) {
+      globalLeagueId = globalRows[0].id;
+    } else {
+      const [globalResult] = await conn.execute<ResultSetHeader>(
+        `INSERT INTO leagues (name, owner_user_id, season_year, salary_cap, is_public, is_global, max_members)
+         VALUES (?, ?, ?, ?, 0, 1, 2147483647)`,
+        [GLOBAL_LEADERBOARD_NAME, userId, season_year, CAP]
       );
+      globalLeagueId = globalResult.insertId;
     }
 
-    // Create fantasy team
+    await conn.execute(
+      `INSERT IGNORE INTO league_members (league_id, user_id, role) VALUES (?, ?, 'member')`,
+      [globalLeagueId, userId]
+    );
+
+    // Create fantasy team — one per user per season, shared across every league
     const [teamResult] = await conn.execute<ResultSetHeader>(
-      `INSERT INTO fantasy_teams (user_id, league_id, team_name, season_year, budget_remaining)
-       VALUES (?, ?, ?, ?, ?)`,
-      [userId, resolvedLeagueId, team_name.trim(), season_year, budgetRemaining]
+      `INSERT INTO fantasy_teams (user_id, team_name, season_year, budget_remaining)
+       VALUES (?, ?, ?, ?)`,
+      [userId, team_name.trim(), season_year, budgetRemaining]
     );
     const teamId = teamResult.insertId;
 

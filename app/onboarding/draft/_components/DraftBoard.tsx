@@ -24,15 +24,6 @@ export interface DraftPlayer {
   projected_next_week: number;
 }
 
-export interface PublicLeague {
-  id: number;
-  name: string;
-  season_year: number;
-  salary_cap: number;
-  max_members: number;
-  member_count: number;
-}
-
 // ─── Quotas ───────────────────────────────────────────────────────────────────
 const CAP          = 100_000_000;
 const QUOTA        = { QB: 2, RB: 3, FLEX: 5 }; // FLEX = WR+TE combined
@@ -639,29 +630,27 @@ function WelcomeModal({ userName, onClose }: { userName: string; onClose: () => 
   );
 }
 
-// ─── League joining modal ──────────────────────────────────────────────────────
+// ─── Name-your-team confirmation modal ─────────────────────────────────────────
+// No league picker here — every team is auto-enrolled in the season's Global
+// Leaderboard on submit. Private leagues are joined separately afterward,
+// from the Leagues tab.
 function LeagueModal({
-  publicLeagues,
   teamName,
   playerIds,
   season,
   onClose,
 }: {
-  publicLeagues: PublicLeague[];
   teamName: string;
   playerIds: number[];
   season: number;
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<'public' | 'code'>('public');
-  const [selectedLeague, setSelectedLeague] = useState<number | null>(null);
-  const [inviteCode, setInviteCode] = useState('');
   const [name, setName] = useState(teamName);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const canSubmit = name.trim().length >= 2 && (selectedLeague !== null || inviteCode.trim().length >= 4);
+  const canSubmit = name.trim().length >= 2;
 
   async function handleSubmit() {
     if (!canSubmit || submitting) return;
@@ -674,8 +663,6 @@ function LeagueModal({
         body: JSON.stringify({
           team_name: name.trim(),
           player_ids: playerIds,
-          league_id: tab === 'public' ? selectedLeague : undefined,
-          invite_code: tab === 'code' ? inviteCode.trim() : undefined,
           season_year: season,
         }),
       });
@@ -697,7 +684,7 @@ function LeagueModal({
       padding: 24,
     }}>
       <div style={{
-        background: '#fff', borderRadius: 24, width: '100%', maxWidth: 520,
+        background: '#fff', borderRadius: 24, width: '100%', maxWidth: 480,
         boxShadow: '0 32px 80px rgba(0,0,0,0.5)', overflow: 'hidden',
         animation: 'modal-in 0.35s cubic-bezier(0.34,1.4,0.64,1) both',
       }}>
@@ -707,13 +694,13 @@ function LeagueModal({
           background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
         }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 6 }}>
-            Step 2 of 2
+            Almost there
           </div>
           <h2 style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', margin: 0 }}>
-            Join a League
+            Name Your Team
           </h2>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
-            Compete against other GMs to win the season.
+            You'll be entered into the Global Leaderboard automatically — join private leagues anytime from the Leagues tab.
           </p>
         </div>
 
@@ -724,8 +711,10 @@ function LeagueModal({
               Team Name
             </label>
             <input
+              autoFocus
               value={name}
               onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
               placeholder="e.g. The Dream Team"
               maxLength={40}
               style={{
@@ -737,112 +726,15 @@ function LeagueModal({
             />
           </div>
 
-          {/* Tab switcher */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: '#f1f5f9', borderRadius: 12, padding: 4 }}>
-            {(['public', 'code'] as const).map(t => (
-              <button
-                key={t}
-                onClick={() => { setTab(t); setSelectedLeague(null); setInviteCode(''); setError(''); }}
-                style={{
-                  flex: 1, padding: '7px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
-                  fontSize: 12, fontWeight: 700,
-                  background: tab === t ? '#fff' : 'transparent',
-                  color: tab === t ? '#0f172a' : '#94a3b8',
-                  boxShadow: tab === t ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {t === 'public' ? '🌐 Public Leagues' : '🔒 Invite Code'}
-              </button>
-            ))}
-          </div>
-
-          {/* Public leagues list */}
-          {tab === 'public' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 240, overflowY: 'auto' }}>
-              {publicLeagues.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '24px 0', color: '#94a3b8', fontSize: 13 }}>
-                  No public leagues available right now.
-                </div>
-              )}
-              {publicLeagues.map(league => {
-                const full = league.member_count >= league.max_members;
-                const pct  = Math.round((league.member_count / league.max_members) * 100);
-                const active = selectedLeague === league.id;
-                return (
-                  <div
-                    key={league.id}
-                    onClick={() => !full && setSelectedLeague(active ? null : league.id)}
-                    style={{
-                      padding: '10px 14px', borderRadius: 12, cursor: full ? 'default' : 'pointer',
-                      border: `1.5px solid ${active ? '#059669' : '#e2e8f0'}`,
-                      background: active ? '#f0fdf4' : full ? '#fafafa' : '#fff',
-                      opacity: full ? 0.5 : 1, transition: 'all 0.15s',
-                      display: 'flex', alignItems: 'center', gap: 10,
-                    }}
-                  >
-                    <div style={{
-                      width: 28, height: 28, borderRadius: 8,
-                      background: active ? '#059669' : '#e2e8f0',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0, transition: 'background 0.15s',
-                    }}>
-                      {active
-                        ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
-                        : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-                      }
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{league.name}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
-                        <div style={{ flex: 1, height: 3, borderRadius: 99, background: '#e2e8f0', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${pct}%`, background: '#059669', borderRadius: 99, transition: 'width 0.3s' }} />
-                        </div>
-                        <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, flexShrink: 0 }}>
-                          {league.member_count}/{league.max_members}
-                        </span>
-                      </div>
-                    </div>
-                    {full && <span style={{ fontSize: 10, fontWeight: 700, color: '#f43f5e' }}>FULL</span>}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Invite code input */}
-          {tab === 'code' && (
-            <div>
-              <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 6 }}>
-                Invite Code
-              </label>
-              <input
-                value={inviteCode}
-                onChange={e => setInviteCode(e.target.value.toUpperCase())}
-                placeholder="e.g. ALPHA-2025"
-                maxLength={20}
-                style={{
-                  width: '100%', padding: '9px 12px', borderRadius: 10,
-                  border: '1.5px solid #e2e8f0', fontSize: 14, fontWeight: 700,
-                  color: '#0f172a', background: '#f8fafc', outline: 'none',
-                  boxSizing: 'border-box', letterSpacing: '0.08em',
-                }}
-              />
-              <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
-                Ask your league commissioner for your invite code.
-              </p>
-            </div>
-          )}
-
           {/* Error */}
           {error && (
-            <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fecaca', fontSize: 12, color: '#dc2626', fontWeight: 600 }}>
+            <div style={{ marginBottom: 4, padding: '8px 12px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fecaca', fontSize: 12, color: '#dc2626', fontWeight: 600 }}>
               {error}
             </div>
           )}
 
           {/* Actions */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <button
               onClick={onClose}
               style={{
@@ -879,13 +771,11 @@ function LeagueModal({
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function DraftBoard({
   players,
-  publicLeagues,
   userName,
   season,
   matchups,
 }: {
   players: DraftPlayer[];
-  publicLeagues: PublicLeague[];
   userName: string;
   season: number;
   matchups: Record<string, Matchup>;
@@ -1555,7 +1445,6 @@ export default function DraftBoard({
       {/* ── LEAGUE MODAL ──────────────────────────────────────────────────────── */}
       {showModal && (
         <LeagueModal
-          publicLeagues={publicLeagues}
           teamName={`${userName.split(' ')[0]}'s Squad`}
           playerIds={selected.map(p => p.id)}
           season={season}

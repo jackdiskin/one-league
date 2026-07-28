@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth';
 import { withTransaction } from '@/lib/mysql';
 import type { ResultSetHeader } from 'mysql2';
 
-const SEASON = 2025;
+const SEASON = 2026;
 
 function generateInviteCode(): string {
   // Unambiguous alphanumeric characters (no 0/O, 1/I/L)
