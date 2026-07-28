@@ -27,8 +27,8 @@ async function handleBuy(request: NextRequest) {
   }
 
   // Verify the user owns this fantasy team
-  const [team] = await query<{ id: number; budget_remaining: number; league_id: number; season_year: number }>(
-    `SELECT id, budget_remaining, league_id, season_year FROM fantasy_teams WHERE id = ? AND user_id = ?`,
+  const [team] = await query<{ id: number; budget_remaining: number; season_year: number }>(
+    `SELECT id, budget_remaining, season_year FROM fantasy_teams WHERE id = ? AND user_id = ?`,
     [fantasy_team_id, userId]
   );
   if (!team) return NextResponse.json({ error: 'Fantasy team not found' }, { status: 404 });
