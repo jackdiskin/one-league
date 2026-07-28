@@ -56,8 +56,8 @@ async function handleBuy(request: NextRequest) {
   );
   if (alreadyOwned) return NextResponse.json({ error: 'Player already on roster' }, { status: 409 });
 
-  // Enforce roster quota (11 total; 2 QB, 3 RB, 5 WR/TE combined, 1 K)
-  const QUOTA = { QB: 2, RB: 3, FLEX: 5, K: 1 };
+  // Enforce roster quota (10 total; 2 QB, 3 RB, 5 WR/TE combined)
+  const QUOTA = { QB: 2, RB: 3, FLEX: 5 };
   const [playerPos] = await query<{ position: string }>(
     `SELECT position FROM players WHERE id = ?`, [player_id]
   );
@@ -75,7 +75,7 @@ async function handleBuy(request: NextRequest) {
   const rosterTotal = Object.values(countMap).reduce((s, n) => s + n, 0);
   const flexCount   = (countMap.WR ?? 0) + (countMap.TE ?? 0);
 
-  if (rosterTotal >= 11) {
+  if (rosterTotal >= 10) {
     return NextResponse.json({ error: 'Roster full — sell a player first' }, { status: 409 });
   }
   if (playerPos.position === 'QB' && (countMap.QB ?? 0) >= QUOTA.QB) {
@@ -86,9 +86,6 @@ async function handleBuy(request: NextRequest) {
   }
   if ((playerPos.position === 'WR' || playerPos.position === 'TE') && flexCount >= QUOTA.FLEX) {
     return NextResponse.json({ error: `WR/TE slots full (max ${QUOTA.FLEX})` }, { status: 409 });
-  }
-  if (playerPos.position === 'K' && (countMap.K ?? 0) >= QUOTA.K) {
-    return NextResponse.json({ error: `K slot full (max ${QUOTA.K})` }, { status: 409 });
   }
 
   const newPrice = applyBuyImpact(executionPrice);

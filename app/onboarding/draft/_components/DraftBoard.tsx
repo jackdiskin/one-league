@@ -35,8 +35,8 @@ export interface PublicLeague {
 
 // ─── Quotas ───────────────────────────────────────────────────────────────────
 const CAP          = 100_000_000;
-const QUOTA        = { QB: 2, RB: 3, FLEX: 5, K: 1 }; // FLEX = WR+TE combined
-const TOTAL_SLOTS  = 11;
+const QUOTA        = { QB: 2, RB: 3, FLEX: 5 }; // FLEX = WR+TE combined
+const TOTAL_SLOTS  = 10;
 
 // Deep green HUD gradient — the app's actual brand tone (dark green / white / green
 // accent), replacing the generic navy-fintech background this screen had before.
@@ -47,10 +47,9 @@ const POS_COLORS: Record<string, { bg: string; text: string; bar: string; light:
   RB: { bg: '#ecfdf5', text: '#059669', bar: '#059669', light: 'rgba(5,150,105,0.14)' },
   WR: { bg: '#fff7ed', text: '#ea580c', bar: '#ea580c', light: 'rgba(234,88,12,0.14)' },
   TE: { bg: '#faf5ff', text: '#9333ea', bar: '#9333ea', light: 'rgba(147,51,234,0.14)' },
-  K:  { bg: '#f1f5f9', text: '#334155', bar: '#334155', light: 'rgba(51,65,85,0.14)' },
 };
 
-const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K'];
+const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'];
 
 // $0.5M increments from $18M down to $1M, e.g. "$17.5M", "$17M", ...
 const PRICE_PRESETS: { label: string; value: number | null }[] = [
@@ -93,20 +92,143 @@ function sortPlayers(list: DraftPlayer[], key: SortKey): DraftPlayer[] {
   }
 }
 
+// ─── Pseudo-3D perspective helpers ─────────────────────────────────────────────
+// The camera sits behind OUR OWN goal (bottom of screen, near/large) tilted
+// down, looking north up the field toward the OPPONENT's goal (top of screen,
+// far/small) — like FPL's squad pitch, but the team scores toward the top.
+// Nominal x/y coordinates below get remapped through these at render time so
+// everything converges toward a vanishing point near the top.
+// The field itself only occupies the bottom portion of the container — its
+// far/top edge (back of the end zone) stops well short of the container's own
+// top edge instead of running all the way up, leaving a plain blank margin
+// above it.
+const FIELD_TOP_Y = 24;
+// More birds-eye than horizon-level: a wider top (less narrowing), gentler
+// scale falloff, and a gentler compression curve (see yardToY's exponent)
+// all make the far end zone read as closer/less "way off in the distance."
+const FIELD_TOP_WIDTH_PCT = 68; // visible width of the trapezoid at y=0 (top/far)
+const SCALE_AT_TOP    = 0.75;
+const SCALE_AT_BOTTOM = 1.15;
+// The turf's bottom edge is drawn wider than the container itself and relies
+// on the container's overflow:hidden to crop it — so the sidelines exit off
+// the left/right edges of the screen instead of converging into a visible
+// bottom-left/bottom-right corner.
+const FIELD_BOTTOM_OVERFLOW_PCT = 35;
+
+function widthAtDepth(y: number): number {
+  return FIELD_TOP_WIDTH_PCT + (100 - FIELD_TOP_WIDTH_PCT) * (y / 100);
+}
+function remapX(x: number, y: number): number {
+  return 50 + (x - 50) * (widthAtDepth(y) / 100);
+}
+function depthScale(y: number): number {
+  return SCALE_AT_TOP + (SCALE_AT_BOTTOM - SCALE_AT_TOP) * (y / 100);
+}
+
+// The camera sits AT the 25-yard line (25 yards from their goal) — nothing
+// south of it is ever in frame. This is a closer/more zoomed-in vantage point
+// than midfield would be, while the far/top edge (the end zone, FIELD_TOP_Y,
+// THEIR_GOAL_Y) stays exactly where it was. Maps "yards from the camera
+// toward their goal" (0 = camera/25-yard line, 25 = their goal) to a screen
+// y% — eased (not linear) so far-away yard lines compress together near the
+// vanishing point instead of being evenly spaced, matching real perspective
+// foreshortening.
+const CAMERA_Y            = 96; // near/bottom — right at the camera (the 25)
+const CAMERA_YARDS_TO_GOAL = 25; // how many real yards are visible at all
+// The end zone is only 10 real yards deep (vs. 25 for the field-of-play
+// stretch shown here) and this far from camera everything is heavily
+// compressed, so its screen band has to be much thinner than the field's
+// last 10-yard stretch, not the same size — hence a small value close to the
+// vanishing point. Unchanged from before per "keep the end zone where it is."
+const THEIR_GOAL_Y  = 3; // far/top — the goal line; end zone band is 0 to this
+const GOALPOST_Y    = 1; // back of the end zone, right at the vanishing point
+function yardToY(yardsFromCamera: number): number {
+  const t = Math.max(0, Math.min(1, yardsFromCamera / CAMERA_YARDS_TO_GOAL));
+  const eased = 1 - Math.pow(1 - t, 1.25);
+  return CAMERA_Y - eased * (CAMERA_Y - THEIR_GOAL_Y);
+}
+
+// Yard lines within the visible 25-yard stretch (the 20 and the 10).
+const YARD_LINES = [5, 15].map(yardsFromCamera => ({
+  key: yardsFromCamera,
+  y: yardToY(yardsFromCamera),
+}));
+
+// Continuous hash-mark ticks every yard (not just at the two labeled lines),
+// like the inbounds lines on a real field.
+const YARD_TICKS = Array.from({ length: 24 }, (_, i) => i + 1).map(yardsFromCamera => ({
+  key: yardsFromCamera,
+  y: yardToY(yardsFromCamera),
+}));
+
+// ─── Stadium crowd (fills the blank margin above the field) ───────────────────
+// Deterministic PRNG (mulberry32) — Math.random() here would give the server
+// render and the client's first render different values for the exact same
+// dots, and React would throw a hydration mismatch on every one of them.
+function mulberry32(seed: number) {
+  return function random() {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const CROWD_COLORS = [
+  '#c53030', '#dd6b20', '#d69e2e', '#38a169', '#3182ce', '#5a67d8',
+  '#805ad5', '#d53f8c', '#e2e8f0', '#a0aec0', '#718096', '#2d3748',
+  '#f6e05e', '#fefcbf', '#fbd38d', '#feb2b2', '#9ae6b4', '#90cdf4',
+];
+
+interface CrowdDot { x: number; y: number; w: number; h: number; color: string; opacity: number }
+
+// yMin/yMax are % within this tier's own band; depth (0=far edge of the tier,
+// 1=near edge) drives both size and brightness, same idea as depthScale for
+// the field itself — the tier closer to the field reads bigger/punchier.
+function generateCrowd(seed: number, count: number, yMin: number, yMax: number, sizeMin: number, sizeMax: number): CrowdDot[] {
+  const rand = mulberry32(seed);
+  const dots: CrowdDot[] = [];
+  for (let i = 0; i < count; i++) {
+    const y = yMin + rand() * (yMax - yMin);
+    const depth = (y - yMin) / (yMax - yMin);
+    const size = sizeMin + depth * (sizeMax - sizeMin) + rand() * 1.1;
+    dots.push({
+      x: rand() * 100,
+      y,
+      w: size,
+      h: size * (1.1 + rand() * 0.3),
+      color: CROWD_COLORS[Math.floor(rand() * CROWD_COLORS.length)],
+      opacity: 0.5 + depth * 0.35 + rand() * 0.15,
+    });
+  }
+  return dots;
+}
+
+// Upper deck: further from the field, smaller/dimmer dots. Lower deck: right
+// above the field, bigger/brighter dots. Fixed seeds keep both decks stable
+// across re-renders instead of reshuffling every time.
+const UPPER_DECK_CROWD = generateCrowd(1001, 240, 6, 40, 2, 3.6);
+const LOWER_DECK_CROWD = generateCrowd(2002, 300, 50, 97, 3.2, 6);
+const STADIUM_LIGHT_X = [12, 34, 66, 88];
+
 // ─── Formation slot definitions ───────────────────────────────────────────────
-// y is from top of field area (%), x is from left (%)
+// Nominal x/y (0=top/far, 100=bottom/near) — x gets remapped via remapX above.
+// All 10 drafted players (2 QB, 3 RB, 5 WR/TE) get an on-field slot — no
+// separate bench area. Same front-to-back depth logic as a real shotgun snap:
+// the 5 WR/TE are shallowest (closest to their goal, on the line of
+// scrimmage), the 3 RBs a few yards behind that, and the 2 QBs deepest of all
+// ten (furthest from their goal).
 const FORMATION_SLOTS = [
-  { id: 'K1',     posGroup: 'K',    label: 'K',     x: 50, y: 10 },
-  { id: 'FLEX1',  posGroup: 'FLEX', label: 'WR/TE', x: 10, y: 30 },
-  { id: 'FLEX2',  posGroup: 'FLEX', label: 'WR/TE', x: 27, y: 30 },
-  { id: 'FLEX3',  posGroup: 'FLEX', label: 'WR/TE', x: 50, y: 30 },
-  { id: 'FLEX4',  posGroup: 'FLEX', label: 'WR/TE', x: 73, y: 30 },
-  { id: 'FLEX5',  posGroup: 'FLEX', label: 'WR/TE', x: 90, y: 30 },
-  { id: 'RB1',    posGroup: 'RB',   label: 'RB',    x: 28, y: 55 },
-  { id: 'RB2',    posGroup: 'RB',   label: 'RB',    x: 50, y: 55 },
-  { id: 'RB3',    posGroup: 'RB',   label: 'RB',    x: 72, y: 55 },
-  { id: 'QB1',    posGroup: 'QB',   label: 'QB',    x: 38, y: 76 },
-  { id: 'QB2',    posGroup: 'QB',   label: 'QB',    x: 62, y: 76 },
+  { id: 'FLEX1',  posGroup: 'FLEX', label: 'WR/TE', x: 10,  y: 21 },
+  { id: 'FLEX2',  posGroup: 'FLEX', label: 'WR/TE', x: 30, y: 21 },
+  { id: 'FLEX3',  posGroup: 'FLEX', label: 'WR/TE', x: 50, y: 21 },
+  { id: 'FLEX4',  posGroup: 'FLEX', label: 'WR/TE', x: 70, y: 21 },
+  { id: 'FLEX5',  posGroup: 'FLEX', label: 'WR/TE', x: 90, y: 21 },
+  { id: 'RB1',    posGroup: 'RB',   label: 'RB',    x: 24, y: 48 },
+  { id: 'RB2',    posGroup: 'RB',   label: 'RB',    x: 50, y: 48 },
+  { id: 'RB3',    posGroup: 'RB',   label: 'RB',    x: 76, y: 48 },
+  { id: 'QB1',    posGroup: 'QB',   label: 'QB',    x: 38, y: 75 },
+  { id: 'QB2',    posGroup: 'QB',   label: 'QB',    x: 62, y: 75 },
 ] as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -117,12 +239,12 @@ function posGroup(pos: string): string {
 
 function slotColor(group: string): typeof POS_COLORS[string] {
   if (group === 'FLEX') return POS_COLORS.WR;
-  return POS_COLORS[group] ?? POS_COLORS.K;
+  return POS_COLORS[group] ?? POS_COLORS.QB;
 }
 
 // ─── Player Avatar ─────────────────────────────────────────────────────────────
 function PlayerAvatar({ player, size = 48 }: { player: DraftPlayer; size?: number }) {
-  const col = POS_COLORS[player.position] ?? POS_COLORS.K;
+  const col = POS_COLORS[player.position] ?? POS_COLORS.QB;
   return (
     <div style={{ position: 'relative', flexShrink: 0 }}>
       {player.headshot_url ? (
@@ -157,72 +279,77 @@ function PlayerAvatar({ player, size = 48 }: { player: DraftPlayer; size?: numbe
 }
 
 // ─── Field slot: filled ────────────────────────────────────────────────────────
+// Big clickable rectangle cards, FPL-pick-team style, instead of circular
+// avatars — used for every one of the 10 on-field slots (no separate bench).
+const CARD_W = 92;
+const CARD_H = 118;
+
 function FilledSlot({ player, onRemove }: { player: DraftPlayer; onRemove: () => void }) {
   const displayName = formatPlayerName(player.full_name);
+  const col = POS_COLORS[player.position] ?? POS_COLORS.QB;
 
   return (
     <div
-      style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-        animation: 'slot-pop 0.3s cubic-bezier(0.34,1.56,0.64,1) both',
-        cursor: 'pointer',
-      }}
       onClick={onRemove}
       title={`Remove ${player.full_name}`}
+      style={{
+        width: CARD_W, height: CARD_H, borderRadius: 10,
+        background: `linear-gradient(160deg, rgba(15,23,42,0.82), rgba(15,23,42,0.62))`,
+        border: `1px solid ${col.bar}77`,
+        boxShadow: '0 6px 18px rgba(0,0,0,0.35)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+        cursor: 'pointer', position: 'relative', overflow: 'hidden',
+        animation: 'slot-pop 0.3s cubic-bezier(0.34,1.56,0.64,1) both',
+      }}
     >
+      {/* Remove X overlay on hover */}
       <div style={{
-        background: 'rgba(15,23,42,0.8)', backdropFilter: 'blur(6px)',
-        borderRadius: 20, padding: '2px 8px',
-        fontSize: 10, fontWeight: 700, color: '#fff',
-        border: '1px solid rgba(255,255,255,0.15)', whiteSpace: 'nowrap',
-      }}>
-        {formatPrice(Number(player.current_price))}
+        position: 'absolute', inset: 0, borderRadius: 10,
+        background: 'rgba(244,63,94,0.85)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        opacity: 0, transition: 'opacity 0.15s', zIndex: 2,
+      }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0'; }}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
       </div>
-      <div style={{ position: 'relative' }}>
-        <div style={{ position: 'relative' }}>
-          {player.headshot_url ? (
-            <Image
-              src={player.headshot_url} alt={player.full_name}
-              width={52} height={52} unoptimized
-              style={{ width: 52, height: 52, objectFit: 'contain', display: 'block' }}
-            />
-          ) : (
-            <div style={{
-              width: 52, height: 52, borderRadius: 12, background: '#334155',
-              border: '2.5px solid #fff', boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 18, fontWeight: 800, color: '#fff',
-            }}>
-              {player.full_name[0]}
-            </div>
-          )}
-        </div>
-        {/* Remove X overlay on hover */}
+
+      {player.headshot_url ? (
+        <Image
+          src={player.headshot_url} alt={player.full_name}
+          width={40} height={40} unoptimized
+          style={{ width: 40, height: 40, objectFit: 'contain', display: 'block' }}
+        />
+      ) : (
         <div style={{
-          position: 'absolute', inset: 0, borderRadius: '50%',
-          background: 'rgba(244,63,94,0.8)',
+          width: 40, height: 40, borderRadius: '50%', background: col.bar,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          opacity: 0, transition: 'opacity 0.15s',
-        }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0'; }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
+          fontSize: 15, fontWeight: 800, color: '#fff',
+        }}>
+          {player.full_name[0]}
         </div>
-      </div>
-      <div style={{
-        background: 'rgba(255,255,255,0.95)', borderRadius: 8,
-        padding: '3px 8px', textAlign: 'center',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.3)', minWidth: 52, maxWidth: 80,
-      }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      )}
+      <div style={{ textAlign: 'center' }}>
+        <div style={{
+          fontSize: 12, fontWeight: 800, color: '#fff',
+          maxWidth: CARD_W - 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
           {displayName}
         </div>
-        <div style={{ fontSize: 9, color: '#64748b', fontWeight: 600 }}>{player.team_code}</div>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', fontWeight: 600, marginTop: 1 }}>
+          {player.team_code} · {formatPrice(Number(player.current_price))}
+        </div>
       </div>
+      <span style={{
+        fontSize: 9, fontWeight: 800, color: col.bar, background: '#fff',
+        borderRadius: 20, padding: '1px 7px', letterSpacing: '0.04em',
+      }}>
+        {player.position}
+      </span>
     </div>
   );
 }
@@ -235,24 +362,29 @@ function EmptySlot({ label, group, onClick }: { label: string; group: string; on
       onClick={onClick}
       title={onClick ? `Show available ${label} players` : undefined}
       style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-        opacity: 0.55, cursor: onClick ? 'pointer' : 'default',
+        width: CARD_W, height: CARD_H, borderRadius: 10,
+        background: `linear-gradient(160deg, ${col.bar}4d, ${col.bar}26)`,
+        border: `1px solid ${col.bar}70`,
+        boxShadow: '0 4px 14px rgba(0,0,0,0.22)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
+        cursor: onClick ? 'pointer' : 'default',
       }}
     >
-      <div style={{
-        width: 52, height: 52, borderRadius: '50%',
-        border: `2px dashed ${col.bar}`,
-        background: col.light,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <span style={{ fontSize: 9, fontWeight: 800, color: col.bar, letterSpacing: '0.05em' }}>{label}</span>
+      <div style={{ position: 'relative', width: 34, height: 34 }}>
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="rgba(255,255,255,0.92)">
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21c0-4 3.5-7 8-7s8 3 8 7z" />
+        </svg>
+        <div style={{
+          position: 'absolute', top: -4, left: -6,
+          width: 15, height: 15, borderRadius: '50%', background: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 11, fontWeight: 900, color: col.bar, lineHeight: 1,
+        }}>
+          +
+        </div>
       </div>
-      <div style={{
-        background: 'rgba(255,255,255,0.15)', borderRadius: 6,
-        padding: '2px 8px', textAlign: 'center', minWidth: 48,
-      }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Empty</div>
-      </div>
+      <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: '0.04em' }}>{label}</span>
     </div>
   );
 }
@@ -271,13 +403,12 @@ const WELCOME_STEPS = [
     icon: '📋',
     eyebrow: 'Step 1',
     title: 'Draft Your Squad',
-    subtitle: '11 players. $100M cap. One shot.',
+    subtitle: '10 players. $100M cap. One shot.',
     body: null,
     bullets: [
       { icon: '🔵', label: '2 Quarterbacks', sub: 'Your franchise signal-callers' },
       { icon: '🟢', label: '3 Running Backs', sub: 'Ground game and receiving threats' },
       { icon: '🟡', label: '5 Wide Receivers / Tight Ends', sub: 'Any mix — all count as flex spots' },
-      { icon: '⚪', label: '1 Kicker', sub: 'Every point counts at the margins' },
     ],
     accent: '#60a5fa',
   },
@@ -300,7 +431,7 @@ const WELCOME_STEPS = [
     subtitle: 'Weekly lineups. Season-long standings.',
     body: 'Each week, set your starting lineup from your active roster. Your starters earn fantasy points based on real NFL performance. Compete in private leagues with friends or go head-to-head in global public leagues.',
     bullets: [
-      { icon: '📅', label: 'Weekly lineup decisions', sub: 'Start your best 8 — your other 3 sit on the bench and score nothing' },
+      { icon: '📅', label: 'Weekly lineup decisions', sub: 'Start your best 6 — your other 4 sit on the bench and score nothing' },
       { icon: '🌐', label: 'Global public leagues', sub: 'Compete against the world' },
       { icon: '🔒', label: 'Private leagues', sub: 'Invite friends with a code' },
     ],
@@ -756,10 +887,9 @@ export default function DraftBoard({
   const qbCount   = selected.filter(p => p.position === 'QB').length;
   const rbCount   = selected.filter(p => p.position === 'RB').length;
   const flexCount = selected.filter(p => p.position === 'WR' || p.position === 'TE').length;
-  const kCount    = selected.filter(p => p.position === 'K').length;
   const totalCost = selected.reduce((s, p) => s + Number(p.current_price), 0);
   const capLeft   = CAP - totalCost;
-  const isComplete = qbCount === QUOTA.QB && rbCount === QUOTA.RB && flexCount === QUOTA.FLEX && kCount === QUOTA.K;
+  const isComplete = qbCount === QUOTA.QB && rbCount === QUOTA.RB && flexCount === QUOTA.FLEX;
 
   function canAdd(player: DraftPlayer): boolean {
     if (selected.find(p => p.id === player.id)) return false;
@@ -767,7 +897,6 @@ export default function DraftBoard({
     if (pg === 'QB'   && qbCount   >= QUOTA.QB)   return false;
     if (pg === 'RB'   && rbCount   >= QUOTA.RB)   return false;
     if (pg === 'FLEX' && flexCount >= QUOTA.FLEX)  return false;
-    if (pg === 'K'    && kCount    >= QUOTA.K)     return false;
     if (totalCost + Number(player.current_price) > CAP) return false;
     return true;
   }
@@ -795,7 +924,7 @@ export default function DraftBoard({
     });
   }
 
-  // ── Assign players to formation slots ────────────────────────────────────
+  // ── Assign players to formation slots ─────────────────────────────────────
   // Slot assignment is stable per-player (set once on add, cleared once on
   // remove) rather than re-derived from array order — otherwise removing one
   // player would "slide" every later same-position player into a lower slot.
@@ -1020,7 +1149,7 @@ export default function DraftBoard({
             </div>
           )}
           {paginated.map(player => {
-            const col      = POS_COLORS[player.position] ?? POS_COLORS.K;
+            const col      = POS_COLORS[player.position] ?? POS_COLORS.QB;
             const isAdded  = !!selected.find(p => p.id === player.id);
             const addable  = !isAdded && canAdd(player);
             const justPop  = justAdded === player.id;
@@ -1190,7 +1319,6 @@ export default function DraftBoard({
             <QuotaBadge label="QB"    current={qbCount}   max={QUOTA.QB}   color="#60a5fa" />
             <QuotaBadge label="RB"    current={rbCount}   max={QUOTA.RB}   color="#34d399" />
             <QuotaBadge label="WR/TE" current={flexCount} max={QUOTA.FLEX} color="#ff5900" />
-            <QuotaBadge label="K"     current={kCount}    max={QUOTA.K}    color="#a78bfa" />
           </div>
 
           {/* Spacer */}
@@ -1223,101 +1351,177 @@ export default function DraftBoard({
           borderLeft: '3px solid #fbbf24',
           fontSize: 11, color: 'rgba(255,255,255,0.8)', fontWeight: 600,
         }}>
-           Only your 8 starters score points each week — your 3 bench players sit out unless you swap them in later.
+           Only 6 of these 10 will start each week — you'll set your exact lineup from your team page once the season begins.
         </div>
 
-        {/* Football field */}
-        <div style={{
-          flex: 1, position: 'relative', overflow: 'hidden',
-          background: `repeating-linear-gradient(180deg, #1a7a32 0px, #1a7a32 48px, #1e8838 48px, #1e8838 96px)`,
-        }}>
-          {/* Opponent end zone (top) */}
+        {/* Football field — pseudo-3D trapezoid, low camera behind our own
+            goal tilted downward (FPL-pitch style). See the perspective helpers
+            above FORMATION_SLOTS for the math. */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#fff' }}>
+
+          {/* Stadium crowd — fills the blank margin above the field. Two
+              tiers (upper deck far/dim, lower deck near/bright) separated by
+              a concourse walkway, stadium lights along the top, a wall band
+              right where the stands meet the turf. */}
           <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0, height: '7%',
-            background: 'rgba(0,0,0,0.2)', borderBottom: '2px solid rgba(255,255,255,0.5)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            position: 'absolute', top: 0, left: 0, right: 0, height: `${FIELD_TOP_Y}%`,
+            overflow: 'hidden',
+            background: 'linear-gradient(180deg, #10131b 0%, #191f2c 28%, #222a3c 52%, #2a3247 76%, #333c53 100%)',
           }}>
-            <div style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.4em', textTransform: 'uppercase' }}>
-              END ZONE
-            </div>
-          </div>
+            {/* Stadium lights */}
+            {STADIUM_LIGHT_X.map((x, i) => (
+              <div key={i} style={{
+                position: 'absolute', top: '3%', left: `${x}%`, transform: 'translate(-50%, 0)',
+                width: 12, height: 6, borderRadius: 3,
+                background: 'radial-gradient(circle, #fffbeb 0%, #fef3c7 55%, transparent 100%)',
+                boxShadow: '0 0 14px 5px rgba(254,243,199,0.45)',
+              }} />
+            ))}
 
-          {/* Own end zone (bottom) */}
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, height: '7%',
-            background: 'rgba(0,0,0,0.2)', borderTop: '2px solid rgba(255,255,255,0.5)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <div style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.4em', textTransform: 'uppercase' }}>
-              END ZONE
-            </div>
-          </div>
+            {/* Upper deck */}
+            {UPPER_DECK_CROWD.map((d, i) => (
+              <div key={`u${i}`} style={{
+                position: 'absolute', top: `${d.y}%`, left: `${d.x}%`,
+                width: d.w, height: d.h, borderRadius: '50%',
+                background: d.color, opacity: d.opacity,
+              }} />
+            ))}
 
-          {/* Sidelines */}
-          <div style={{ position: 'absolute', top: '7%', bottom: '7%', left: 28, width: 2, background: 'rgba(255,255,255,0.55)' }} />
-          <div style={{ position: 'absolute', top: '7%', bottom: '7%', right: 28, width: 2, background: 'rgba(255,255,255,0.55)' }} />
-
-          {/* Yard lines */}
-          {[20, 35, 50, 65, 80].map(pct => (
-            <div key={pct} style={{
-              position: 'absolute', left: 28, right: 28, top: `${7 + (86 * pct / 100)}%`,
-              height: 1, background: 'rgba(255,255,255,0.18)',
+            {/* Concourse walkway between decks */}
+            <div style={{
+              position: 'absolute', top: '41%', left: 0, right: 0, height: '6%',
+              background: 'linear-gradient(180deg, rgba(0,0,0,0.4), rgba(0,0,0,0.15))',
             }} />
-          ))}
 
-          {/* Hash marks */}
-          {Array.from({ length: 16 }, (_, i) => (
-            <div key={i} style={{
-              position: 'absolute',
-              top: `${8 + i * (84 / 16)}%`,
-              left: 0, right: 0,
-              display: 'flex', justifyContent: 'space-between', padding: '0 90px',
-            }}>
-              <div style={{ width: 12, height: 1, background: 'rgba(255,255,255,0.22)' }} />
-              <div style={{ width: 12, height: 1, background: 'rgba(255,255,255,0.22)' }} />
-            </div>
-          ))}
+            {/* Lower deck */}
+            {LOWER_DECK_CROWD.map((d, i) => (
+              <div key={`l${i}`} style={{
+                position: 'absolute', top: `${d.y}%`, left: `${d.x}%`,
+                width: d.w, height: d.h, borderRadius: '50%',
+                background: d.color, opacity: d.opacity,
+              }} />
+            ))}
 
-          {/* Formation slots */}
-          {FORMATION_SLOTS.map(slot => {
-            const player = filledSlots[slot.id];
-            return (
-              <div
-                key={slot.id}
-                style={{
-                  position: 'absolute',
-                  left: `${slot.x}%`,
-                  top: `${slot.y}%`,
-                  transform: 'translate(-50%, -50%)',
-                  zIndex: 10,
-                }}
-              >
-                {player
-                  ? <FilledSlot player={player} onRemove={() => removePlayer(player.id)} />
-                  : <EmptySlot label={slot.label} group={slot.posGroup} onClick={() => setPos(slot.posGroup)} />
-                }
-              </div>
-            );
-          })}
+            {/* Wall/tunnel level right above the turf */}
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0, height: '6%',
+              background: 'linear-gradient(180deg, #3d4358, #20233a)',
+              borderBottom: '2px solid rgba(255,255,255,0.15)',
+            }} />
+          </div>
 
-          {/* Center tip */}
-          {selected.length === 0 && (
+          {/* Turf layer — clipped to the trapezoid, purely decorative */}
+          <div style={{
+            position: 'absolute', top: `${FIELD_TOP_Y}%`, left: 0, right: 0, bottom: 0,
+            clipPath: `polygon(${50 - FIELD_TOP_WIDTH_PCT / 2}% 0%, ${50 + FIELD_TOP_WIDTH_PCT / 2}% 0%, ${100 + FIELD_BOTTOM_OVERFLOW_PCT}% 100%, ${-FIELD_BOTTOM_OVERFLOW_PCT}% 100%)`,
+            background: `repeating-linear-gradient(180deg, #1a7a32 0px, #1a7a32 34px, #1e8838 34px, #1e8838 68px)`,
+          }}>
+            {/* Atmospheric haze — subtle, just enough to sell distance without
+                hiding the opponent's end zone up there (we want that visible). */}
             <div style={{
               position: 'absolute', inset: 0,
+              background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0) 14%)',
+            }} />
+
+            {/* Their end zone — the scoring target, far away and small */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0, right: 0, height: `${THEIR_GOAL_Y}%`,
+              background: 'rgba(0,0,0,0.25)', borderBottom: '1.5px solid rgba(255,255,255,0.5)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              pointerEvents: 'none',
             }}>
-              <div style={{
-                background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)',
-                borderRadius: 16, padding: '12px 20px', textAlign: 'center',
-                border: '1px solid rgba(255,255,255,0.1)',
-              }}>
-                <div style={{ fontSize: 28, marginBottom: 6 }}>🏈</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>Select players from the left</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>They'll appear in formation here</div>
+              <div style={{ fontSize: 7, fontWeight: 900, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+                END ZONE
               </div>
             </div>
-          )}
+
+            {/* Yard lines, converging with depth */}
+            {YARD_LINES.map(({ key, y }) => (
+              <div key={key} style={{ position: 'absolute', left: 0, right: 0, top: `${y}%`, height: 1.5, background: 'rgba(255,255,255,0.32)' }} />
+            ))}
+
+            {/* Hash marks — continuous ticks every yard, two inner rows like
+                the inbounds lines on a real field, not just at the labeled lines */}
+            {YARD_TICKS.map(({ key, y }) => (
+              <div key={`hash-${key}`}>
+                {[38, 62].map(nominalX => (
+                  <div key={nominalX} style={{
+                    position: 'absolute', top: `${y}%`, left: `${remapX(nominalX, y)}%`,
+                    width: 8 * depthScale(y), height: 1.2,
+                    background: 'rgba(255,255,255,0.3)', transform: 'translate(-50%, -50%)',
+                  }} />
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* Player layer — not clipped, so cards never get sliced by the
+              trapezoid edge, but positioned with the same perspective math. */}
+          <div style={{ position: 'absolute', top: `${FIELD_TOP_Y}%`, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
+            {/* Goalpost — back of the end zone, anchored at its base. Anchor
+                (translate) and scale are kept on separate elements — combining
+                a %-based translate with scale() in one transform list scales
+                the translate distance too and the post ends up in the wrong
+                place (or effectively invisible). */}
+            <div style={{
+              position: 'absolute',
+              left: `${remapX(50, GOALPOST_Y)}%`,
+              top: `${GOALPOST_Y}%`,
+              transform: 'translate(-50%, -100%)',
+              zIndex: 1,
+            }}>
+              <svg
+                width="90" height="130" viewBox="0 0 90 130"
+                style={{ display: 'block', overflow: 'visible', transform: `scale(${depthScale(GOALPOST_Y)})`, transformOrigin: 'bottom center' }}
+              >
+                <line x1="45" y1="130" x2="45" y2="70" stroke="#f2c14e" strokeWidth="6" strokeLinecap="round" />
+                <line x1="13" y1="70"  x2="77" y2="70" stroke="#f2c14e" strokeWidth="6" strokeLinecap="round" />
+                <line x1="13" y1="70"  x2="13" y2="8"  stroke="#f2c14e" strokeWidth="6" strokeLinecap="round" />
+                <line x1="77" y1="70"  x2="77" y2="8"  stroke="#f2c14e" strokeWidth="6" strokeLinecap="round" />
+              </svg>
+            </div>
+
+            {FORMATION_SLOTS.map(slot => {
+              const player = filledSlots[slot.id];
+              const scale = depthScale(slot.y);
+              return (
+                <div
+                  key={slot.id}
+                  style={{
+                    position: 'absolute',
+                    left: `${remapX(slot.x, slot.y)}%`,
+                    top: `${slot.y}%`,
+                    transform: `translate(-50%, -50%) scale(${scale})`,
+                    zIndex: 10 + Math.round(slot.y),
+                    pointerEvents: 'auto',
+                  }}
+                >
+                  {player
+                    ? <FilledSlot player={player} onRemove={() => removePlayer(player.id)} />
+                    : <EmptySlot label={slot.label} group={slot.posGroup} onClick={() => setPos(slot.posGroup)} />
+                  }
+                </div>
+              );
+            })}
+
+            {/* Center tip — floats in the big empty stretch of field between
+                the camera and the formation up near the opponent's goal */}
+            {selected.length === 0 && (
+              <div style={{
+                position: 'absolute', left: 0, right: 0, top: '25%', transform: 'translateY(-50%)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <div style={{
+                  background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)',
+                  borderRadius: 16, padding: '12px 20px', textAlign: 'center',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                }}>
+                  <div style={{ fontSize: 28, marginBottom: 6 }}>🏈</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>Select players from the left</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>They'll appear in formation here</div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

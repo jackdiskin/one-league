@@ -48,10 +48,6 @@ const STAT_COLS: Record<string, { key: string; label: string }[]> = {
     { key: 'receiving_yards',label: 'Rec Yds' },
     { key: 'receiving_tds',  label: 'Rec TD' },
   ],
-  K: [
-    { key: 'field_goals_made',  label: 'FG Made' },
-    { key: 'extra_points_made', label: 'XP Made' },
-  ],
 };
 
 async function fetchCurrentWeek(season: number) {
@@ -139,7 +135,7 @@ export default async function PlayerPage({
   const canAfford = userTeam ? Number(userTeam.budget_remaining) >= Number(player.current_price) : false;
 
   // Count active roster slots by position to enforce quotas
-  const QUOTA = { QB: 2, RB: 3, FLEX: 5, K: 1 } as const;
+  const QUOTA = { QB: 2, RB: 3, FLEX: 5 } as const;
   let blockReason: string | null = null;
 
   if (userTeam && !alreadyOwned) {
@@ -155,7 +151,7 @@ export default async function PlayerPage({
     const rosterTotal = Object.values(countMap).reduce((s, n) => s + n, 0);
     const flexCount   = (countMap.WR ?? 0) + (countMap.TE ?? 0);
 
-    if (rosterTotal >= 11) {
+    if (rosterTotal >= 10) {
       blockReason = 'Roster full — sell a player first';
     } else if (player.position === 'QB' && (countMap.QB ?? 0) >= QUOTA.QB) {
       blockReason = `QB slots full (${QUOTA.QB}/${QUOTA.QB})`;
@@ -163,8 +159,6 @@ export default async function PlayerPage({
       blockReason = `RB slots full (${QUOTA.RB}/${QUOTA.RB})`;
     } else if ((player.position === 'WR' || player.position === 'TE') && flexCount >= QUOTA.FLEX) {
       blockReason = `WR/TE slots full (${QUOTA.FLEX}/${QUOTA.FLEX})`;
-    } else if (player.position === 'K' && (countMap.K ?? 0) >= QUOTA.K) {
-      blockReason = `K slot full (${QUOTA.K}/${QUOTA.K})`;
     }
   }
 

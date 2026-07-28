@@ -8,7 +8,7 @@ export const PRICE_CEIL       = 55_000_000;  // $55M maximum
 
 // Position average fantasy points — used as fallback when no projection exists
 export const POSITION_AVG_PTS: Record<string, number> = {
-  QB: 20, RB: 12, WR: 11, TE: 8, K: 8, DEF: 10,
+  QB: 20, RB: 12, WR: 11, TE: 8, DEF: 10,
 };
 
 function round2(n: number): number {

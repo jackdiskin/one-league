@@ -53,7 +53,7 @@ async function fetchPlayers(currentWeek: number): Promise<DraftPlayer[]> {
      LEFT JOIN player_price_weeks ppw ON ppw.player_id = p.id AND ppw.season_year = ? AND ppw.week = ?
      LEFT JOIN player_weekly_projections proj ON proj.player_id = p.id AND proj.season_year = ?
        AND proj.week = ? AND proj.projection_source = 'internal_model'
-     WHERE p.position IN ('QB','RB','WR','TE','K')
+     WHERE p.position IN ('QB','RB','WR','TE')
      ORDER BY COALESCE(pms.current_price, 20000000) DESC`,
     [SEASON, SEASON, SEASON, SEASON - 1, SEASON, SEASON, currentWeek, SEASON, currentWeek + 1]
   );
