@@ -429,7 +429,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
 
   if (!league) {
     return (
-      <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
+      <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
         <Sidebar
           user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
           leagues={userLeagues} currentWeek={currentWeek} season={SEASON}
@@ -493,7 +493,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
   const maxRosterVal = Number(rosterValues[0]?.roster_value ?? 1);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
+    <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
 
       {/* Background blobs */}
       <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', zIndex: -1, pointerEvents: 'none' }}>

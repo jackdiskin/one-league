@@ -114,7 +114,7 @@ export default async function DashboardPage({
   ]);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
+    <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
 
       {/* Background blobs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">

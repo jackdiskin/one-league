@@ -121,7 +121,7 @@ export default async function TransfersPage({
   const budgetRemaining = team?.budget_remaining ?? 0;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
+    <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
 
       {/* Background blobs */}
       <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', zIndex: -1, pointerEvents: 'none' }}>

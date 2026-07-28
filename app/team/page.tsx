@@ -184,7 +184,7 @@ export default async function TeamPage({
 
   if (!team) {
     return (
-      <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
+      <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
         <Sidebar
           user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
           leagues={userLeagues} currentWeek={currentWeek} season={SEASON}
@@ -210,7 +210,7 @@ export default async function TeamPage({
   const rankLabel = team.rank === 1 ? '1st' : team.rank === 2 ? '2nd' : team.rank === 3 ? '3rd' : `${team.rank}th`;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
+    <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
 
       {/* Background blobs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">

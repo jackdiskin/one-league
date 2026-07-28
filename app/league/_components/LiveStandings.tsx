@@ -132,11 +132,13 @@ export default function LiveStandings({
       </div>
 
       {/* Column headers */}
+      <div style={{ overflowX: 'auto' }}>
       <div style={{
         display: 'grid', gridTemplateColumns: '44px 1fr 80px 92px 84px 52px',
         padding: '7px 18px', background: '#fafafa', borderBottom: '1px solid #f1f5f9',
         fontSize: 9, fontWeight: 700, color: '#cbd5e1',
         textTransform: 'uppercase', letterSpacing: '0.1em',
+        minWidth: 520,
       }}>
         <span>#</span>
         <span>Team</span>
@@ -172,6 +174,7 @@ export default function LiveStandings({
             background: isMe
               ? 'linear-gradient(90deg,rgba(16,185,129,0.06),rgba(240,253,250,0.3))'
               : 'transparent',
+            minWidth: 520,
           }}>
             {/* Rank */}
             <div>
@@ -268,6 +271,7 @@ export default function LiveStandings({
           </div>
         );
       })}
+      </div>
 
       {lastUpdated && (
         <div style={{

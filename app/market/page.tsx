@@ -260,7 +260,7 @@ export default async function MarketPage({
   const topDemand     = highDemand[0] ?? null;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
+    <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
 
       {/* Background blobs */}
       <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', zIndex: -1, pointerEvents: 'none' }}>
@@ -313,7 +313,7 @@ export default async function MarketPage({
           </div>
 
           {/* Stat tiles */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+          <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: 12 }}>
             {[
               {
                 label: 'Biggest Gainer',
@@ -357,7 +357,7 @@ export default async function MarketPage({
           </div>
 
           {/* Movers: Gainers | Losers */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 16 }}>
 
             {/* Top Gainers */}
             <SectionCard title="Top Gainers" sub="Biggest price increases this week" badge={`${gainers.length} players`}>
@@ -431,7 +431,7 @@ export default async function MarketPage({
           </div>
 
           {/* Demand Watch + Sell Pressure + Most Traded */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+          <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: 16 }}>
 
             {/* High Demand */}
             <SectionCard title="High Demand" sub="Players with the most net buy flow" dark>
@@ -559,11 +559,13 @@ export default async function MarketPage({
           <SectionCard title="Recent Transactions" sub="Latest buys &amp; sells across all leagues" badge={`Last ${recentTx.length}`}>
             {recentTx.length === 0 && <Empty msg="No transactions yet this season." />}
 
+            <div style={{ overflowX: 'auto' }}>
             {/* Column headers */}
             <div style={{
               display: 'grid', gridTemplateColumns: '36px 1fr 140px 80px 80px 80px 120px',
               padding: '7px 18px', background: '#fafafa', borderBottom: '1px solid #f1f5f9',
               fontSize: 9, fontWeight: 700, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.1em',
+              minWidth: 640,
             }}>
               <span />
               <span>Player</span>
@@ -582,6 +584,7 @@ export default async function MarketPage({
                   display: 'grid', gridTemplateColumns: '36px 1fr 140px 80px 80px 80px 120px',
                   alignItems: 'center', padding: '8px 18px',
                   borderBottom: i < recentTx.length - 1 ? '1px solid #f8fafc' : 'none',
+                  minWidth: 640,
                 }}>
                   {/* Avatar + indicator */}
                   <div style={{ position: 'relative', width: 28, height: 28 }}>
@@ -643,6 +646,7 @@ export default async function MarketPage({
                 </div>
               );
             })}
+            </div>
           </SectionCard>
 
         </main>

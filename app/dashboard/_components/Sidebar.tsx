@@ -4,7 +4,7 @@ import { formatWeek } from '@/lib/format';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { authClient } from '@/lib/auth-client';
 import LeagueHubModal from './CreateLeagueModal';
 
@@ -84,6 +84,7 @@ export default function Sidebar({ user, leagues, currentWeek, season, logoUri }:
   const [leaguesOpen, setLeaguesOpen]   = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [mobileOpen, setMobileOpen]     = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -92,26 +93,16 @@ export default function Sidebar({ user, leagues, currentWeek, season, logoUri }:
   const seasonParam = searchParams.get('season');
   const seasonSuffix = seasonParam ? `?season=${seasonParam}` : '';
 
+  // Close the mobile drawer whenever navigation happens
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
+
   async function handleSignOut() {
     await authClient.signOut();
     router.push('/auth/sign-in');
   }
 
-  return (
-    <aside style={{
-      width: 248,
-      flexShrink: 0,
-      height: '100vh',
-      position: 'sticky',
-      top: 0,
-      display: 'flex',
-      flexDirection: 'column',
-      background: '#ffffff',
-      borderRight: '1px solid #e2e8f0',
-      overflowY: 'auto',
-      zIndex: 30,
-    }}>
-
+  const content = (
+    <>
       {/* ── Brand ── */}
       <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid #f1f5f9' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
@@ -302,8 +293,6 @@ export default function Sidebar({ user, leagues, currentWeek, season, logoUri }:
         )}
       </div>
 
-      {showCreateModal && <LeagueHubModal onClose={() => setShowCreateModal(false)} />}
-
       {/* ── User footer ── */}
       <div style={{ margin: '10px 10px 10px', position: 'relative' }}>
         {showUserMenu && (
@@ -371,6 +360,99 @@ export default function Sidebar({ user, leagues, currentWeek, season, logoUri }:
           </svg>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* ── Mobile top bar ── */}
+      <div
+        className="md:hidden"
+        style={{
+          position: 'sticky', top: 0, zIndex: 35, width: '100%',
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 14px', background: 'rgba(255,255,255,0.97)',
+          backdropFilter: 'blur(8px)', borderBottom: '1px solid #e2e8f0',
+        }}
+      >
+        <button
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open menu"
+          style={{
+            width: 34, height: 34, borderRadius: 9, border: '1px solid #e2e8f0',
+            background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, cursor: 'pointer',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.3" strokeLinecap="round">
+            <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" />
+          </svg>
+        </button>
+        <div style={{
+          width: 26, height: 26, borderRadius: 8, background: '#fff',
+          border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflow: 'hidden', position: 'relative', flexShrink: 0,
+        }}>
+          <Image src={logoUri} alt="One League" fill style={{ objectFit: 'contain', padding: 3 }} />
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
+          One League
+        </div>
+      </div>
+
+      {/* ── Desktop sidebar ── */}
+      <aside
+        className="hidden md:flex"
+        style={{
+          width: 248,
+          flexShrink: 0,
+          height: '100vh',
+          position: 'sticky',
+          top: 0,
+          flexDirection: 'column',
+          background: '#ffffff',
+          borderRight: '1px solid #e2e8f0',
+          overflowY: 'auto',
+          zIndex: 30,
+        }}
+      >
+        {content}
+      </aside>
+
+      {/* ── Mobile drawer ── */}
+      {mobileOpen && (
+        <div className="md:hidden">
+          <div
+            onClick={() => setMobileOpen(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 45, background: 'rgba(7,10,22,0.55)' }}
+          />
+          <aside style={{
+            position: 'fixed', top: 0, bottom: 0, left: 0, zIndex: 50,
+            width: '84vw', maxWidth: 300,
+            display: 'flex', flexDirection: 'column',
+            background: '#ffffff', overflowY: 'auto',
+            boxShadow: '0 0 40px rgba(0,0,0,0.3)',
+          }}>
+            <button
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close menu"
+              style={{
+                position: 'absolute', top: 14, right: 14, zIndex: 1,
+                width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0',
+                background: '#f8fafc', color: '#64748b',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+            {content}
+          </aside>
+        </div>
+      )}
+
+      {showCreateModal && <LeagueHubModal onClose={() => setShowCreateModal(false)} />}
+    </>
   );
 }

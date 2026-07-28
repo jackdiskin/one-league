@@ -84,7 +84,7 @@ export default async function LeaguesPage({
   ]);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
+    <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
       <Sidebar
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
         leagues={userLeagues} currentWeek={currentWeek} season={SEASON_YEAR}

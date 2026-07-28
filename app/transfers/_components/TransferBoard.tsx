@@ -207,7 +207,7 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
   }, [pending, fantasyTeamId, currentWeek, router]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 380px', gap: 16, alignItems: 'start' }}>
+    <div className="grid grid-cols-1 lg:[grid-template-columns:minmax(0,1fr)_380px]" style={{ gap: 16, alignItems: 'start' }}>
 
       {/* My Squad */}
       <div style={{ borderRadius: 16, background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
