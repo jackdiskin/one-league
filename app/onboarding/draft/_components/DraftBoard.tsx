@@ -15,6 +15,13 @@ export interface DraftPlayer {
   team_code: string;
   headshot_url: string | null;
   current_price: number;
+  season_points: number;
+  last_year_points: number;
+  ownership_pct: number;
+  trades_in: number;
+  trades_out: number;
+  price_pct_change: number;
+  projected_next_week: number;
 }
 
 export interface PublicLeague {
@@ -31,15 +38,60 @@ const CAP          = 100_000_000;
 const QUOTA        = { QB: 2, RB: 3, FLEX: 5, K: 1 }; // FLEX = WR+TE combined
 const TOTAL_SLOTS  = 11;
 
+// Deep green HUD gradient — the app's actual brand tone (dark green / white / green
+// accent), replacing the generic navy-fintech background this screen had before.
+const HUD_BG = 'linear-gradient(135deg, #04150c 0%, #0a2e1a 55%, #0f3d24 100%)';
+
 const POS_COLORS: Record<string, { bg: string; text: string; bar: string; light: string }> = {
-  QB: { bg: '#eff6ff', text: '#3b82f6', bar: '#3b82f6', light: 'rgba(59,130,246,0.12)' },
-  RB: { bg: '#f0fdf4', text: '#10b981', bar: '#10b981', light: 'rgba(16,185,129,0.12)' },
-  WR: { bg: '#fffbeb', text: '#f59e0b', bar: '#f59e0b', light: 'rgba(245,158,11,0.12)' },
-  TE: { bg: '#faf5ff', text: '#a855f7', bar: '#a855f7', light: 'rgba(168,85,247,0.12)' },
-  K:  { bg: '#f8fafc', text: '#64748b', bar: '#94a3b8', light: 'rgba(100,116,139,0.12)' },
+  QB: { bg: '#eff6ff', text: '#2563eb', bar: '#2563eb', light: 'rgba(37,99,235,0.14)' },
+  RB: { bg: '#ecfdf5', text: '#059669', bar: '#059669', light: 'rgba(5,150,105,0.14)' },
+  WR: { bg: '#fff7ed', text: '#ea580c', bar: '#ea580c', light: 'rgba(234,88,12,0.14)' },
+  TE: { bg: '#faf5ff', text: '#9333ea', bar: '#9333ea', light: 'rgba(147,51,234,0.14)' },
+  K:  { bg: '#f1f5f9', text: '#334155', bar: '#334155', light: 'rgba(51,65,85,0.14)' },
 };
 
 const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K'];
+
+// $0.5M increments from $18M down to $1M, e.g. "$17.5M", "$17M", ...
+const PRICE_PRESETS: { label: string; value: number | null }[] = [
+  { label: 'Any Price', value: null },
+  ...Array.from({ length: 28 }, (_, i) => {
+    const m = 18 - i * 0.5;
+    return { label: `$${m}M`, value: Math.round(m * 1_000_000) };
+  }),
+];
+
+const SORT_OPTIONS = [
+  { key: 'price_desc',         label: 'Price: High to Low' },
+  { key: 'price_asc',          label: 'Price: Low to High' },
+  { key: 'season_points',      label: 'Total Points This Year' },
+  { key: 'last_year_points',   label: 'Points Last Year' },
+  { key: 'ownership_pct',      label: '% Selected' },
+  { key: 'trades_in',          label: 'Trades In' },
+  { key: 'trades_out',         label: 'Trades Out' },
+  { key: 'rising',             label: 'Highest Rising' },
+  { key: 'falling',            label: 'Highest Falling' },
+  { key: 'projected_next_week', label: 'Projected Points Next Week' },
+] as const;
+
+type SortKey = typeof SORT_OPTIONS[number]['key'];
+
+function sortPlayers(list: DraftPlayer[], key: SortKey): DraftPlayer[] {
+  const sorted = [...list];
+  switch (key) {
+    case 'price_desc':          return sorted.sort((a, b) => Number(b.current_price) - Number(a.current_price));
+    case 'price_asc':           return sorted.sort((a, b) => Number(a.current_price) - Number(b.current_price));
+    case 'season_points':       return sorted.sort((a, b) => b.season_points - a.season_points);
+    case 'last_year_points':    return sorted.sort((a, b) => b.last_year_points - a.last_year_points);
+    case 'ownership_pct':       return sorted.sort((a, b) => b.ownership_pct - a.ownership_pct);
+    case 'trades_in':           return sorted.sort((a, b) => b.trades_in - a.trades_in);
+    case 'trades_out':          return sorted.sort((a, b) => b.trades_out - a.trades_out);
+    case 'rising':              return sorted.sort((a, b) => b.price_pct_change - a.price_pct_change);
+    case 'falling':             return sorted.sort((a, b) => a.price_pct_change - b.price_pct_change);
+    case 'projected_next_week': return sorted.sort((a, b) => b.projected_next_week - a.projected_next_week);
+    default:                    return sorted;
+  }
+}
 
 // ─── Formation slot definitions ───────────────────────────────────────────────
 // y is from top of field area (%), x is from left (%)
@@ -176,13 +228,17 @@ function FilledSlot({ player, onRemove }: { player: DraftPlayer; onRemove: () =>
 }
 
 // ─── Field slot: empty ─────────────────────────────────────────────────────────
-function EmptySlot({ label, group }: { label: string; group: string }) {
+function EmptySlot({ label, group, onClick }: { label: string; group: string; onClick?: () => void }) {
   const col = slotColor(group);
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-      opacity: 0.55,
-    }}>
+    <div
+      onClick={onClick}
+      title={onClick ? `Show available ${label} players` : undefined}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+        opacity: 0.55, cursor: onClick ? 'pointer' : 'default',
+      }}
+    >
       <div style={{
         width: 52, height: 52, borderRadius: '50%',
         border: `2px dashed ${col.bar}`,
@@ -244,7 +300,7 @@ const WELCOME_STEPS = [
     subtitle: 'Weekly lineups. Season-long standings.',
     body: 'Each week, set your starting lineup from your active roster. Your starters earn fantasy points based on real NFL performance. Compete in private leagues with friends or go head-to-head in global public leagues.',
     bullets: [
-      { icon: '📅', label: 'Weekly lineup decisions', sub: 'Start your best 7 each week' },
+      { icon: '📅', label: 'Weekly lineup decisions', sub: 'Start your best 8 — your other 3 sit on the bench and score nothing' },
       { icon: '🌐', label: 'Global public leagues', sub: 'Compete against the world' },
       { icon: '🔒', label: 'Private leagues', sub: 'Invite friends with a code' },
     ],
@@ -303,18 +359,11 @@ function WelcomeModal({ userName, onClose }: { userName: string; onClose: () => 
                   {s.eyebrow}
                 </div>
                 <div style={{
-                  fontFamily: "'Barlow Condensed', 'Impact', sans-serif",
-                  fontSize: 72, fontWeight: 900,
-                  fontStyle: 'italic',
+                  fontSize: 40, fontWeight: 800,
                   letterSpacing: '-0.02em',
-                  lineHeight: 0.9,
+                  lineHeight: 1.1,
                   margin: '0 0 14px',
-                  background: 'linear-gradient(135deg, #34d399 0%, #10b981 40%, #fbbf24 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
-                  animation: 'draft-glow 3s ease-in-out infinite',
-                  display: 'inline-block',
+                  color: '#fff',
                 }}>
                   {s.title}
                 </div>
@@ -684,6 +733,7 @@ export default function DraftBoard({
   matchups: Record<string, Matchup>;
 }) {
   const [selected, setSelected]     = useState<DraftPlayer[]>([]);
+  const [slotAssignment, setSlotAssignment] = useState<Record<string, number>>({}); // slotId -> playerId
   const [pos, setPos]               = useState('ALL');
   const [search, setSearch]         = useState('');
   const [page, setPage]             = useState(1);
@@ -691,7 +741,16 @@ export default function DraftBoard({
   const [showModal, setShowModal]   = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
   const [justAdded, setJustAdded]   = useState<number | null>(null);
+  const [sortBy, setSortBy]         = useState<SortKey>('price_desc');
+  const [teamFilter, setTeamFilter] = useState('ALL');
+  const [maxPrice, setMaxPrice]     = useState<number | null>(null);
+  const [affordableOnly, setAffordableOnly] = useState(false);
   const PAGE_SIZE = 20;
+
+  const teams = useMemo(
+    () => Array.from(new Set(players.map(p => p.team_code))).sort(),
+    [players]
+  );
 
   // ── Derived quota counts ──────────────────────────────────────────────────
   const qbCount   = selected.filter(p => p.position === 'QB').length;
@@ -715,39 +774,58 @@ export default function DraftBoard({
 
   function addPlayer(player: DraftPlayer) {
     if (!canAdd(player)) return;
+    const pg = posGroup(player.position);
+    const emptySlot = FORMATION_SLOTS.find(slot => slot.posGroup === pg && !(slot.id in slotAssignment));
     setSelected(prev => [...prev, player]);
+    if (emptySlot) {
+      setSlotAssignment(prev => ({ ...prev, [emptySlot.id]: player.id }));
+    }
     setJustAdded(player.id);
     setTimeout(() => setJustAdded(null), 600);
   }
 
   function removePlayer(playerId: number) {
     setSelected(prev => prev.filter(p => p.id !== playerId));
+    setSlotAssignment(prev => {
+      const next = { ...prev };
+      for (const slotId of Object.keys(next)) {
+        if (next[slotId] === playerId) delete next[slotId];
+      }
+      return next;
+    });
   }
 
   // ── Assign players to formation slots ────────────────────────────────────
+  // Slot assignment is stable per-player (set once on add, cleared once on
+  // remove) rather than re-derived from array order — otherwise removing one
+  // player would "slide" every later same-position player into a lower slot.
   const filledSlots = useMemo(() => {
-    const qbs  = selected.filter(p => p.position === 'QB');
-    const rbs  = selected.filter(p => p.position === 'RB');
-    const flex = selected.filter(p => p.position === 'WR' || p.position === 'TE');
-    const ks   = selected.filter(p => p.position === 'K');
     const map: Record<string, DraftPlayer> = {};
-    qbs.forEach((p, i)  => { map[`QB${i + 1}`]   = p; });
-    rbs.forEach((p, i)  => { map[`RB${i + 1}`]   = p; });
-    flex.forEach((p, i) => { map[`FLEX${i + 1}`] = p; });
-    ks.forEach((p, i)   => { map[`K${i + 1}`]    = p; });
+    for (const [slotId, playerId] of Object.entries(slotAssignment)) {
+      const player = selected.find(p => p.id === playerId);
+      if (player) map[slotId] = player;
+    }
     return map;
-  }, [selected]);
+  }, [selected, slotAssignment]);
 
-  // ── Filtered & paginated list ─────────────────────────────────────────────
+  // ── Filtered, sorted & paginated list ─────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return players
-      .filter(p => pos === 'ALL' || p.position === pos)
-      .filter(p => !q || p.full_name.toLowerCase().includes(q) || p.team_code.toLowerCase().includes(q));
-  }, [players, pos, search]);
+    const list = players
+      .filter(p => {
+        if (pos === 'ALL') return true;
+        if (pos === 'FLEX') return p.position === 'WR' || p.position === 'TE';
+        return p.position === pos;
+      })
+      .filter(p => !q || p.full_name.toLowerCase().includes(q) || p.team_code.toLowerCase().includes(q))
+      .filter(p => teamFilter === 'ALL' || p.team_code === teamFilter)
+      .filter(p => maxPrice == null || Number(p.current_price) <= maxPrice)
+      .filter(p => !affordableOnly || Number(p.current_price) <= capLeft);
+    return sortPlayers(list, sortBy);
+  }, [players, pos, search, teamFilter, maxPrice, affordableOnly, sortBy, capLeft]);
 
   // Reset page on filter change
-  useEffect(() => { setPage(1); }, [pos, search]);
+  useEffect(() => { setPage(1); }, [pos, search, teamFilter, maxPrice, affordableOnly, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -760,8 +838,8 @@ export default function DraftBoard({
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '5px 10px', borderRadius: 20,
-        background: done ? 'rgba(16,185,129,0.15)' : current > 0 ? `rgba(255,255,255,0.08)` : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${done ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.1)'}`,
+        background: done ? 'rgba(52,211,153,0.18)' : current > 0 ? `${color}26` : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${done ? 'rgba(52,211,153,0.5)' : current > 0 ? `${color}70` : 'rgba(255,255,255,0.1)'}`,
         transition: 'all 0.2s',
       }}>
         <span style={{ fontSize: 10, fontWeight: 800, color: done ? '#34d399' : color, letterSpacing: '0.05em' }}>{label}</span>
@@ -777,13 +855,11 @@ export default function DraftBoard({
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{
+      display: 'flex', height: '100vh', overflow: 'hidden',
+      fontFamily: 'Arial, "Helvetica Neue", Helvetica, sans-serif', fontWeight: 400,
+    }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,900;1,900&display=swap');
-        @keyframes draft-glow {
-          0%, 100% { text-shadow: 0 0 40px rgba(52,211,153,0.5), 0 0 80px rgba(52,211,153,0.2); }
-          50%       { text-shadow: 0 0 60px rgba(52,211,153,0.8), 0 0 120px rgba(52,211,153,0.35), 0 0 200px rgba(251,191,36,0.15); }
-        }
         @keyframes slot-pop {
           0%   { transform: scale(0.6); opacity: 0; }
           100% { transform: scale(1);   opacity: 1; }
@@ -838,16 +914,17 @@ export default function DraftBoard({
           <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 10 }}>
             {POSITIONS.map(p => {
               const col = POS_COLORS[p];
-              const active = pos === p;
+              const active = pos === p || (pos === 'FLEX' && (p === 'WR' || p === 'TE'));
               return (
                 <button
                   key={p}
                   onClick={() => setPos(p)}
                   style={{
-                    padding: '3px 9px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                    fontSize: 11, fontWeight: 700,
-                    background: active ? (col?.bg ?? '#f0fdf4') : '#f8fafc',
-                    color: active ? (col?.text ?? '#059669') : '#94a3b8',
+                    padding: '4px 11px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                    fontSize: 11, fontWeight: 800,
+                    background: active ? (col?.bar ?? '#059669') : '#f1f5f9',
+                    color: active ? '#fff' : '#94a3b8',
+                    boxShadow: active ? `0 2px 8px ${col?.bar ?? '#059669'}55` : 'none',
                     transition: 'all 0.15s',
                   }}
                 >
@@ -874,6 +951,65 @@ export default function DraftBoard({
               }}
             />
           </div>
+
+          {/* Sort + team filter */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as SortKey)}
+              style={{
+                flex: 1, minWidth: 0, padding: '6px 8px', fontSize: 11, fontWeight: 600,
+                borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc',
+                color: '#0f172a', outline: 'none',
+              }}
+            >
+              {SORT_OPTIONS.map(o => (
+                <option key={o.key} value={o.key}>{o.label}</option>
+              ))}
+            </select>
+            <select
+              value={teamFilter}
+              onChange={e => setTeamFilter(e.target.value)}
+              style={{
+                width: 84, padding: '6px 8px', fontSize: 11, fontWeight: 600,
+                borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc',
+                color: '#0f172a', outline: 'none',
+              }}
+            >
+              <option value="ALL">All Teams</option>
+              {teams.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+
+          {/* Max price filter */}
+          <select
+            value={maxPrice == null ? 'any' : String(maxPrice)}
+            onChange={e => setMaxPrice(e.target.value === 'any' ? null : Number(e.target.value))}
+            style={{
+              width: '100%', marginTop: 6, padding: '6px 8px', fontSize: 11, fontWeight: 600,
+              borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc',
+              color: '#0f172a', outline: 'none', boxSizing: 'border-box',
+            }}
+          >
+            {PRICE_PRESETS.map(preset => (
+              <option key={preset.label} value={preset.value == null ? 'any' : preset.value}>
+                {preset.label}
+              </option>
+            ))}
+          </select>
+
+          {/* Affordable-only toggle */}
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 6, marginTop: 8,
+            fontSize: 11, fontWeight: 600, color: '#475569', cursor: 'pointer',
+          }}>
+            <input
+              type="checkbox"
+              checked={affordableOnly}
+              onChange={e => setAffordableOnly(e.target.checked)}
+            />
+            Show affordable players only
+          </label>
         </div>
 
         {/* Player rows */}
@@ -1015,7 +1151,7 @@ export default function DraftBoard({
         {/* Cap & quota strip */}
         <div style={{
           padding: '10px 20px', flexShrink: 0,
-          background: 'rgba(7,10,22,0.95)', borderBottom: '1px solid rgba(255,255,255,0.07)',
+          background: HUD_BG, borderBottom: '1px solid rgba(255,255,255,0.08)',
           display: 'flex', alignItems: 'center', gap: 16,
           flexWrap: 'wrap',
         }}>
@@ -1025,9 +1161,8 @@ export default function DraftBoard({
               Welcome, {userName.split(' ')[0]}
             </div>
             <div style={{
-              fontSize: 18, fontWeight: 900, letterSpacing: '-0.03em',
-              background: 'linear-gradient(135deg, #fff 0%, #34d399 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+              fontSize: 18, fontWeight: 800, letterSpacing: '-0.01em',
+              color: '#fff', lineHeight: 1.2,
             }}>
               Build Your Team
             </div>
@@ -1054,7 +1189,7 @@ export default function DraftBoard({
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <QuotaBadge label="QB"    current={qbCount}   max={QUOTA.QB}   color="#60a5fa" />
             <QuotaBadge label="RB"    current={rbCount}   max={QUOTA.RB}   color="#34d399" />
-            <QuotaBadge label="WR/TE" current={flexCount} max={QUOTA.FLEX} color="#fbbf24" />
+            <QuotaBadge label="WR/TE" current={flexCount} max={QUOTA.FLEX} color="#ff5900" />
             <QuotaBadge label="K"     current={kCount}    max={QUOTA.K}    color="#a78bfa" />
           </div>
 
@@ -1079,6 +1214,16 @@ export default function DraftBoard({
           >
             {isComplete ? '✓ Finalize Squad →' : `${TOTAL_SLOTS - selected.length} selections left`}
           </button>
+        </div>
+
+        {/* Bench/scoring reminder */}
+        <div style={{
+          padding: '6px 20px', flexShrink: 0,
+          background: '#08170f', borderBottom: '1px solid rgba(255,255,255,0.06)',
+          borderLeft: '3px solid #fbbf24',
+          fontSize: 11, color: 'rgba(255,255,255,0.8)', fontWeight: 600,
+        }}>
+           Only your 8 starters score points each week — your 3 bench players sit out unless you swap them in later.
         </div>
 
         {/* Football field */}
@@ -1149,7 +1294,7 @@ export default function DraftBoard({
               >
                 {player
                   ? <FilledSlot player={player} onRemove={() => removePlayer(player.id)} />
-                  : <EmptySlot label={slot.label} group={slot.posGroup} />
+                  : <EmptySlot label={slot.label} group={slot.posGroup} onClick={() => setPos(slot.posGroup)} />
                 }
               </div>
             );

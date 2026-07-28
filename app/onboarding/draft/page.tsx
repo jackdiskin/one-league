@@ -7,15 +7,55 @@ import { getNextMatchupByTeam } from '@/lib/schedule';
 
 const SEASON = 2026;
 
-async function fetchPlayers(): Promise<DraftPlayer[]> {
+async function fetchCurrentWeek(): Promise<number> {
+  const [row] = await query<{ w: number }>(
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`,
+    [SEASON]
+  );
+  return row?.w ?? 1;
+}
+
+async function fetchPlayers(currentWeek: number): Promise<DraftPlayer[]> {
   return query<DraftPlayer>(
     `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url,
-            COALESCE(pms.current_price, 20000000) AS current_price
+            COALESCE(pms.current_price, 20000000) AS current_price,
+            COALESCE(sp.season_points, 0) AS season_points,
+            COALESCE(lp.last_year_points, 0) AS last_year_points,
+            ROUND(COALESCE(own.owner_count, 0) /
+                  NULLIF((SELECT COUNT(*) FROM fantasy_teams WHERE season_year = ?), 0) * 100, 1
+            ) AS ownership_pct,
+            COALESCE(tx.trades_in, 0) AS trades_in,
+            COALESCE(tx.trades_out, 0) AS trades_out,
+            CASE WHEN ppw.opening_price IS NOT NULL AND ppw.opening_price > 0
+                 THEN (COALESCE(pms.current_price, 20000000) - ppw.opening_price) / ppw.opening_price
+                 ELSE 0 END AS price_pct_change,
+            COALESCE(proj.expected_points, 0) AS projected_next_week
      FROM players p
      LEFT JOIN player_market_state pms ON pms.player_id = p.id AND pms.season_year = ?
+     LEFT JOIN (
+       SELECT player_id, SUM(fantasy_points) AS season_points
+       FROM player_weekly_scores WHERE season_year = ? GROUP BY player_id
+     ) sp ON sp.player_id = p.id
+     LEFT JOIN (
+       SELECT player_id, SUM(fantasy_points) AS last_year_points
+       FROM player_weekly_scores WHERE season_year = ? GROUP BY player_id
+     ) lp ON lp.player_id = p.id
+     LEFT JOIN (
+       SELECT player_id, COUNT(DISTINCT fantasy_team_id) AS owner_count
+       FROM fantasy_team_roster WHERE is_active = TRUE GROUP BY player_id
+     ) own ON own.player_id = p.id
+     LEFT JOIN (
+       SELECT player_id,
+              SUM(transaction_type = 'buy')  AS trades_in,
+              SUM(transaction_type = 'sell') AS trades_out
+       FROM player_transactions WHERE season_year = ? GROUP BY player_id
+     ) tx ON tx.player_id = p.id
+     LEFT JOIN player_price_weeks ppw ON ppw.player_id = p.id AND ppw.season_year = ? AND ppw.week = ?
+     LEFT JOIN player_weekly_projections proj ON proj.player_id = p.id AND proj.season_year = ?
+       AND proj.week = ? AND proj.projection_source = 'internal_model'
      WHERE p.position IN ('QB','RB','WR','TE','K')
      ORDER BY COALESCE(pms.current_price, 20000000) DESC`,
-    [SEASON]
+    [SEASON, SEASON, SEASON, SEASON - 1, SEASON, SEASON, currentWeek, SEASON, currentWeek + 1]
   );
 }
 
@@ -47,8 +87,9 @@ export default async function OnboardingDraftPage() {
   );
   if (existing) redirect('/dashboard');
 
+  const currentWeek = await fetchCurrentWeek();
   const [players, publicLeagues, matchups] = await Promise.all([
-    fetchPlayers(),
+    fetchPlayers(currentWeek),
     fetchPublicLeagues(),
     getNextMatchupByTeam(SEASON),
   ]);
