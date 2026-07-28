@@ -21,7 +21,13 @@ export interface CatalogPlayer {
   net_order_flow: number;
   last_week_points: number | null;
   season_points: number;
+  last_year_points: number;
   owner_count: number;
+  ownership_pct: number;
+  trades_in: number;
+  trades_out: number;
+  price_pct_change: number;
+  projected_next_week: number;
   is_owned: boolean;
   purchase_price: number | null;
   acquired_week: number | null;
@@ -56,6 +62,47 @@ const POS_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
 
 // Mirrors the quota enforced server-side in app/api/market/buy/route.ts
 const QUOTA: Record<string, number> = { QB: 2, RB: 3, FLEX: 5 };
+
+// $0.5M increments from $18M down to $1M, e.g. "$17.5M", "$17M", ... (same presets as the draft screen)
+const PRICE_PRESETS: { label: string; value: number | null }[] = [
+  { label: 'Any Price', value: null },
+  ...Array.from({ length: 28 }, (_, i) => {
+    const m = 18 - i * 0.5;
+    return { label: `$${m}M`, value: Math.round(m * 1_000_000) };
+  }),
+];
+
+const SORT_OPTIONS = [
+  { key: 'price_desc',          label: 'Price: High to Low' },
+  { key: 'price_asc',           label: 'Price: Low to High' },
+  { key: 'season_points',       label: 'Total Points This Year' },
+  { key: 'last_year_points',    label: 'Points Last Year' },
+  { key: 'ownership_pct',       label: '% Selected' },
+  { key: 'trades_in',           label: 'Trades In' },
+  { key: 'trades_out',          label: 'Trades Out' },
+  { key: 'rising',              label: 'Highest Rising' },
+  { key: 'falling',             label: 'Highest Falling' },
+  { key: 'projected_next_week', label: 'Projected Points Next Week' },
+] as const;
+
+type SortKey = typeof SORT_OPTIONS[number]['key'];
+
+function sortCandidates(list: CatalogPlayer[], key: SortKey): CatalogPlayer[] {
+  const sorted = [...list];
+  switch (key) {
+    case 'price_desc':          return sorted.sort((a, b) => Number(b.current_price) - Number(a.current_price));
+    case 'price_asc':           return sorted.sort((a, b) => Number(a.current_price) - Number(b.current_price));
+    case 'season_points':       return sorted.sort((a, b) => b.season_points - a.season_points);
+    case 'last_year_points':    return sorted.sort((a, b) => b.last_year_points - a.last_year_points);
+    case 'ownership_pct':       return sorted.sort((a, b) => b.ownership_pct - a.ownership_pct);
+    case 'trades_in':           return sorted.sort((a, b) => b.trades_in - a.trades_in);
+    case 'trades_out':          return sorted.sort((a, b) => b.trades_out - a.trades_out);
+    case 'rising':              return sorted.sort((a, b) => b.price_pct_change - a.price_pct_change);
+    case 'falling':             return sorted.sort((a, b) => a.price_pct_change - b.price_pct_change);
+    case 'projected_next_week': return sorted.sort((a, b) => b.projected_next_week - a.projected_next_week);
+    default:                    return sorted;
+  }
+}
 
 const GROUPS: { key: string; label: string; positions: string[] }[] = [
   { key: 'QB',   label: 'Quarterbacks',  positions: ['QB'] },
@@ -102,7 +149,17 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
   const [results, setResults] = useState<{ label: string; ok: boolean; msg?: string }[] | null>(null);
   const [profileId, setProfileId] = useState<number | null>(null);
 
+  // Replacement-picker sort/filter — shared across every pending slot's candidate list
+  const [sortBy, setSortBy]             = useState<SortKey>('price_desc');
+  const [teamFilter, setTeamFilter]     = useState('ALL');
+  const [maxPrice, setMaxPrice]         = useState<number | null>(null);
+  const [affordableOnly, setAffordableOnly] = useState(false);
+
   const owned = useMemo(() => players.filter(p => p.is_owned), [players]);
+  const teams = useMemo(
+    () => Array.from(new Set(players.map(p => p.team_code))).sort(),
+    [players]
+  );
 
   // Budget available for a given slot: base budget + sell proceeds of every pending
   // outgoing player, minus the incoming price already committed on every OTHER slot.
@@ -149,12 +206,16 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
     const alreadyChosenElsewhere = new Set(
       pending.filter(t => t.key !== slot.key && t.incoming).map(t => t.incoming!.id)
     );
-    return players
+    const available = availableBudgetFor(slot.key);
+    const list = players
       .filter(p => !p.is_owned && slot.positions.includes(p.position))
       .filter(p => !alreadyChosenElsewhere.has(p.id))
       .filter(p => !q || p.full_name.toLowerCase().includes(q) || p.team_code.toLowerCase().includes(q))
-      .sort((a, b) => Number(b.current_price) - Number(a.current_price));
-  }, [players, pending, searchBySlot]);
+      .filter(p => teamFilter === 'ALL' || p.team_code === teamFilter)
+      .filter(p => maxPrice == null || Number(p.current_price) <= maxPrice)
+      .filter(p => !affordableOnly || Number(p.current_price) <= available);
+    return sortCandidates(list, sortBy);
+  }, [players, pending, searchBySlot, teamFilter, maxPrice, affordableOnly, sortBy, availableBudgetFor]);
 
   const confirmAll = useCallback(async () => {
     if (!fantasyTeamId) return;
@@ -474,6 +535,65 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                               }}
                             />
                           </div>
+
+                          {/* Sort + team filter */}
+                          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                            <select
+                              value={sortBy}
+                              onChange={e => setSortBy(e.target.value as SortKey)}
+                              style={{
+                                flex: 1, minWidth: 0, padding: '5px 7px', fontSize: 10.5, fontWeight: 600,
+                                borderRadius: 9, border: '1px solid #e2e8f0', background: '#f8fafc',
+                                color: '#0f172a', outline: 'none',
+                              }}
+                            >
+                              {SORT_OPTIONS.map(o => (
+                                <option key={o.key} value={o.key}>{o.label}</option>
+                              ))}
+                            </select>
+                            <select
+                              value={teamFilter}
+                              onChange={e => setTeamFilter(e.target.value)}
+                              style={{
+                                width: 76, padding: '5px 7px', fontSize: 10.5, fontWeight: 600,
+                                borderRadius: 9, border: '1px solid #e2e8f0', background: '#f8fafc',
+                                color: '#0f172a', outline: 'none',
+                              }}
+                            >
+                              <option value="ALL">All Teams</option>
+                              {teams.map(tc => <option key={tc} value={tc}>{tc}</option>)}
+                            </select>
+                          </div>
+
+                          {/* Max price filter */}
+                          <select
+                            value={maxPrice == null ? 'any' : String(maxPrice)}
+                            onChange={e => setMaxPrice(e.target.value === 'any' ? null : Number(e.target.value))}
+                            style={{
+                              width: '100%', marginTop: 6, padding: '5px 7px', fontSize: 10.5, fontWeight: 600,
+                              borderRadius: 9, border: '1px solid #e2e8f0', background: '#f8fafc',
+                              color: '#0f172a', outline: 'none', boxSizing: 'border-box',
+                            }}
+                          >
+                            {PRICE_PRESETS.map(preset => (
+                              <option key={preset.label} value={preset.value == null ? 'any' : preset.value}>
+                                {preset.label}
+                              </option>
+                            ))}
+                          </select>
+
+                          {/* Affordable-only toggle */}
+                          <label style={{
+                            display: 'flex', alignItems: 'center', gap: 6, marginTop: 6,
+                            fontSize: 10.5, fontWeight: 600, color: '#475569', cursor: 'pointer',
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={affordableOnly}
+                              onChange={e => setAffordableOnly(e.target.checked)}
+                            />
+                            Show affordable players only
+                          </label>
                         </div>
 
                         <div style={{ maxHeight: 280, overflowY: 'auto', marginTop: 6 }}>

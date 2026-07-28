@@ -62,7 +62,7 @@ async function fetchTeam(userId: string, season: number) {
   return team ?? null;
 }
 
-async function fetchPlayers(season: number, lastWeek: number, teamId: number | null): Promise<CatalogPlayer[]> {
+async function fetchPlayers(season: number, lastWeek: number, currentWeek: number, teamId: number | null): Promise<CatalogPlayer[]> {
   return query<CatalogPlayer>(
     `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url,
             COALESCE(pms.current_price, 0)      AS current_price,
@@ -70,7 +70,17 @@ async function fetchPlayers(season: number, lastWeek: number, teamId: number | n
             COALESCE(pms.net_order_flow, 0)     AS net_order_flow,
             pws.fantasy_points                  AS last_week_points,
             COALESCE(tot.season_points, 0)      AS season_points,
+            COALESCE(lp.last_year_points, 0)    AS last_year_points,
             COALESCE(own.owner_count, 0)        AS owner_count,
+            ROUND(COALESCE(own.owner_count, 0) /
+                  NULLIF((SELECT COUNT(*) FROM fantasy_teams WHERE season_year = ?), 0) * 100, 1
+            ) AS ownership_pct,
+            COALESCE(tx.trades_in, 0)  AS trades_in,
+            COALESCE(tx.trades_out, 0) AS trades_out,
+            CASE WHEN ppw.opening_price IS NOT NULL AND ppw.opening_price > 0
+                 THEN (COALESCE(pms.current_price, 0) - ppw.opening_price) / ppw.opening_price
+                 ELSE 0 END AS price_pct_change,
+            COALESCE(proj.expected_points, 0) AS projected_next_week,
             (my_ftr.id IS NOT NULL)             AS is_owned,
             my_ftr.purchase_price                AS purchase_price,
             my_ftr.acquired_week                 AS acquired_week
@@ -84,14 +94,27 @@ async function fetchPlayers(season: number, lastWeek: number, teamId: number | n
        FROM player_weekly_scores WHERE season_year = ? GROUP BY player_id
      ) tot ON tot.player_id = p.id
      LEFT JOIN (
+       SELECT player_id, SUM(fantasy_points) AS last_year_points
+       FROM player_weekly_scores WHERE season_year = ? GROUP BY player_id
+     ) lp ON lp.player_id = p.id
+     LEFT JOIN (
        SELECT player_id, COUNT(DISTINCT fantasy_team_id) AS owner_count
        FROM fantasy_team_roster WHERE is_active = TRUE GROUP BY player_id
      ) own ON own.player_id = p.id
+     LEFT JOIN (
+       SELECT player_id,
+              SUM(transaction_type = 'buy')  AS trades_in,
+              SUM(transaction_type = 'sell') AS trades_out
+       FROM player_transactions WHERE season_year = ? GROUP BY player_id
+     ) tx ON tx.player_id = p.id
+     LEFT JOIN player_price_weeks ppw ON ppw.player_id = p.id AND ppw.season_year = ? AND ppw.week = ?
+     LEFT JOIN player_weekly_projections proj ON proj.player_id = p.id AND proj.season_year = ?
+       AND proj.week = ? AND proj.projection_source = 'internal_model'
      LEFT JOIN fantasy_team_roster my_ftr
        ON my_ftr.player_id = p.id AND my_ftr.fantasy_team_id = ? AND my_ftr.is_active = TRUE
      WHERE p.position IN ('QB','RB','WR','TE')
      ORDER BY COALESCE(pms.current_price, 0) DESC`,
-    [season, season, lastWeek, season, teamId]
+    [season, season, season, lastWeek, season, season - 1, season, season, lastWeek, season, currentWeek + 1, teamId]
   );
 }
 
@@ -115,7 +138,7 @@ export default async function TransfersPage({
     getNextMatchupByTeam(SCHEDULE_SEASON),
   ]);
 
-  const players = await fetchPlayers(SEASON, lastScoreWeek, team?.id ?? null);
+  const players = await fetchPlayers(SEASON, lastScoreWeek, currentWeek, team?.id ?? null);
 
   const owned = players.filter(p => p.is_owned);
   const budgetRemaining = team?.budget_remaining ?? 0;
