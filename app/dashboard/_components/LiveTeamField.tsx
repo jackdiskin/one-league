@@ -18,6 +18,7 @@ export interface FieldPlayer {
   headshot_url: string | null;
   external_player_id: string | null;
   roster_slot: string;
+  projected_points?: number | null;
 }
 
 export interface FieldSlot {
@@ -323,6 +324,7 @@ function PlayerCard({
   const displayName = formatPlayerName(player.full_name);
   const isLive = livePoints !== null;
   const clickable = interactive || isLive;
+  const hasProj = player.projected_points != null;
 
   return (
     <div
@@ -412,35 +414,47 @@ function PlayerCard({
         )}
       </div>
 
-      {/* Name card */}
-      <div style={{
-        background: 'rgba(255,255,255,0.97)', borderRadius: 10, padding: '5px 10px',
-        textAlign: 'center', boxShadow: '0 3px 12px rgba(0,0,0,0.25)',
-        minWidth: 66, maxWidth: 108,
-        outline: selected ? `1.5px solid ${SELECT_COLOR}` : isLive ? '1.5px solid rgba(16,185,129,0.45)' : 'none',
-      }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {displayName}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, marginTop: 2, flexWrap: 'wrap' }}>
-          <PositionBadge position={player.position} />
-          <TeamLogo code={player.team_code} size={10} />
-          <span style={{ fontSize: 10, fontWeight: 600, color: '#64748b' }}>{player.team_code}</span>
-          {isLive && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 2,
-              fontSize: 7.5, fontWeight: 800, color: '#059669',
-              background: 'rgba(5,150,105,0.09)', borderRadius: 20,
-              padding: '1px 4px', letterSpacing: '0.04em',
-            }}>
+      {/* Name card (+ projected points, hanging off the bottom as a small tag) */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{
+          background: 'rgba(255,255,255,0.97)', borderRadius: 10, padding: '5px 10px',
+          textAlign: 'center', boxShadow: '0 3px 12px rgba(0,0,0,0.25)',
+          minWidth: 66, maxWidth: 108,
+          outline: selected ? `1.5px solid ${SELECT_COLOR}` : isLive ? '1.5px solid rgba(16,185,129,0.45)' : 'none',
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {displayName}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, marginTop: 2, flexWrap: 'wrap' }}>
+            <PositionBadge position={player.position} />
+            <TeamLogo code={player.team_code} size={10} />
+            <span style={{ fontSize: 10, fontWeight: 600, color: '#64748b' }}>{player.team_code}</span>
+            {isLive && (
               <span style={{
-                width: 4, height: 4, borderRadius: '50%', background: '#10b981', flexShrink: 0,
-                animation: 'live-dot-pulse 1.4s ease-in-out infinite',
-              }} />
-              LIVE
-            </span>
-          )}
+                display: 'inline-flex', alignItems: 'center', gap: 2,
+                fontSize: 7.5, fontWeight: 800, color: '#059669',
+                background: 'rgba(5,150,105,0.09)', borderRadius: 20,
+                padding: '1px 4px', letterSpacing: '0.04em',
+              }}>
+                <span style={{
+                  width: 4, height: 4, borderRadius: '50%', background: '#10b981', flexShrink: 0,
+                  animation: 'live-dot-pulse 1.4s ease-in-out infinite',
+                }} />
+                LIVE
+              </span>
+            )}
+          </div>
         </div>
+        {hasProj && (
+          <div style={{
+            background: '#1e293b', borderRadius: 8, padding: '2px 9px',
+            marginTop: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+          }}>
+            <span style={{ fontSize: 9, fontWeight: 800, color: '#e2e8f0', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
+              Proj {formatPoints(player.projected_points as number)}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -465,6 +479,7 @@ function BenchCard({
 }) {
   const displayName = formatPlayerName(player.full_name);
   const isLive = livePoints !== null;
+  const hasProj = player.projected_points != null;
 
   return (
     <div
@@ -526,6 +541,17 @@ function BenchCard({
           <TeamLogo code={player.team_code} size={9} />
           <span style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600 }}>{player.team_code}</span>
         </div>
+        {hasProj && (
+          <div style={{
+            background: '#1e293b', borderRadius: 6, padding: '1.5px 7px',
+            display: 'inline-block', marginTop: 1,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+          }}>
+            <span style={{ fontSize: 8.5, fontWeight: 800, color: '#e2e8f0', letterSpacing: '0.02em' }}>
+              Proj {formatPoints(player.projected_points as number)}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

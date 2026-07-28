@@ -183,15 +183,15 @@ function FilledSlot({ player, onRemove }: { player: DraftPlayer; onRemove: () =>
           {player.headshot_url ? (
             <Image
               src={player.headshot_url} alt={player.full_name}
-              width={52} height={52} unoptimized
-              style={{ width: 52, height: 52, objectFit: 'contain', display: 'block' }}
+              width={60} height={60} unoptimized
+              style={{ width: 60, height: 60, objectFit: 'contain', display: 'block' }}
             />
           ) : (
             <div style={{
-              width: 52, height: 52, borderRadius: 12, background: '#334155',
+              width: 60, height: 60, borderRadius: 12, background: '#334155',
               border: '2.5px solid #fff', boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 18, fontWeight: 800, color: '#fff',
+              fontSize: 20, fontWeight: 800, color: '#fff',
             }}>
               {player.full_name[0]}
             </div>

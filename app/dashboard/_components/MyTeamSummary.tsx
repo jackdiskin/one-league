@@ -92,16 +92,24 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
     );
   }
 
+  const [weekRow] = await query<{ w: number }>(
+    `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [seasonYear]
+  );
+  const lastWeek = weekRow?.w ?? 1;
+
   const [roster, matchups] = await Promise.all([
     query<Player>(
       `SELECT p.id, p.full_name, p.position, p.team_code, pms.current_price, p.headshot_url,
-              p.external_player_id, ftr.roster_slot
+              p.external_player_id, ftr.roster_slot, pwp.expected_points AS projected_points
        FROM fantasy_team_roster ftr
        JOIN players p ON p.id = ftr.player_id
        JOIN player_market_state pms ON pms.player_id = ftr.player_id AND pms.season_year = ?
+       LEFT JOIN player_weekly_projections pwp
+         ON pwp.player_id = ftr.player_id AND pwp.season_year = ? AND pwp.week = ?
+            AND pwp.projection_source = 'internal_model'
        WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE
        ORDER BY FIELD(p.position,'WR','TE','QB','RB','K'), pms.current_price DESC`,
-      [seasonYear, team.id]
+      [seasonYear, seasonYear, lastWeek, team.id]
     ),
     getNextMatchupByTeam(SCHEDULE_SEASON),
   ]);
