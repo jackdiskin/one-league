@@ -12,35 +12,37 @@ type Player = FieldPlayer;
 // Compute (x%, y%) for each slot — a real NFL pre-snap shotgun look: the
 // O-line marks the line of scrimmage near the top, and every skill player
 // lines up even with it or behind it (nobody lines up ahead of the ball).
-// The flex trio adapts to who's actually starting (like FPL): 2 WR always
-// out wide, right on the line; the 3rd spot is either a TE lined up tight
-// on the line next to the tackle, or a 3rd WR off the line in the slot.
-// Recomputed fresh from the current starters, so subbing auto-updates it.
-function getPositions(wrs: Player[], tes: Player[], qbs: Player[], rbs: Player[]) {
+// The flex trio adapts to who's actually starting (like FPL): WR1/WR2 always
+// out wide, right on the line; WR3 is the true FLEX slot (RB/WR/TE) and can
+// be a TE lined up tight next to the tackle, a 3rd WR in the slot, or a RB.
+// Looked up by named roster_slot (not position), so subbing auto-updates it
+// and a RB sitting in the FLEX slot renders in the right spot.
+function getPositions(starters: Player[]) {
+  const bySlot = (slot: string) => starters.find(p => p.roster_slot === slot) ?? null;
+
+  const wr1  = bySlot('WR1');
+  const wr2  = bySlot('WR2');
+  const flex = bySlot('WR3');
+  const qb1  = bySlot('QB1');
+  const rb1  = bySlot('RB1');
+  const rb2  = bySlot('RB2');
+
   const out: FieldSlot[] = [];
-
   const LOS = 16; // O-line / line-of-scrimmage depth — see the bar in LiveTeamField
+  const flexIsTE = flex?.position === 'TE';
 
-  // ── Flex trio: prefer WRs for the two outside slots, whatever's left
-  //    (a TE, or a 3rd WR) takes the slot/tight position ──────────────────
-  const flexPool = [...wrs, ...tes];
-  const left  = flexPool[0] ?? null;
-  const right = flexPool[1] ?? null;
-  const slot  = flexPool[2] ?? null;
-  const slotIsTE = slot?.position === 'TE';
-
-  out.push({ player: left,  pos: left?.position  ?? 'WR',    x: 6,  y: LOS });
-  out.push({ player: right, pos: right?.position ?? 'WR',    x: 94, y: LOS });
-  // TE lines up on the line too, tight next to the tackle; a 3rd WR lines
-  // up just off the line in the slot (has to be off the line to be eligible).
-  out.push({ player: slot,  pos: slot?.position  ?? 'WR/TE', x: slotIsTE ? 74 : 50, y: slotIsTE ? LOS : LOS + 7 });
+  out.push({ player: wr1,  pos: wr1?.position  ?? 'WR',   x: 6,  y: LOS });
+  out.push({ player: wr2,  pos: wr2?.position  ?? 'WR',   x: 94, y: LOS });
+  // TE lines up on the line too, tight next to the tackle; a flex WR/RB
+  // lines up just off the line in the slot (has to be off the line to be eligible).
+  out.push({ player: flex, pos: flex?.position ?? 'FLEX', x: flexIsTE ? 74 : 50, y: flexIsTE ? LOS : LOS + 7 });
 
   // ── QB in shotgun, well behind the line ───────────────────────────────
-  out.push({ player: qbs[0] ?? null, pos: 'QB', x: 50, y: LOS + 24 });
+  out.push({ player: qb1, pos: 'QB', x: 50, y: LOS + 24 });
 
   // ── RBs split, flanking the QB ────────────────────────────────────────
-  out.push({ player: rbs[0] ?? null, pos: 'RB', x: 32, y: LOS + 32 });
-  out.push({ player: rbs[1] ?? null, pos: 'RB', x: 68, y: LOS + 32 });
+  out.push({ player: rb1, pos: 'RB', x: 32, y: LOS + 32 });
+  out.push({ player: rb2, pos: 'RB', x: 68, y: LOS + 32 });
 
   return out;
 }
@@ -114,11 +116,7 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
   const starters = roster.filter(p => p.roster_slot !== 'BENCH');
   const bench    = roster.filter(p => p.roster_slot === 'BENCH');
 
-  const qbs = starters.filter(p => p.position === 'QB');
-  const rbs = starters.filter(p => p.position === 'RB');
-  const wrs = starters.filter(p => p.position === 'WR');
-  const tes = starters.filter(p => p.position === 'TE');
-  const positions = getPositions(wrs, tes, qbs, rbs);
+  const positions = getPositions(starters);
 
   const rankLabel = team.rank === 1 ? '1st' : team.rank === 2 ? '2nd' : team.rank === 3 ? '3rd' : `${team.rank}th`;
   const rankMedal = team.rank === 1 ? '🥇' : team.rank === 2 ? '🥈' : team.rank === 3 ? '🥉' : null;

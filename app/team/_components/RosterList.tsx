@@ -182,21 +182,36 @@ const POS_LABELS: Record<string, string> = {
   QB: 'Quarterback', RB: 'Running Backs', WR: 'Wide Receivers', TE: 'Tight Ends',
 };
 
-// Starter slot groups: defines expected named slots per position group
-const STARTER_SLOT_GROUPS = [
-  { key: 'QB',   positions: ['QB'],       maxStarters: 1, slotPrefix: 'QB', label: 'Quarterbacks', singularLabel: 'QB Starter'  },
-  { key: 'RB',   positions: ['RB'],       maxStarters: 2, slotPrefix: 'RB', label: 'Running Backs', singularLabel: 'RB Starter' },
-  { key: 'FLEX', positions: ['WR', 'TE'], maxStarters: 3, slotPrefix: 'WR', label: 'Receivers',     singularLabel: 'WR/TE Starter' },
+// Named starter slots, in display order. WR3 is the true FLEX slot — RB,
+// WR, or TE — everyone else is fixed to their own position. Rendered by
+// exact slot name (not position category) so a RB sitting in WR3 shows up
+// in the right place instead of overflowing the Running Backs group.
+const STARTER_SLOTS = [
+  { slot: 'QB1', eligiblePositions: ['QB'],           sectionKey: 'QB',   sectionLabel: 'Quarterbacks',  singularLabel: 'QB Starter'      },
+  { slot: 'RB1', eligiblePositions: ['RB'],           sectionKey: 'RB',   sectionLabel: 'Running Backs', singularLabel: 'RB Starter'      },
+  { slot: 'RB2', eligiblePositions: ['RB'],           sectionKey: 'RB',   sectionLabel: 'Running Backs', singularLabel: 'RB Starter'      },
+  { slot: 'WR1', eligiblePositions: ['WR', 'TE'],      sectionKey: 'FLEX', sectionLabel: 'Receivers',     singularLabel: 'WR/TE Starter'   },
+  { slot: 'WR2', eligiblePositions: ['WR', 'TE'],      sectionKey: 'FLEX', sectionLabel: 'Receivers',     singularLabel: 'WR/TE Starter'   },
+  { slot: 'WR3', eligiblePositions: ['RB', 'WR', 'TE'], sectionKey: 'FLEX', sectionLabel: 'Receivers',    singularLabel: 'FLEX (RB/WR/TE)' },
 ] as const;
+
+const SECTION_ORDER = ['QB', 'RB', 'FLEX'] as const;
+const SECTION_COLOR_POS: Record<string, string> = { QB: 'QB', RB: 'RB', FLEX: 'WR' };
+
+function eligiblePositionsForSlot(slot: string): readonly string[] {
+  return STARTER_SLOTS.find(s => s.slot === slot)?.eligiblePositions ?? [];
+}
 
 // Extracted so PlayerRow (defined outside RosterList) can call it without closures
 function isEligibleForSwap(p: RosterPlayer, selected: RosterPlayer | null): boolean {
   if (!selected) return false;
   if (p.id === selected.id) return false;
-  const flex = ['WR', 'TE'];
-  const sameGroup = (a: string, b: string) => (flex.includes(a) && flex.includes(b)) || a === b;
-  if (!sameGroup(selected.position, p.position)) return false;
-  return (selected.roster_slot === 'BENCH') !== (p.roster_slot === 'BENCH');
+  const selectedOnBench = selected.roster_slot === 'BENCH';
+  const pOnBench = p.roster_slot === 'BENCH';
+  if (selectedOnBench === pOnBench) return false; // one must be a starter, the other bench
+  const starter = selectedOnBench ? p : selected;
+  const bench   = selectedOnBench ? selected : p;
+  return eligiblePositionsForSlot(starter.roster_slot).includes(bench.position);
 }
 
 interface PlayerRowProps {
@@ -409,6 +424,7 @@ export default function RosterList({ roster, teamId, matchups, season }: {
 
   const handlePlayerClick = useCallback((p: RosterPlayer) => {
     if (swapping.has(p.id)) return;
+    setPickerSlot(null);
     setSelected(prev => {
       if (!prev) return p;
       if (prev.id === p.id) return null;
@@ -421,42 +437,27 @@ export default function RosterList({ roster, teamId, matchups, season }: {
   const starters = roster.filter(p => p.roster_slot !== 'BENCH');
   const bench    = roster.filter(p => p.roster_slot === 'BENCH');
 
-  function getEmptyStarterSlots(slotPrefix: string, maxStarters: number, groupPlayers: RosterPlayer[]): string[] {
-    const emptyCount = maxStarters - groupPlayers.length;
-    if (emptyCount <= 0) return [];
-    const filled = new Set(groupPlayers.map(p => p.roster_slot).filter(Boolean));
-    const result: string[] = [];
-    for (let i = 1; result.length < emptyCount; i++) {
-      const slot = `${slotPrefix}${i}`;
-      if (!filled.has(slot)) result.push(slot);
-    }
-    return result;
-  }
+  // Total bench capacity = roster size minus the fixed number of named starter
+  // slots, so the "empty bench slot" placeholder only shows up when the bench
+  // genuinely has room (not just whenever the roster happens to be short a
+  // starter, which used to show a phantom empty slot even at a full 4/4 bench).
+  const MAX_BENCH = 10 - STARTER_SLOTS.length;
 
   const isSelectionActive = selected !== null;
 
-  // WR and TE share flex starter slots — treat as same group for eligibility
-  function sameGroup(a: string, b: string): boolean {
-    const flex = ['WR', 'TE'];
-    if (flex.includes(a) && flex.includes(b)) return true;
-    return a === b;
-  }
+  // Which slot is currently showing its "pick a bench player" dropdown
+  // (only relevant when nothing is pre-selected — see EmptySlotRow).
+  const [pickerSlot, setPickerSlot] = useState<string | null>(null);
 
-  // Eligible targets for a regular swap (two real players)
-  function isEligible(p: RosterPlayer): boolean {
-    if (!selected) return false;
-    if (p.id === selected.id) return false;
-    if (!sameGroup(selected.position, p.position)) return false;
-    const selectedOnBench = selected.roster_slot === 'BENCH';
-    const targetOnBench   = p.roster_slot === 'BENCH';
-    return selectedOnBench !== targetOnBench;
-  }
+  // Eligible targets for a regular swap (two real players) — reuses the
+  // same slot-aware rule as PlayerRow's isEligibleForSwap.
+  const isEligible = useCallback((p: RosterPlayer) => isEligibleForSwap(p, selected), [selected]);
 
   // Empty starter slot is eligible when a bench player of matching group is selected
-  function isEmptyStarterEligible(positions: readonly string[]): boolean {
+  function isEmptyStarterEligible(slot: string): boolean {
     if (!selected) return false;
     if (selected.roster_slot !== 'BENCH') return false;
-    return positions.includes(selected.position);
+    return eligiblePositionsForSlot(slot).includes(selected.position);
   }
 
   // Empty bench slot is eligible when any starter is selected
@@ -468,6 +469,7 @@ export default function RosterList({ roster, teamId, matchups, season }: {
   async function executeSwap(playerA: RosterPlayer, playerB: RosterPlayer) {
     setSwapping(new Set([playerA.id, playerB.id]));
     setSelected(null);
+    setPickerSlot(null);
 
     try {
       const res = await fetch('/api/roster/swap', {
@@ -492,6 +494,7 @@ export default function RosterList({ roster, teamId, matchups, season }: {
   async function executeMove(player: RosterPlayer, targetSlot: string) {
     setSwapping(new Set([player.id]));
     setSelected(null);
+    setPickerSlot(null);
     try {
       const res = await fetch('/api/roster/move', {
         method: 'POST',
@@ -508,65 +511,109 @@ export default function RosterList({ roster, teamId, matchups, season }: {
   }
 
   // ── Empty slot row ──────────────────────────────────────────────────────────
+  // Two ways to fill an empty starter slot: (1) a bench player is already
+  // selected and this slot accepts their position — click fills it directly;
+  // (2) nothing is selected — click the "+" to open a picker of every
+  // eligible bench player and choose one, no pre-selection needed.
   function EmptySlotRow({
-    targetSlot, label, barColor, ringColor, lightColor, eligible, onMove,
+    label, barColor, ringColor, lightColor, eligible, onMove,
+    pickable, pickerOpen, onTogglePicker, onPick,
   }: {
     targetSlot: string; label: string;
     barColor: string; ringColor: string; lightColor: string;
     eligible: boolean; onMove: () => void;
+    pickable: RosterPlayer[]; pickerOpen: boolean;
+    onTogglePicker: () => void; onPick: (p: RosterPlayer) => void;
   }) {
+    const canPick = !isSelectionActive && pickable.length > 0;
+    const active  = eligible || canPick;
+
+    function handleClick() {
+      if (eligible) { onMove(); return; }
+      if (canPick) onTogglePicker();
+    }
+
     return (
-      <div
-        onClick={eligible ? onMove : undefined}
-        style={{
-          display: 'flex', alignItems: 'center',
-          padding: '9px 20px',
-          cursor: eligible ? 'pointer' : 'default',
-          background: eligible ? lightColor : 'transparent',
-          outline: eligible ? `1.5px dashed ${ringColor}` : 'none',
-          outlineOffset: '-2px',
-          borderRadius: eligible ? 10 : 0,
-          transition: 'all 0.2s',
-          position: 'relative',
-        }}
-        onMouseEnter={e => { if (eligible) (e.currentTarget as HTMLElement).style.opacity = '0.85'; }}
-        onMouseLeave={e => { if (eligible) (e.currentTarget as HTMLElement).style.opacity = '1'; }}
-      >
-        {eligible && (
+      <div>
+        <div
+          onClick={handleClick}
+          style={{
+            display: 'flex', alignItems: 'center',
+            padding: '9px 20px',
+            cursor: active ? 'pointer' : 'default',
+            background: eligible ? lightColor : pickerOpen ? '#f8fafc' : 'transparent',
+            outline: eligible ? `1.5px dashed ${ringColor}` : pickerOpen ? `1.5px solid ${ringColor}` : 'none',
+            outlineOffset: '-2px',
+            borderRadius: (eligible || pickerOpen) ? 10 : 0,
+            transition: 'all 0.2s',
+            position: 'relative',
+          }}
+          onMouseEnter={e => { if (active) (e.currentTarget as HTMLElement).style.opacity = '0.85'; }}
+          onMouseLeave={e => { if (active) (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+        >
+          {eligible && (
+            <div style={{
+              position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
+              width: 4, height: '60%', minHeight: 18, borderRadius: 4, background: ringColor, opacity: 0.8,
+            }} />
+          )}
           <div style={{
-            position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
-            width: 4, height: '60%', minHeight: 18, borderRadius: 4, background: ringColor, opacity: 0.8,
-          }} />
-        )}
-        <div style={{
-          width: 40, height: 40, borderRadius: '50%', flexShrink: 0, marginRight: 12,
-          border: `2px dashed ${eligible ? ringColor : '#e2e8f0'}`,
-          background: eligible ? lightColor : '#f8fafc',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          {eligible ? (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={ringColor} strokeWidth="2.5" strokeLinecap="round">
-              <polyline points="17 11 12 6 7 11" /><line x1="12" y1="6" x2="12" y2="18" />
-            </svg>
-          ) : (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round">
+            width: 40, height: 40, borderRadius: '50%', flexShrink: 0, marginRight: 12,
+            border: `2px dashed ${active ? ringColor : '#e2e8f0'}`,
+            background: eligible ? lightColor : '#f8fafc',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={active ? ringColor : '#cbd5e1'} strokeWidth="2.5" strokeLinecap="round">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
             </svg>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: active ? ringColor : '#cbd5e1', fontStyle: 'italic' }}>
+              {eligible ? 'Move here' : canPick ? 'Tap to add a player' : 'Empty slot'}
+            </div>
+            <div style={{ fontSize: 10, color: active ? ringColor : '#e2e8f0', opacity: 0.8 }}>{label}</div>
+          </div>
+          {active && (
+            <div style={{
+              fontSize: 10, fontWeight: 700, color: ringColor,
+              background: lightColor, border: `1px solid ${ringColor}`,
+              borderRadius: 20, padding: '2px 8px', opacity: 0.9,
+            }}>
+              {eligible ? '↑ Start' : pickerOpen ? '✕ Close' : '+ Add'}
+            </div>
           )}
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: eligible ? ringColor : '#cbd5e1', fontStyle: 'italic' }}>
-            {eligible ? `Move here` : `Empty slot`}
-          </div>
-          <div style={{ fontSize: 10, color: eligible ? ringColor : '#e2e8f0', opacity: 0.8 }}>{label}</div>
-        </div>
-        {eligible && (
-          <div style={{
-            fontSize: 10, fontWeight: 700, color: ringColor,
-            background: lightColor, border: `1px solid ${ringColor}`,
-            borderRadius: 20, padding: '2px 8px', opacity: 0.9,
-          }}>
-            ↑ Start
+
+        {pickerOpen && canPick && (
+          <div style={{ padding: '4px 20px 10px', background: '#fafafa' }}>
+            {pickable.map(p => (
+              <div
+                key={p.id}
+                onClick={() => onPick(p)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '7px 10px', borderRadius: 9, cursor: 'pointer',
+                  background: '#fff', border: '1px solid #e2e8f0', marginTop: 5,
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = ringColor; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0'; }}
+              >
+                <Avatar player={p} size={28} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {formatPlayerName(p.full_name)}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#94a3b8' }}>{p.position} · {p.team_code}</div>
+                </div>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, color: ringColor,
+                  background: lightColor, border: `1px solid ${ringColor}`,
+                  borderRadius: 20, padding: '2px 8px', flexShrink: 0,
+                }}>
+                  Start
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -747,19 +794,14 @@ export default function RosterList({ roster, teamId, matchups, season }: {
           Starters
         </div>
 
-        {STARTER_SLOT_GROUPS.map(group => {
-          const groupPlayers = starters.filter(p => (group.positions as readonly string[]).includes(p.position));
-          const emptySlots   = getEmptyStarterSlots(group.slotPrefix, group.maxStarters, groupPlayers);
-          if (groupPlayers.length === 0 && emptySlots.length === 0) return null;
-
-          // Use the first position's color; for FLEX use WR color
-          const firstPos  = group.positions[0] as string;
-          const col       = POS_COLORS[firstPos] ?? POS_COLORS.QB;
-          const eligible  = isEmptyStarterEligible(group.positions);
-          const totalCount = groupPlayers.length + (eligible ? emptySlots.length : 0);
+        {SECTION_ORDER.map(sectionKey => {
+          const slotsInSection = STARTER_SLOTS.filter(s => s.sectionKey === sectionKey);
+          const col = POS_COLORS[SECTION_COLOR_POS[sectionKey]] ?? POS_COLORS.QB;
+          const filledCount = slotsInSection.filter(s => starters.some(p => p.roster_slot === s.slot)).length;
+          const openCount = slotsInSection.length - filledCount;
 
           return (
-            <div key={group.key}>
+            <div key={sectionKey}>
               <div style={{
                 padding: '6px 20px',
                 borderTop: '1px solid #f1f5f9',
@@ -769,39 +811,50 @@ export default function RosterList({ roster, teamId, matchups, season }: {
               }}>
                 <div style={{ width: 3, height: 12, borderRadius: 2, background: col.bar, flexShrink: 0 }} />
                 <span style={{ fontSize: 10, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                  {group.label}
+                  {slotsInSection[0].sectionLabel}
                 </span>
                 <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>
-                  · {groupPlayers.length}/{group.maxStarters}
+                  · {filledCount}/{slotsInSection.length}
                 </span>
-                {emptySlots.length > 0 && (
+                {openCount > 0 && (
                   <span style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 20, padding: '1px 6px' }}>
-                    {emptySlots.length} open
+                    {openCount} open
                   </span>
                 )}
               </div>
-              {groupPlayers.map(p => (
-                <PlayerRow
-                  key={p.id} p={p}
-                  selected={selected} swapping={swapping}
-                  liveData={liveStats.get(p.external_player_id ?? '') ?? undefined}
-                  onPlayerClick={handlePlayerClick}
-                  onProfileClick={p => setProfileId(p.id)}
-                  matchups={matchups}
-                />
-              ))}
-              {emptySlots.map(slot => (
-                <EmptySlotRow
-                  key={slot}
-                  targetSlot={slot}
-                  label={group.singularLabel}
-                  barColor={col.bar}
-                  ringColor={col.ring}
-                  lightColor={col.light}
-                  eligible={eligible}
-                  onMove={() => selected && executeMove(selected, slot)}
-                />
-              ))}
+              {slotsInSection.map(slotDef => {
+                const occupant = starters.find(p => p.roster_slot === slotDef.slot);
+                if (occupant) {
+                  return (
+                    <PlayerRow
+                      key={occupant.id} p={occupant}
+                      selected={selected} swapping={swapping}
+                      liveData={liveStats.get(occupant.external_player_id ?? '') ?? undefined}
+                      onPlayerClick={handlePlayerClick}
+                      onProfileClick={p => setProfileId(p.id)}
+                      matchups={matchups}
+                    />
+                  );
+                }
+                const eligible = isEmptyStarterEligible(slotDef.slot);
+                const pickable = bench.filter(p => (slotDef.eligiblePositions as readonly string[]).includes(p.position) && !swapping.has(p.id));
+                return (
+                  <EmptySlotRow
+                    key={slotDef.slot}
+                    targetSlot={slotDef.slot}
+                    label={slotDef.singularLabel}
+                    barColor={col.bar}
+                    ringColor={col.ring}
+                    lightColor={col.light}
+                    eligible={eligible}
+                    onMove={() => selected && executeMove(selected, slotDef.slot)}
+                    pickable={pickable}
+                    pickerOpen={pickerSlot === slotDef.slot}
+                    onTogglePicker={() => setPickerSlot(prev => (prev === slotDef.slot ? null : slotDef.slot))}
+                    onPick={p => executeMove(p, slotDef.slot)}
+                  />
+                );
+              })}
             </div>
           );
         })}
@@ -877,11 +930,13 @@ export default function RosterList({ roster, teamId, matchups, season }: {
           );
         })}
 
-        {/* Empty bench slot — always shown so any starter can be sent down */}
-        <EmptyBenchSlotRow
-          eligible={isEmptyBenchEligible()}
-          onMove={() => selected && executeMove(selected, 'BENCH')}
-        />
+        {/* Empty bench slot — only shown when the bench actually has room */}
+        {bench.length < MAX_BENCH && (
+          <EmptyBenchSlotRow
+            eligible={isEmptyBenchEligible()}
+            onMove={() => selected && executeMove(selected, 'BENCH')}
+          />
+        )}
       </>
 
       {profileId != null && (

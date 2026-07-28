@@ -30,12 +30,22 @@ export interface FieldSlot {
 
 const SELECT_COLOR = '#f59e0b';
 
+// Named starter slots and which positions may occupy them — WR3 is the true
+// FLEX slot (RB/WR/TE); everyone else is fixed to their own position.
+const SLOT_ELIGIBLE_POSITIONS: Record<string, string[]> = {
+  QB1: ['QB'], RB1: ['RB'], RB2: ['RB'],
+  WR1: ['WR', 'TE'], WR2: ['WR', 'TE'], WR3: ['RB', 'WR', 'TE'],
+};
+
 function isEligibleSwap(a: FieldPlayer, b: FieldPlayer): boolean {
   if (a.id === b.id) return false;
-  const flex = ['WR', 'TE'];
-  const sameGroup = (x: string, y: string) => (flex.includes(x) && flex.includes(y)) || x === y;
-  if (!sameGroup(a.position, b.position)) return false;
-  return (a.roster_slot === 'BENCH') !== (b.roster_slot === 'BENCH');
+  const aBench = a.roster_slot === 'BENCH';
+  const bBench = b.roster_slot === 'BENCH';
+  if (aBench === bBench) return false; // one must be a starter, the other bench
+  const starter = aBench ? b : a;
+  const bench   = aBench ? a : b;
+  const eligible = SLOT_ELIGIBLE_POSITIONS[starter.roster_slot] ?? [starter.position];
+  return eligible.includes(bench.position);
 }
 
 // ---------------------------------------------------------------------------
