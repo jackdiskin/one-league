@@ -367,10 +367,10 @@ export default function Sidebar({ user, leagues, currentWeek, season, logoUri }:
     <>
       {/* ── Mobile top bar ── */}
       <div
-        className="md:hidden"
+        className="flex md:hidden"
         style={{
-          position: 'sticky', top: 0, zIndex: 35, width: '100%',
-          display: 'flex', alignItems: 'center', gap: 10,
+          position: 'sticky', top: 0, zIndex: 35,
+          alignItems: 'center', gap: 10,
           padding: '10px 14px', background: 'rgba(255,255,255,0.97)',
           backdropFilter: 'blur(8px)', borderBottom: '1px solid #e2e8f0',
         }}
