@@ -43,7 +43,6 @@ export async function POST(req: NextRequest) {
   }
 
   if (!league) return NextResponse.json({ error: 'League not found' }, { status: 404 });
-  if (league.member_count >= league.max_members) return NextResponse.json({ error: 'League is full' }, { status: 409 });
 
   // Check not already a member
   const [alreadyMember] = await query<{ id: number }>(

@@ -5,7 +5,7 @@ import { formatPrice } from '@/lib/format';
 
 interface League {
   id: number; name: string; season_year: number;
-  salary_cap: number; member_count: number; max_members: number;
+  salary_cap: number; member_count: number;
 }
 
 export default function DiscoverLeagues({ leagues }: { leagues: League[] }) {
@@ -31,10 +31,8 @@ export default function DiscoverLeagues({ leagues }: { leagues: League[] }) {
       ) : (
         <div className="space-y-2">
           {leagues.map((league) => {
-            const isFull    = league.member_count >= league.max_members;
             const hasJoined = joined.has(league.id);
             const isLoading = loading === league.id;
-            const fillPct   = Math.round((league.member_count / league.max_members) * 100);
 
             return (
               <div key={league.id}
@@ -49,24 +47,17 @@ export default function DiscoverLeagues({ leagues }: { leagues: League[] }) {
                   </div>
                   <button
                     onClick={() => handleJoin(league.id)}
-                    disabled={isFull || hasJoined || isLoading}
+                    disabled={hasJoined || isLoading}
                     className="shrink-0 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold
                                text-white hover:bg-slate-700 disabled:opacity-40
                                disabled:cursor-not-allowed transition-opacity"
                   >
-                    {isLoading ? '…' : hasJoined ? 'Joined ✓' : isFull ? 'Full' : 'Join'}
+                    {isLoading ? '…' : hasJoined ? 'Joined ✓' : 'Join'}
                   </button>
                 </div>
-                {/* Member fill bar */}
-                <div className="mt-2.5 flex items-center gap-2">
-                  <div className="flex-1 h-1.5 rounded-full bg-slate-200 overflow-hidden">
-                    <div className="h-full rounded-full bg-slate-900 transition-all"
-                      style={{ width: `${fillPct}%` }} />
-                  </div>
-                  <span className="text-[10px] text-slate-400 shrink-0">
-                    {league.member_count}/{league.max_members}
-                  </span>
-                </div>
+                <p className="mt-2.5 text-[10px] text-slate-400">
+                  {league.member_count} member{league.member_count === 1 ? '' : 's'}
+                </p>
               </div>
             );
           })}

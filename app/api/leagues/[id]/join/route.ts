@@ -43,15 +43,6 @@ export async function POST(
   if (existing) return NextResponse.json({ error: 'Already a member' }, { status: 409 });
 
   await withTransaction(async (conn) => {
-    // Re-check member count inside transaction to avoid race conditions
-    const [count] = await conn.execute<import('mysql2').RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt FROM league_members WHERE league_id = ?`,
-      [leagueId]
-    ) as [import('mysql2').RowDataPacket[], unknown];
-    if (count[0].cnt >= league.max_members) {
-      throw Object.assign(new Error('League is full'), { status: 409 });
-    }
-
     await conn.execute(
       `INSERT INTO league_members (league_id, user_id, role) VALUES (?, ?, 'member')`,
       [leagueId, userId]

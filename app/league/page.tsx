@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
 import { formatPoints, formatPrice, formatWeekLong, formatWeek, formatPlayerName } from '@/lib/format';
-import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Image from 'next/image';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import LeagueChart, { type TeamWeekScore } from './_components/LeagueChart';
@@ -516,8 +515,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
           background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)',
           borderBottom: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 24px' }}>
-            <SeasonModeSwitcher season={SEASON} currentWeek={currentWeek} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '10px 24px' }}>
             <div style={{
               width: 32, height: 32, borderRadius: '50%', background: '#0f172a', color: '#fff',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -557,8 +555,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
               <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                 {[
                   { label: 'Your Rank', value: ordinal(myStanding?.rank ?? league.rank) },
-                  { label: 'Members', value: `${league.member_count}/${league.max_members}` },
-                  { label: 'Season', value: String(league.season_year) },
+                  { label: 'Members', value: String(league.member_count) },
                 ].map(chip => (
                   <div key={chip.label} style={{
                     borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0',

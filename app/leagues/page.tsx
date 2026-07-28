@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
-import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import LeaguesClient, { type MyLeague } from './_components/LeaguesClient';
 
 const PREV_SEASON = 2025;
@@ -93,12 +92,6 @@ export default async function LeaguesPage({
       />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between px-6 py-3">
-            <SeasonModeSwitcher season={SEASON_YEAR} currentWeek={currentWeek} />
-          </div>
-        </header>
-
         <main style={{ flex: 1, padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 760 }}>
           <div style={{ paddingLeft: 4 }}>
             <h1 style={{

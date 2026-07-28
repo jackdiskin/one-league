@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-type PublicLeague = { id: number; name: string; member_count: number; max_members: number };
+type PublicLeague = { id: number; name: string; member_count: number };
 
 // ── Shared animation styles ────────────────────────────────────────────────────
 const STYLES = `
@@ -458,19 +458,17 @@ function JoinPanel({ onClose, router }: { onClose: () => void; router: ReturnTyp
             </div>
           )}
           {publicLeagues.map(league => {
-            const full   = league.member_count >= league.max_members;
-            const pct    = Math.round((league.member_count / league.max_members) * 100);
             const active = selectedId === league.id;
             return (
               <div
                 key={league.id}
                 className="league-row"
-                onClick={() => !full && setSelectedId(active ? null : league.id)}
+                onClick={() => setSelectedId(active ? null : league.id)}
                 style={{
-                  padding: '10px 13px', borderRadius: 11, cursor: full ? 'default' : 'pointer',
+                  padding: '10px 13px', borderRadius: 11, cursor: 'pointer',
                   border: `1.5px solid ${active ? '#10b981' : '#e2e8f0'}`,
                   background: active ? '#f0fdf4' : '#fff',
-                  opacity: full ? 0.5 : 1, transition: 'all 0.15s',
+                  transition: 'all 0.15s',
                   display: 'flex', alignItems: 'center', gap: 10,
                 }}
               >
@@ -489,16 +487,10 @@ function JoinPanel({ onClose, router }: { onClose: () => void; router: ReturnTyp
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {league.name}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                    <div style={{ flex: 1, height: 3, borderRadius: 99, background: '#e2e8f0', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${pct}%`, background: active ? '#10b981' : '#94a3b8', borderRadius: 99, transition: 'width 0.3s, background 0.15s' }} />
-                    </div>
-                    <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', flexShrink: 0 }}>
-                      {league.member_count}/{league.max_members}
-                    </span>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', marginTop: 4 }}>
+                    {league.member_count} member{league.member_count === 1 ? '' : 's'}
                   </div>
                 </div>
-                {full && <span style={{ fontSize: 9, fontWeight: 800, color: '#f43f5e', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 20, padding: '2px 7px' }}>FULL</span>}
               </div>
             );
           })}
