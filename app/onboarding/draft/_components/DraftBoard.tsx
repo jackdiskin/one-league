@@ -219,16 +219,16 @@ const STADIUM_LIGHT_X = [12, 34, 66, 88];
 // scrimmage), the 3 RBs a few yards behind that, and the 2 QBs deepest of all
 // ten (furthest from their goal).
 const FORMATION_SLOTS = [
-  { id: 'FLEX1',  posGroup: 'FLEX', label: 'WR/TE', x: 10,  y: 21 },
-  { id: 'FLEX2',  posGroup: 'FLEX', label: 'WR/TE', x: 30, y: 21 },
-  { id: 'FLEX3',  posGroup: 'FLEX', label: 'WR/TE', x: 50, y: 21 },
-  { id: 'FLEX4',  posGroup: 'FLEX', label: 'WR/TE', x: 70, y: 21 },
-  { id: 'FLEX5',  posGroup: 'FLEX', label: 'WR/TE', x: 90, y: 21 },
-  { id: 'RB1',    posGroup: 'RB',   label: 'RB',    x: 24, y: 48 },
+  { id: 'FLEX1',  posGroup: 'FLEX', label: 'WR/TE', x: 8,  y: 18 },
+  { id: 'FLEX2',  posGroup: 'FLEX', label: 'WR/TE', x: 29, y: 18 },
+  { id: 'FLEX3',  posGroup: 'FLEX', label: 'WR/TE', x: 50, y: 18 },
+  { id: 'FLEX4',  posGroup: 'FLEX', label: 'WR/TE', x: 71, y: 18 },
+  { id: 'FLEX5',  posGroup: 'FLEX', label: 'WR/TE', x: 92, y: 18 },
+  { id: 'RB1',    posGroup: 'RB',   label: 'RB',    x: 25, y: 48 },
   { id: 'RB2',    posGroup: 'RB',   label: 'RB',    x: 50, y: 48 },
-  { id: 'RB3',    posGroup: 'RB',   label: 'RB',    x: 76, y: 48 },
-  { id: 'QB1',    posGroup: 'QB',   label: 'QB',    x: 38, y: 75 },
-  { id: 'QB2',    posGroup: 'QB',   label: 'QB',    x: 62, y: 75 },
+  { id: 'RB3',    posGroup: 'RB',   label: 'RB',    x: 75, y: 48 },
+  { id: 'QB1',    posGroup: 'QB',   label: 'QB',    x: 35, y: 80 },
+  { id: 'QB2',    posGroup: 'QB',   label: 'QB',    x: 65, y: 80 },
 ] as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -281,13 +281,13 @@ function PlayerAvatar({ player, size = 48 }: { player: DraftPlayer; size?: numbe
 // ─── Field slot: filled ────────────────────────────────────────────────────────
 // Big clickable rectangle cards, FPL-pick-team style, instead of circular
 // avatars — used for every one of the 10 on-field slots (no separate bench).
-const CARD_W = 92;
-const CARD_H = 118;
+const CARD_W = 112;
+const CARD_H = 144;
 
 // Filled cards render slightly bigger than the empty placeholder they
 // replace, so a drafted player visually "pops" against the open slots.
-const FILLED_W = CARD_W + 6;
-const FILLED_H = CARD_H + 5;
+const FILLED_W = CARD_W + 7;
+const FILLED_H = CARD_H + 6;
 
 function FilledSlot({ player, onRemove }: { player: DraftPlayer; onRemove: () => void }) {
   const displayName = formatPlayerName(player.full_name);
@@ -326,31 +326,31 @@ function FilledSlot({ player, onRemove }: { player: DraftPlayer; onRemove: () =>
       {player.headshot_url ? (
         <Image
           src={player.headshot_url} alt={player.full_name}
-          width={40} height={40} unoptimized
-          style={{ width: 40, height: 40, objectFit: 'contain', display: 'block' }}
+          width={68} height={68} unoptimized
+          style={{ width: 68, height: 68, objectFit: 'contain', display: 'block' }}
         />
       ) : (
         <div style={{
-          width: 40, height: 40, borderRadius: '50%', background: col.bar,
+          width: 68, height: 68, borderRadius: '50%', background: col.bar,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 15, fontWeight: 800, color: '#fff',
+          fontSize: 24, fontWeight: 800, color: '#fff',
         }}>
           {player.full_name[0]}
         </div>
       )}
       <div style={{ textAlign: 'center' }}>
         <div style={{
-          fontSize: 12, fontWeight: 800, color: '#fff',
+          fontSize: 14, fontWeight: 800, color: '#fff',
           maxWidth: FILLED_W - 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {displayName}
         </div>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', fontWeight: 600, marginTop: 1 }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: 600, marginTop: 1 }}>
           {player.team_code} · {formatPrice(Number(player.current_price))}
         </div>
       </div>
       <span style={{
-        fontSize: 9, fontWeight: 800, color: col.bar, background: '#fff',
+        fontSize: 12, fontWeight: 800, color: col.bar, background: '#fff',
         borderRadius: 20, padding: '1px 7px', letterSpacing: '0.04em',
       }}>
         {player.position}
@@ -362,17 +362,39 @@ function FilledSlot({ player, onRemove }: { player: DraftPlayer; onRemove: () =>
 // ─── Field slot: empty ─────────────────────────────────────────────────────────
 function EmptySlot({ label, group, onClick }: { label: string; group: string; onClick?: () => void }) {
   const col = slotColor(group);
+  const baseBg     = `linear-gradient(160deg, ${col.bar}4d, ${col.bar}26)`;
+  const hoverBg    = `linear-gradient(160deg, ${col.bar}b0, ${col.bar}75)`;
+  const baseBorder  = `1px solid ${col.bar}70`;
+  const hoverBorder = `1.5px solid ${col.bar}`;
+  const baseShadow  = '0 4px 14px rgba(0,0,0,0.22)';
+  const hoverShadow = `0 6px 22px ${col.bar}88`;
   return (
     <div
       onClick={onClick}
       title={onClick ? `Show available ${label} players` : undefined}
       style={{
         width: CARD_W, height: CARD_H, borderRadius: 10,
-        background: `linear-gradient(160deg, ${col.bar}4d, ${col.bar}26)`,
-        border: `1px solid ${col.bar}70`,
-        boxShadow: '0 4px 14px rgba(0,0,0,0.22)',
+        background: baseBg,
+        border: baseBorder,
+        boxShadow: baseShadow,
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
         cursor: onClick ? 'pointer' : 'default',
+        transition: 'background 0.15s, border 0.15s, box-shadow 0.15s, transform 0.15s',
+      }}
+      onMouseEnter={e => {
+        if (!onClick) return;
+        const el = e.currentTarget as HTMLElement;
+        el.style.background = hoverBg;
+        el.style.border = hoverBorder;
+        el.style.boxShadow = hoverShadow;
+        el.style.transform = 'scale(1.045)';
+      }}
+      onMouseLeave={e => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.background = baseBg;
+        el.style.border = baseBorder;
+        el.style.boxShadow = baseShadow;
+        el.style.transform = 'scale(1)';
       }}
     >
       <div style={{ position: 'relative', width: 34, height: 34 }}>
