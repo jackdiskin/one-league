@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { formatPoints, formatWeekLong } from '@/lib/format';
+import { formatPoints, formatWeekLong, formatPlayerName } from '@/lib/format';
 import ClickablePlayerRow from '@/components/ClickablePlayerRow';
 import TeamLogo from '@/components/TeamLogo';
 import MatchupBadge from '@/components/MatchupBadge';
@@ -116,7 +116,7 @@ export default function WeeklyPerformance({ players, week, season, matchups }: {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {p.full_name}
+                      {formatPlayerName(p.full_name)}
                     </span>
                     <TeamLogo code={p.team_code} size={11} />
                     <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>

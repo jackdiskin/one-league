@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useLiveStats } from '@/hooks/useLiveStats';
+import { formatPlayerName } from '@/lib/format';
 import type { RosterPlayer } from '@/app/team/_components/RosterList';
 
 interface Props {
@@ -114,7 +115,7 @@ export default function LiveWeekScore({ roster, currentWeek }: Props) {
                 fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.85)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
-                {p.full_name.split(' ').pop()}
+                {formatPlayerName(p.full_name)}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
                 <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b' }}>{p.position}</span>

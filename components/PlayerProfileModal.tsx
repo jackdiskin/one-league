@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { formatPrice, formatPoints, formatWeek, parseNaiveDateTime } from '@/lib/format';
+import { formatPrice, formatPoints, formatWeek, parseNaiveDateTime, formatPlayerName } from '@/lib/format';
 import TeamLogo from './TeamLogo';
 import type { Matchup } from '@/lib/schedule';
 
@@ -128,7 +128,7 @@ export default function PlayerProfileModal({
                 )}
 
                 <h2 style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', marginTop: 12 }}>
-                  {profile.full_name}
+                  {formatPlayerName(profile.full_name)}
                 </h2>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>

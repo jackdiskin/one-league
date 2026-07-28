@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useState, useTransition, useMemo, useCallback, memo, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { formatPrice, formatPoints } from '@/lib/format';
+import { formatPoints, formatPlayerName } from '@/lib/format';
 import { useLiveStats, getLivePoints, type LiveStatDelta } from '@/hooks/useLiveStats';
 import TeamLogo from '@/components/TeamLogo';
 import PlayerProfileModal from '@/components/PlayerProfileModal';
@@ -21,7 +21,9 @@ export interface RosterPlayer {
   acquired_week: number;
   roster_slot: string;
   last_week_points: number | null;
+  projected_points: number | null;
   season_points: number | null;
+  position_rank: number | null;
   external_player_id: string | null;
 }
 
@@ -185,7 +187,7 @@ const POS_LABELS: Record<string, string> = {
 const STARTER_SLOT_GROUPS = [
   { key: 'QB',   positions: ['QB'],       maxStarters: 1, slotPrefix: 'QB', label: 'Quarterbacks', singularLabel: 'QB Starter'  },
   { key: 'RB',   positions: ['RB'],       maxStarters: 2, slotPrefix: 'RB', label: 'Running Backs', singularLabel: 'RB Starter' },
-  { key: 'FLEX', positions: ['WR', 'TE'], maxStarters: 4, slotPrefix: 'WR', label: 'Receivers',     singularLabel: 'WR/TE Starter' },
+  { key: 'FLEX', positions: ['WR', 'TE'], maxStarters: 3, slotPrefix: 'WR', label: 'Receivers',     singularLabel: 'WR/TE Starter' },
   { key: 'K',    positions: ['K'],        maxStarters: 1, slotPrefix: 'K',  label: 'Kicker',        singularLabel: 'K Starter'   },
 ] as const;
 
@@ -245,14 +247,16 @@ const PlayerRow = memo(function PlayerRow({
   // (wrong position group) so it's obvious at a glance who can be subbed in.
   const dimmed     = selected != null && !isSelected && !eligible;
 
-  const currentPrice  = Number(p.current_price);
-  const purchasePrice = Number(p.purchase_price);
-  const pnl           = currentPrice - purchasePrice;
-  const isGain        = pnl >= 0;
-
   return (
     <div
-      onClick={() => { if (!isSwapping) onProfileClick(p); }}
+      onClick={() => {
+        if (isSwapping) return;
+        // While a swap is pending, clicking any row (selected, eligible, or
+        // not) completes/cancels/reselects via the same logic as the Move
+        // button — clicking a profile mid-swap would be a dead end.
+        if (selected) { onPlayerClick(p); return; }
+        onProfileClick(p);
+      }}
       style={{
         display: 'flex', alignItems: 'center',
         padding: '9px 20px',
@@ -297,7 +301,7 @@ const PlayerRow = memo(function PlayerRow({
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {p.full_name}
+            {formatPlayerName(p.full_name)}
           </span>
           <TeamLogo code={p.team_code} size={12} />
           <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
@@ -326,17 +330,6 @@ const PlayerRow = memo(function PlayerRow({
 
       {/* Data columns */}
       <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-        <div style={{ width: 72, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
-          {formatPrice(currentPrice)}
-        </div>
-        <div style={{ width: 72, textAlign: 'right', fontSize: 12, color: '#64748b' }}>
-          {formatPrice(purchasePrice)}
-        </div>
-        <div style={{ width: 60, textAlign: 'right' }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: isGain ? '#059669' : '#e11d48' }}>
-            {isGain ? '+' : ''}{formatPrice(pnl)}
-          </span>
-        </div>
         <div style={{ width: 68, textAlign: 'right' }}>
           {isLive && livePoints != null ? (
             <span style={{ fontSize: 13, fontWeight: 800, color: '#059669' }}>{formatPoints(livePoints)}</span>
@@ -345,6 +338,12 @@ const PlayerRow = memo(function PlayerRow({
           ) : (
             <span style={{ fontSize: 12, color: '#e2e8f0' }}>—</span>
           )}
+        </div>
+        <div style={{ width: 56, textAlign: 'right', fontSize: 12, color: '#64748b' }}>
+          {p.projected_points != null ? formatPoints(p.projected_points) : '—'}
+        </div>
+        <div style={{ width: 56, textAlign: 'right', fontSize: 12, fontWeight: 700, color: '#64748b' }}>
+          {p.position_rank != null ? `#${p.position_rank}` : '—'}
         </div>
         <div style={{ width: 72, textAlign: 'right', fontSize: 12, color: '#64748b' }}>
           {p.season_points != null ? formatPoints(p.season_points) : '—'}
@@ -389,10 +388,11 @@ const PlayerRow = memo(function PlayerRow({
   );
 });
 
-export default function RosterList({ roster, teamId, matchups }: {
+export default function RosterList({ roster, teamId, matchups, season }: {
   roster: RosterPlayer[];
   teamId: number;
   matchups: Record<string, Matchup>;
+  season: number;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -690,10 +690,9 @@ export default function RosterList({ roster, teamId, matchups }: {
         </div>
         {/* Column labels — widths mirror PlayerRow data columns exactly. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 0, fontSize: 9, fontWeight: 700, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          <span style={{ width: 72, textAlign: 'right' }}>Price</span>
-          <span style={{ width: 72, textAlign: 'right' }}>Bought at</span>
-          <span style={{ width: 60, textAlign: 'right' }}>P&amp;L</span>
           <span style={{ width: 68, textAlign: 'right' }}>Live / Wk</span>
+          <span style={{ width: 56, textAlign: 'right' }}>Proj</span>
+          <span style={{ width: 56, textAlign: 'right' }}>Pos Rk</span>
           <span style={{ width: 72, textAlign: 'right' }}>Season</span>
           <span style={{ width: 64, flexShrink: 0 }} />
         </div>
@@ -713,7 +712,7 @@ export default function RosterList({ roster, teamId, matchups }: {
               background: POS_COLORS[selected.position]?.ring ?? '#94a3b8',
             }} />
             <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>
-              {selected.roster_slot === 'BENCH' ? 'Starting' : 'Moving'} {selected.full_name}
+              {selected.roster_slot === 'BENCH' ? 'Starting' : 'Moving'} {formatPlayerName(selected.full_name)}
             </span>
             <span style={{ fontSize: 11, color: '#64748b' }}>
               {selected.roster_slot === 'BENCH'
@@ -888,7 +887,7 @@ export default function RosterList({ roster, teamId, matchups }: {
       </>
 
       {profileId != null && (
-        <PlayerProfileModal playerId={profileId} onClose={() => setProfileId(null)} />
+        <PlayerProfileModal playerId={profileId} season={season} onClose={() => setProfileId(null)} />
       )}
     </div>
   );

@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/mysql';
 
 // Valid named starter slots — bench players always use 'BENCH'
-const VALID_STARTER_SLOTS = new Set(['QB1', 'RB1', 'RB2', 'WR1', 'WR2', 'WR3', 'WR4', 'K1']);
+const VALID_STARTER_SLOTS = new Set(['QB1', 'RB1', 'RB2', 'WR1', 'WR2', 'WR3', 'K1']);
 
 // POST /api/roster/move
 // Moves a single player to a new slot (starter → BENCH, or BENCH → starter slot)

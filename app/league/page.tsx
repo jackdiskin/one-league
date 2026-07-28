@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
-import { formatPoints, formatPrice, formatWeekLong, formatWeek } from '@/lib/format';
+import { formatPoints, formatPrice, formatWeekLong, formatWeek, formatPlayerName } from '@/lib/format';
 import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Image from 'next/image';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
@@ -13,7 +13,6 @@ import WeeklyRecapWrapper from './_components/WeeklyRecapWrapper';
 import { computeWeeklyBadges } from '@/lib/weeklyRecapBadges';
 import ClickablePlayerRow from '@/components/ClickablePlayerRow';
 import TeamLogo from '@/components/TeamLogo';
-import MatchupBadge from '@/components/MatchupBadge';
 import { getNextMatchupByTeam } from '@/lib/schedule';
 
 const SCHEDULE_SEASON = 2026;
@@ -812,7 +811,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
                     <div style={{ fontSize: 12, color: '#475569', marginTop: 2, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 5 }}>
                       <span>
                         {isBuy ? 'Added ' : 'Sold '}
-                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{tx.full_name}</span>
+                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{formatPlayerName(tx.full_name)}</span>
                       </span>
                       <span style={{
                         fontSize: 9, fontWeight: 700, color: '#64748b',
@@ -822,9 +821,6 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
                       </span>
                       <TeamLogo code={tx.team_code} size={10} />
                       <span style={{ fontSize: 10, color: '#94a3b8' }}>{tx.team_code}</span>
-                    </div>
-                    <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <MatchupBadge matchup={matchups[tx.team_code]} />
                     </div>
                     <div style={{ display: 'flex', gap: 12, marginTop: 3, fontSize: 10, color: '#94a3b8' }}>
                       <span>{formatPrice(tx.price)}</span>

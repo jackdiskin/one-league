@@ -5,36 +5,51 @@ import { getNextMatchupByTeam } from '@/lib/schedule';
 
 const SCHEDULE_SEASON = 2026;
 
-interface Props { userId: string; seasonYear: number; hidePrices?: boolean }
+interface Props { userId: string; seasonYear: number; hidePrices?: boolean; interactive?: boolean }
 
 type Player = FieldPlayer;
 
-// Compute (x%, y%) for each slot — always 8 fixed slots; player is null for empty slots
+// Compute (x%, y%) for each slot — a real NFL pre-snap shotgun look: the
+// O-line marks the line of scrimmage near the top, and every skill player
+// lines up even with it or behind it (nobody lines up ahead of the ball).
+// The flex trio adapts to who's actually starting (like FPL): 2 WR always
+// out wide, right on the line; the 3rd spot is either a TE lined up tight
+// on the line next to the tackle, or a 3rd WR off the line in the slot.
+// Recomputed fresh from the current starters, so subbing auto-updates it.
 function getPositions(wrs: Player[], tes: Player[], qbs: Player[], rbs: Player[], ks: Player[]) {
   const out: FieldSlot[] = [];
 
-  // ── Receiver line (y = 26%) — always 4 evenly-spaced slots ──────────────
-  const flex = [...wrs, ...tes];
-  const flexX = [10, 35, 62, 87];
-  for (let i = 0; i < 4; i++) {
-    out.push({ player: flex[i] ?? null, pos: flex[i]?.position ?? 'WR', x: flexX[i], y: 26 });
-  }
+  const LOS = 16; // O-line / line-of-scrimmage depth — see the bar in LiveTeamField
 
-  // ── QB in shotgun (y = 47%) — always 1 slot ──────────────────────────────
-  out.push({ player: qbs[0] ?? null, pos: 'QB', x: 50, y: 47 });
+  // ── Flex trio: prefer WRs for the two outside slots, whatever's left
+  //    (a TE, or a 3rd WR) takes the slot/tight position ──────────────────
+  const flexPool = [...wrs, ...tes];
+  const left  = flexPool[0] ?? null;
+  const right = flexPool[1] ?? null;
+  const slot  = flexPool[2] ?? null;
+  const slotIsTE = slot?.position === 'TE';
 
-  // ── RBs flanking QB (y = 62%) — always 2 slots ────────────────────────────
-  out.push({ player: rbs[0] ?? null, pos: 'RB', x: 34, y: 62 });
-  out.push({ player: rbs[1] ?? null, pos: 'RB', x: 66, y: 62 });
+  out.push({ player: left,  pos: left?.position  ?? 'WR',    x: 6,  y: LOS });
+  out.push({ player: right, pos: right?.position ?? 'WR',    x: 94, y: LOS });
+  // TE lines up on the line too, tight next to the tackle; a 3rd WR lines
+  // up just off the line in the slot (has to be off the line to be eligible).
+  out.push({ player: slot,  pos: slot?.position  ?? 'WR/TE', x: slotIsTE ? 74 : 50, y: slotIsTE ? LOS : LOS + 7 });
 
-  // ── Kicker (y = 80%) — always 1 slot ─────────────────────────────────────
-  out.push({ player: ks[0] ?? null, pos: 'K', x: 50, y: 80 });
+  // ── QB in shotgun, well behind the line ───────────────────────────────
+  out.push({ player: qbs[0] ?? null, pos: 'QB', x: 50, y: LOS + 24 });
+
+  // ── RBs split, flanking the QB ────────────────────────────────────────
+  out.push({ player: rbs[0] ?? null, pos: 'RB', x: 32, y: LOS + 32 });
+  out.push({ player: rbs[1] ?? null, pos: 'RB', x: 68, y: LOS + 32 });
+
+  // ── Kicker tucked in the corner (y = 90%) — always 1 slot ────────────────
+  out.push({ player: ks[0] ?? null, pos: 'K', x: 88, y: 90 });
 
   return out;
 }
 
 
-export default async function MyTeamSummary({ userId, seasonYear, hidePrices = false }: Props) {
+export default async function MyTeamSummary({ userId, seasonYear, hidePrices = false, interactive = false }: Props) {
   const [team] = await query<{
     id: number; team_name: string; total_points: number; budget_remaining: number;
     league_name: string; rank: number; league_size: number;
@@ -77,18 +92,22 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
     );
   }
 
-  const [starters, matchups] = await Promise.all([
+  const [roster, matchups] = await Promise.all([
     query<Player>(
-      `SELECT p.full_name, p.position, p.team_code, pms.current_price, p.headshot_url, p.external_player_id
+      `SELECT p.id, p.full_name, p.position, p.team_code, pms.current_price, p.headshot_url,
+              p.external_player_id, ftr.roster_slot
        FROM fantasy_team_roster ftr
        JOIN players p ON p.id = ftr.player_id
        JOIN player_market_state pms ON pms.player_id = ftr.player_id AND pms.season_year = ?
-       WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE AND ftr.roster_slot != 'BENCH'
+       WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE
        ORDER BY FIELD(p.position,'WR','TE','QB','RB','K'), pms.current_price DESC`,
       [seasonYear, team.id]
     ),
     getNextMatchupByTeam(SCHEDULE_SEASON),
   ]);
+
+  const starters = roster.filter(p => p.roster_slot !== 'BENCH');
+  const bench    = roster.filter(p => p.roster_slot === 'BENCH');
 
   const qbs = starters.filter(p => p.position === 'QB');
   const rbs = starters.filter(p => p.position === 'RB');
@@ -99,9 +118,6 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
 
   const rankLabel = team.rank === 1 ? '1st' : team.rank === 2 ? '2nd' : team.rank === 3 ? '3rd' : `${team.rank}th`;
   const rankMedal = team.rank === 1 ? '🥇' : team.rank === 2 ? '🥈' : team.rank === 3 ? '🥉' : null;
-
-  // Line of scrimmage sits just above the WR row (y=26% → ~14% on field)
-  const losY = 13;
 
   return (
     <div className="rounded-2xl overflow-hidden ring-1 ring-slate-200 shadow-sm">
@@ -140,7 +156,10 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
       </div>
 
       {/* ── Field ── */}
-      <LiveTeamField positions={positions} losY={losY} hidePrices={hidePrices} matchups={matchups} />
+      <LiveTeamField
+        positions={positions} hidePrices={hidePrices} matchups={matchups}
+        bench={bench} teamId={team.id} interactive={interactive} season={seasonYear}
+      />
     </div>
   );
 }

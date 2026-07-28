@@ -1,9 +1,8 @@
 import Image from 'next/image';
 import { query } from '@/lib/mysql';
-import { formatPrice, formatPct, formatWeek } from '@/lib/format';
+import { formatPrice, formatPct, formatWeek, formatPlayerName } from '@/lib/format';
 import ClickablePlayerRow from '@/components/ClickablePlayerRow';
 import TeamLogo from '@/components/TeamLogo';
-import MatchupBadge from '@/components/MatchupBadge';
 import { getNextMatchupByTeam } from '@/lib/schedule';
 
 const SCHEDULE_SEASON = 2026;
@@ -62,7 +61,7 @@ function MoverRow({ mover, up, season, matchups }: {
   mover: Mover & { sparkPrices: number[] }; up: boolean; season: number;
   matchups: Record<string, import('@/lib/schedule').Matchup>;
 }) {
-  const lastName = mover.full_name.split(' ').slice(1).join(' ') || mover.full_name;
+  const displayName = formatPlayerName(mover.full_name);
   return (
     <ClickablePlayerRow
       playerId={mover.player_id}
@@ -83,15 +82,12 @@ function MoverRow({ mover, up, season, matchups }: {
         )}
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <p className="text-sm font-semibold text-slate-900 truncate group-hover:text-emerald-700 transition-colors">{lastName}</p>
+            <p className="text-sm font-semibold text-slate-900 truncate group-hover:text-emerald-700 transition-colors">{displayName}</p>
             <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold shrink-0 bg-slate-100 text-slate-600">
               {mover.position}
             </span>
             <TeamLogo code={mover.team_code} size={12} />
             <span className="text-xs text-slate-500 shrink-0">{mover.team_code}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <MatchupBadge matchup={matchups[mover.team_code]} />
           </div>
         </div>
       </div>

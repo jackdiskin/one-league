@@ -3,10 +3,9 @@
 import Image from 'next/image';
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { formatPrice } from '@/lib/format';
+import { formatPrice, formatPlayerName } from '@/lib/format';
 import TeamLogo from '@/components/TeamLogo';
 import PlayerProfileModal from '@/components/PlayerProfileModal';
-import MatchupBadge from '@/components/MatchupBadge';
 import type { Matchup } from '@/lib/schedule';
 
 export interface DraftPlayer {
@@ -107,7 +106,7 @@ function PlayerAvatar({ player, size = 48 }: { player: DraftPlayer; size?: numbe
 
 // ─── Field slot: filled ────────────────────────────────────────────────────────
 function FilledSlot({ player, onRemove }: { player: DraftPlayer; onRemove: () => void }) {
-  const lastName = player.full_name.split(' ').slice(1).join(' ') || player.full_name;
+  const displayName = formatPlayerName(player.full_name);
 
   return (
     <div
@@ -168,7 +167,7 @@ function FilledSlot({ player, onRemove }: { player: DraftPlayer; onRemove: () =>
         boxShadow: '0 2px 10px rgba(0,0,0,0.3)', minWidth: 52, maxWidth: 80,
       }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {lastName}
+          {displayName}
         </div>
         <div style={{ fontSize: 9, color: '#64748b', fontWeight: 600 }}>{player.team_code}</div>
       </div>
@@ -929,14 +928,11 @@ export default function DraftBoard({
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {player.full_name}
+                      {formatPlayerName(player.full_name)}
                     </span>
                     <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 5px' }}>{player.position}</span>
                     <TeamLogo code={player.team_code} size={11} />
                     <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{player.team_code}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
-                    <MatchupBadge matchup={matchups[player.team_code]} />
                   </div>
                 </div>
 

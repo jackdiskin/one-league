@@ -1,19 +1,23 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, useTransition, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { useLiveStats, type LivePlayerStats } from '@/hooks/useLiveStats';
-import { formatPrice, formatPoints } from '@/lib/format';
+import { formatPrice, formatPoints, formatPlayerName } from '@/lib/format';
 import TeamLogo from '@/components/TeamLogo';
+import PlayerProfileModal from '@/components/PlayerProfileModal';
 import type { Matchup } from '@/lib/schedule';
 
 export interface FieldPlayer {
+  id: number;
   full_name: string;
   position: string;
   team_code: string;
   current_price: number;
   headshot_url: string | null;
   external_player_id: string | null;
+  roster_slot: string;
 }
 
 export interface FieldSlot {
@@ -23,9 +27,71 @@ export interface FieldSlot {
   y: number;
 }
 
-const POS_COLOR: Record<string, string> = {
-  QB: '#3b82f6', RB: '#10b981', WR: '#f59e0b', TE: '#a855f7', K: '#cbd5e1',
-};
+const SELECT_COLOR = '#f59e0b';
+
+function isEligibleSwap(a: FieldPlayer, b: FieldPlayer): boolean {
+  if (a.id === b.id) return false;
+  const flex = ['WR', 'TE'];
+  const sameGroup = (x: string, y: string) => (flex.includes(x) && flex.includes(y)) || x === y;
+  if (!sameGroup(a.position, b.position)) return false;
+  return (a.roster_slot === 'BENCH') !== (b.roster_slot === 'BENCH');
+}
+
+// ---------------------------------------------------------------------------
+// Position badge — neutral gray pill, sits inline next to the team code
+// (matches the PosBadge style used everywhere else in the app — never
+// color-coded by position)
+// ---------------------------------------------------------------------------
+function PositionBadge({ position }: { position: string }) {
+  return (
+    <span style={{
+      fontSize: 8.5, fontWeight: 700, color: '#64748b', background: '#f1f5f9',
+      borderRadius: 20, padding: '1px 5px', flexShrink: 0, lineHeight: 1.4,
+    }}>
+      {position}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Action menu — "Sub" / "View Profile", opened by clicking a card
+// ---------------------------------------------------------------------------
+// Pure visual menu box — the caller positions it (fixed, viewport-relative)
+// so it's never clipped by a scrolling/overflow-hidden ancestor.
+function ActionMenu({ onSub, onProfile }: { onSub: () => void; onProfile: () => void }) {
+  const rowStyle: CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 8,
+    width: '100%', padding: '9px 14px',
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontSize: 12, fontWeight: 700, color: '#0f172a', textAlign: 'left',
+    whiteSpace: 'nowrap',
+  };
+  return (
+    <div
+      onClick={e => e.stopPropagation()}
+      style={{
+        background: '#fff', borderRadius: 10, overflow: 'hidden',
+        boxShadow: '0 10px 28px rgba(0,0,0,0.3)', border: '1px solid #e2e8f0',
+        minWidth: 136,
+      }}
+    >
+      <button onClick={onSub} style={rowStyle} onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')} onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={SELECT_COLOR} strokeWidth="2.5" strokeLinecap="round">
+          <polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
+          <polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" />
+        </svg>
+        Sub
+      </button>
+      <div style={{ height: 1, background: '#f1f5f9' }} />
+      <button onClick={onProfile} style={rowStyle} onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')} onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round">
+          <circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.5-7 8-7s8 3 8 7" />
+        </svg>
+        View Profile
+      </button>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Live stats modal
@@ -152,7 +218,7 @@ function LiveStatsModal({
               fontSize: 17, fontWeight: 900, color: '#fff',
               letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
-              {player.full_name}
+              {formatPlayerName(player.full_name)}
             </div>
           </div>
 
@@ -236,28 +302,40 @@ function LiveStatsModal({
 }
 
 // ---------------------------------------------------------------------------
-// PlayerCard
+// PlayerCard (on the pitch)
 // ---------------------------------------------------------------------------
 function PlayerCard({
-  player, x, y, livePoints, onClick, hidePrices = false, matchup,
+  player, x, y, livePoints, hidePrices = false, matchup,
+  interactive = false, selected = false, eligible = false, dimmed = false, isSwapping = false,
+  onCardClick, onShowStats,
 }: {
   player: FieldPlayer; x: number; y: number; livePoints: number | null;
-  onClick?: () => void;
   hidePrices?: boolean;
   matchup?: Matchup;
+  interactive?: boolean;
+  selected?: boolean;
+  eligible?: boolean;
+  dimmed?: boolean;
+  isSwapping?: boolean;
+  onCardClick?: (e: ReactMouseEvent<HTMLDivElement>) => void;
+  onShowStats?: () => void;
 }) {
-  const lastName = player.full_name.split(' ').slice(1).join(' ') || player.full_name;
+  const displayName = formatPlayerName(player.full_name);
   const isLive = livePoints !== null;
+  const clickable = interactive || isLive;
 
   return (
     <div
-      onClick={isLive ? onClick : undefined}
+      onClick={clickable ? (interactive ? onCardClick : onShowStats) : undefined}
       style={{
         position: 'absolute',
         left: `${x}%`, top: `${y}%`,
         transform: 'translate(-50%, -50%)',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: 5, cursor: isLive ? 'pointer' : 'default', zIndex: 10,
+        gap: 5, cursor: clickable ? 'pointer' : 'default', zIndex: selected ? 12 : 10,
+        opacity: isSwapping ? 0.5 : dimmed ? 0.35 : 1,
+        filter: dimmed ? 'grayscale(1)' : 'none',
+        transition: 'opacity 0.15s, filter 0.15s',
       }}
     >
       {/* Price chip */}
@@ -281,20 +359,24 @@ function PlayerCard({
             width={72} height={72} unoptimized
             style={{
               width: 72, height: 72, objectFit: 'cover', display: 'block',
-              border: isLive ? '3px solid #10b981' : '3px solid #fff',
+              border: selected ? `3px solid ${SELECT_COLOR}` : isLive ? '3px solid #10b981' : '3px solid #fff',
               borderRadius: '50%',
-              boxShadow: isLive
-                ? '0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(16,185,129,0.45)'
-                : '0 4px 18px rgba(0,0,0,0.45)',
+              boxShadow: selected
+                ? `0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(245,158,11,0.5)`
+                : isLive
+                  ? '0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(16,185,129,0.45)'
+                  : '0 4px 18px rgba(0,0,0,0.45)',
             }}
           />
         ) : (
           <div style={{
             width: 72, height: 72, borderRadius: '50%', background: '#334155',
-            border: isLive ? '3px solid #10b981' : '3px solid #fff',
-            boxShadow: isLive
-              ? '0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(16,185,129,0.45)'
-              : '0 4px 18px rgba(0,0,0,0.45)',
+            border: selected ? `3px solid ${SELECT_COLOR}` : isLive ? '3px solid #10b981' : '3px solid #fff',
+            boxShadow: selected
+              ? '0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(245,158,11,0.5)'
+              : isLive
+                ? '0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(16,185,129,0.45)'
+                : '0 4px 18px rgba(0,0,0,0.45)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 24, fontWeight: 700, color: '#fff',
           }}>
@@ -302,17 +384,29 @@ function PlayerCard({
           </div>
         )}
 
+        {/* Eligible-target ring */}
+        {eligible && (
+          <div style={{
+            position: 'absolute', inset: -4, borderRadius: '50%',
+            border: `2.5px dashed ${SELECT_COLOR}`, pointerEvents: 'none',
+          }} />
+        )}
+
         {/* Live points overlay */}
         {isLive && (
-          <div style={{
-            position: 'absolute', bottom: 4, left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(3,32,18,0.85)', backdropFilter: 'blur(6px)',
-            color: '#34d399', fontSize: 10, fontWeight: 900,
-            padding: '2px 7px', borderRadius: 20, whiteSpace: 'nowrap',
-            border: '1px solid rgba(52,211,153,0.45)',
-            boxShadow: '0 1px 6px rgba(0,0,0,0.5)',
-            letterSpacing: '-0.01em', zIndex: 2,
-          }}>
+          <div
+            onClick={e => { if (interactive) { e.stopPropagation(); onShowStats?.(); } }}
+            style={{
+              position: 'absolute', bottom: 4, left: '50%', transform: 'translateX(-50%)',
+              background: 'rgba(3,32,18,0.85)', backdropFilter: 'blur(6px)',
+              color: '#34d399', fontSize: 10, fontWeight: 900,
+              padding: '2px 7px', borderRadius: 20, whiteSpace: 'nowrap',
+              border: '1px solid rgba(52,211,153,0.45)',
+              boxShadow: '0 1px 6px rgba(0,0,0,0.5)',
+              letterSpacing: '-0.01em', zIndex: 2,
+              cursor: interactive ? 'pointer' : 'inherit',
+            }}
+          >
             {formatPoints(livePoints)}
           </div>
         )}
@@ -322,13 +416,14 @@ function PlayerCard({
       <div style={{
         background: 'rgba(255,255,255,0.97)', borderRadius: 10, padding: '5px 10px',
         textAlign: 'center', boxShadow: '0 3px 12px rgba(0,0,0,0.25)',
-        minWidth: 66, maxWidth: 94,
-        outline: isLive ? '1.5px solid rgba(16,185,129,0.45)' : 'none',
+        minWidth: 66, maxWidth: 108,
+        outline: selected ? `1.5px solid ${SELECT_COLOR}` : isLive ? '1.5px solid rgba(16,185,129,0.45)' : 'none',
       }}>
         <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {lastName}
+          {displayName}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, marginTop: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, marginTop: 2, flexWrap: 'wrap' }}>
+          <PositionBadge position={player.position} />
           <TeamLogo code={player.team_code} size={10} />
           <span style={{ fontSize: 10, fontWeight: 600, color: '#64748b' }}>{player.team_code}</span>
           {isLive && (
@@ -352,10 +447,94 @@ function PlayerCard({
 }
 
 // ---------------------------------------------------------------------------
+// BenchCard (below the pitch)
+// ---------------------------------------------------------------------------
+function BenchCard({
+  player, livePoints, matchup,
+  selected = false, eligible = false, dimmed = false, isSwapping = false,
+  onCardClick, onShowStats,
+}: {
+  player: FieldPlayer; livePoints: number | null;
+  matchup?: Matchup;
+  selected?: boolean;
+  eligible?: boolean;
+  dimmed?: boolean;
+  isSwapping?: boolean;
+  onCardClick?: (e: ReactMouseEvent<HTMLDivElement>) => void;
+  onShowStats?: () => void;
+}) {
+  const displayName = formatPlayerName(player.full_name);
+  const isLive = livePoints !== null;
+
+  return (
+    <div
+      onClick={onCardClick}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+        width: 78, flexShrink: 0, cursor: 'pointer',
+        opacity: isSwapping ? 0.5 : dimmed ? 0.35 : 1,
+        filter: dimmed ? 'grayscale(1)' : 'none',
+        transition: 'opacity 0.15s, filter 0.15s',
+      }}
+    >
+      <div style={{ position: 'relative' }}>
+        {player.headshot_url ? (
+          <Image
+            src={player.headshot_url} alt={player.full_name}
+            width={52} height={52} unoptimized
+            style={{
+              width: 52, height: 52, objectFit: 'cover', display: 'block', borderRadius: '50%',
+              border: selected ? `2.5px solid ${SELECT_COLOR}` : isLive ? '2.5px solid #10b981' : '2.5px solid #e2e8f0',
+            }}
+          />
+        ) : (
+          <div style={{
+            width: 52, height: 52, borderRadius: '50%', background: '#e2e8f0',
+            border: selected ? `2.5px solid ${SELECT_COLOR}` : isLive ? '2.5px solid #10b981' : '2.5px solid #e2e8f0',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 17, fontWeight: 700, color: '#64748b',
+          }}>
+            {player.full_name[0]}
+          </div>
+        )}
+        {eligible && (
+          <div style={{
+            position: 'absolute', inset: -4, borderRadius: '50%',
+            border: `2px dashed ${SELECT_COLOR}`, pointerEvents: 'none',
+          }} />
+        )}
+        {isLive && (
+          <div
+            onClick={e => { e.stopPropagation(); onShowStats?.(); }}
+            style={{
+              position: 'absolute', bottom: -3, left: '50%', transform: 'translateX(-50%)',
+              background: '#065f46', color: '#d1fae5', fontSize: 8.5, fontWeight: 900,
+              padding: '1px 5px', borderRadius: 20, whiteSpace: 'nowrap',
+              border: '1px solid #10b981', cursor: 'pointer',
+            }}
+          >
+            {formatPoints(livePoints)}
+          </div>
+        )}
+      </div>
+      <div style={{ textAlign: 'center', width: '100%' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {displayName}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, marginTop: 2, flexWrap: 'wrap' }}>
+          <PositionBadge position={player.position} />
+          <TeamLogo code={player.team_code} size={9} />
+          <span style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600 }}>{player.team_code}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // EmptySlotCard
 // ---------------------------------------------------------------------------
 function EmptySlotCard({ pos, x, y }: { pos: string; x: number; y: number }) {
-  const color = POS_COLOR[pos] ?? '#94a3b8';
   return (
     <div style={{
       position: 'absolute', left: `${x}%`, top: `${y}%`,
@@ -377,7 +556,7 @@ function EmptySlotCard({ pos, x, y }: { pos: string; x: number; y: number }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <div style={{
-          width: 22, height: 22, borderRadius: '50%', background: color,
+          width: 22, height: 22, borderRadius: '50%', background: 'rgba(255,255,255,0.25)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 7, fontWeight: 900, color: '#fff', opacity: 0.7,
         }}>
@@ -398,29 +577,98 @@ function EmptySlotCard({ pos, x, y }: { pos: string; x: number; y: number }) {
 // ---------------------------------------------------------------------------
 // Main field component
 // ---------------------------------------------------------------------------
-export default function LiveTeamField({ positions, losY, hidePrices = false, matchups = {} }: {
+export default function LiveTeamField({
+  positions, hidePrices = false, matchups = {}, bench = [], teamId, interactive = false, season,
+}: {
   positions: FieldSlot[];
-  losY: number;
   hidePrices?: boolean;
   matchups?: Record<string, Matchup>;
+  bench?: FieldPlayer[];
+  teamId?: number;
+  interactive?: boolean;
+  season?: number;
 }) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+
+  const starters = useMemo(() => positions.flatMap(s => s.player ? [s.player] : []), [positions]);
+  const allPlayers = useMemo(() => [...starters, ...bench], [starters, bench]);
+
   const playerIds = useMemo(
-    () => positions.flatMap(s => s.player?.external_player_id ? [s.player.external_player_id] : []),
+    () => allPlayers.flatMap(p => p.external_player_id ? [p.external_player_id] : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [positions.map(s => s.player?.external_player_id).join(',')],
+    [allPlayers.map(p => p.external_player_id).join(',')],
   );
   const liveStats = useLiveStats(playerIds);
 
   const [modal, setModal] = useState<{ player: FieldPlayer; stats: LivePlayerStats } | null>(null);
+  const [selected, setSelected] = useState<FieldPlayer | null>(null);
+  const [swapping, setSwapping] = useState<Set<number>>(new Set());
+  const [menuAnchor, setMenuAnchor] = useState<{ id: number; rect: DOMRect } | null>(null);
+  const [profileId, setProfileId] = useState<number | null>(null);
+
+  const executeSwap = useCallback(async (a: FieldPlayer, b: FieldPlayer) => {
+    if (!teamId) return;
+    setSwapping(new Set([a.id, b.id]));
+    setSelected(null);
+    try {
+      const res = await fetch('/api/roster/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fantasy_team_id: teamId, player_a_id: a.id, player_b_id: b.id }),
+      });
+      if (!res.ok) throw new Error('Swap failed');
+      startTransition(() => router.refresh());
+    } catch {
+      startTransition(() => router.refresh());
+    } finally {
+      setSwapping(new Set());
+    }
+  }, [teamId, router, startTransition]);
+
+  // Clicking a card: if a swap is already pending, clicking the same player
+  // cancels it and clicking an eligible teammate completes the swap
+  // immediately (no menu). Otherwise, open the Sub / View Profile menu.
+  const handleCardClick = useCallback((p: FieldPlayer, e: ReactMouseEvent<HTMLDivElement>) => {
+    if (swapping.size > 0) return;
+    if (selected) {
+      if (selected.id === p.id) { setSelected(null); return; }
+      if (isEligibleSwap(selected, p)) { executeSwap(selected, p); return; }
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMenuAnchor(prev => (prev?.id === p.id ? null : { id: p.id, rect }));
+  }, [selected, swapping, executeSwap]);
+
+  const handleSub = useCallback((p: FieldPlayer) => {
+    setMenuAnchor(null);
+    setSelected(prev => {
+      if (!prev) return p;
+      if (prev.id === p.id) return null;
+      if (isEligibleSwap(prev, p)) { executeSwap(prev, p); return null; }
+      return p;
+    });
+  }, [executeSwap]);
+
+  const handleViewProfile = useCallback((p: FieldPlayer) => {
+    setMenuAnchor(null);
+    setProfileId(p.id);
+  }, []);
 
   return (
     <>
+      {/* Click-away layer to close an open action menu */}
+      {menuAnchor != null && (
+        <div onClick={() => setMenuAnchor(null)} style={{ position: 'fixed', inset: 0, zIndex: 150 }} />
+      )}
+
       <div style={{
-        position: 'relative', height: 580, overflow: 'hidden',
+        position: 'relative', height: 400, overflow: 'hidden',
+        boxShadow: 'inset 0 0 70px rgba(0,0,0,0.28)',
         background: `
-          radial-gradient(ellipse 120% 70% at 50% 0%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 55%),
-          radial-gradient(ellipse 140% 90% at 50% 50%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.32) 100%),
-          repeating-linear-gradient(180deg, #1c8a3a 0px, #1c8a3a 48px, #156b2e 48px, #156b2e 96px)
+          radial-gradient(ellipse 90% 45% at 50% 0%, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0) 60%),
+          radial-gradient(ellipse 150% 100% at 50% 50%, rgba(0,0,0,0) 35%, rgba(0,0,0,0.4) 100%),
+          linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 14%),
+          repeating-linear-gradient(180deg, #1e9a44 0px, #1e9a44 48px, #147333 48px, #147333 96px)
         `,
       }}>
         <style>{`
@@ -430,64 +678,127 @@ export default function LiveTeamField({ positions, losY, hidePrices = false, mat
           }
         `}</style>
 
-        {/* End zones */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '9%', background: 'rgba(0,0,0,0.18)', borderBottom: '2px solid rgba(255,255,255,0.5)' }} />
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '9%', background: 'rgba(0,0,0,0.18)', borderTop: '2px solid rgba(255,255,255,0.5)' }} />
-
-        {/* Sidelines */}
-        <div style={{ position: 'absolute', top: '9%', bottom: '9%', left: 36, width: 2, background: 'rgba(255,255,255,0.55)' }} />
-        <div style={{ position: 'absolute', top: '9%', bottom: '9%', right: 36, width: 2, background: 'rgba(255,255,255,0.55)' }} />
-
-        {/* 5-yard lines */}
-        {[9+(91-9)*0.5/9, 9+(91-9)*1.5/9, 9+(91-9)*2.5/9, 9+(91-9)*3.5/9,
-          9+(91-9)*4.5/9, 9+(91-9)*5.5/9, 9+(91-9)*6.5/9, 9+(91-9)*7.5/9].map(pct => (
-          <div key={pct} style={{ position: 'absolute', left: 36, right: 36, top: `${pct}%`, height: 1, background: 'rgba(255,255,255,0.10)' }} />
-        ))}
-
-        {/* Hash marks */}
-        {Array.from({ length: 18 }, (_, i) => (
-          <div key={i} style={{
-            position: 'absolute', top: `${10 + i * (80/18)}%`,
-            left: 0, right: 0, display: 'flex', justifyContent: 'space-between', padding: '0 100px',
+        {/* O-line — a branded block marking the line of scrimmage, sized to
+            roughly the tackle-box width. Every skill player lines up even
+            with this line or behind it, never ahead of it. */}
+        <div style={{
+          position: 'absolute', left: '31%', right: '31%', top: '11%', height: 30,
+          transform: 'translateY(-50%)', zIndex: 2, borderRadius: 7,
+          background: 'linear-gradient(180deg, #f4f4f3 0%, #d9d9d7 100%)',
+          border: '1px solid rgba(255,255,255,0.5)',
+          boxShadow: '0 3px 10px rgba(0,0,0,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflow: 'hidden', padding: '0 8px',
+        }}>
+          <span style={{
+            fontSize: 12, fontWeight: 900, color: '#475569',
+            letterSpacing: '0.08em', whiteSpace: 'nowrap',
           }}>
-            <div style={{ width: 14, height: 1, background: 'rgba(255,255,255,0.25)' }} />
-            <div style={{ width: 14, height: 1, background: 'rgba(255,255,255,0.25)' }} />
-          </div>
-        ))}
-
-        {/* Line of scrimmage */}
-        <div style={{ position: 'absolute', left: 36, right: 36, top: `${losY}%`, height: 2, background: 'rgba(96,165,250,0.7)', boxShadow: '0 0 10px rgba(96,165,250,0.5)' }} />
-        <div style={{ position: 'absolute', right: 40, top: `calc(${losY}% - 14px)`, fontSize: 8, fontWeight: 800, color: 'rgba(147,197,253,0.85)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-          Line of Scrimmage
+            ONELEAGUE
+          </span>
         </div>
-
-        {/* Goal posts */}
-        <svg style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} width="80" height="52" viewBox="0 0 60 52">
-          <rect x="29" y="2" width="2" height="50" fill="rgba(251,191,36,0.7)" rx="1" />
-          <rect x="8" y="22" width="44" height="2" fill="rgba(251,191,36,0.7)" rx="1" />
-          <rect x="8" y="2" width="2" height="22" fill="rgba(251,191,36,0.7)" rx="1" />
-          <rect x="50" y="2" width="2" height="22" fill="rgba(251,191,36,0.7)" rx="1" />
-        </svg>
 
         {/* Players */}
         {positions.map(({ player, pos, x, y }, i) => {
           if (!player) return <EmptySlotCard key={`empty-${pos}-${i}`} pos={pos} x={x} y={y} />;
           const liveData = liveStats.get(player.external_player_id ?? '');
           const livePoints = liveData?.totals.fantasyPointsTotal ?? null;
+          const isSelected = selected?.id === player.id;
+          const eligible = selected != null && !isSelected && isEligibleSwap(selected, player);
+          const dimmed = selected != null && !isSelected && !eligible;
           return (
             <PlayerCard
-              key={`${player.full_name}-${i}`}
+              key={player.id}
               player={player} x={x} y={y}
               livePoints={livePoints}
-              onClick={liveData ? () => setModal({ player, stats: liveData }) : undefined}
               hidePrices={hidePrices}
               matchup={matchups[player.team_code]}
+              interactive={interactive}
+              selected={isSelected}
+              eligible={eligible}
+              dimmed={dimmed}
+              isSwapping={swapping.has(player.id)}
+              onCardClick={e => handleCardClick(player, e)}
+              onShowStats={liveData ? () => setModal({ player, stats: liveData }) : undefined}
             />
           );
         })}
       </div>
 
-      {/* Modal */}
+      {/* Bench — only on interactive (My Team) usage */}
+      {interactive && (
+        <div style={{ background: '#fff', borderTop: '1px solid #f1f5f9', padding: '14px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <line x1="3" y1="9" x2="21" y2="9" />
+              <line x1="9" y1="21" x2="9" y2="9" />
+            </svg>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Bench
+            </span>
+            <span style={{ fontSize: 11, color: '#cbd5e1' }}>· {bench.length} players</span>
+            {selected && (
+              <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: SELECT_COLOR }}>
+                Tap a player to swap with {formatPlayerName(selected.full_name)}
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 4 }}>
+            {bench.length === 0 && (
+              <div style={{ fontSize: 12, color: '#cbd5e1', fontStyle: 'italic', padding: '8px 0' }}>No bench players</div>
+            )}
+            {bench.map(player => {
+              const liveData = liveStats.get(player.external_player_id ?? '');
+              const livePoints = liveData?.totals.fantasyPointsTotal ?? null;
+              const isSelected = selected?.id === player.id;
+              const eligible = selected != null && !isSelected && isEligibleSwap(selected, player);
+              const dimmed = selected != null && !isSelected && !eligible;
+              return (
+                <BenchCard
+                  key={player.id}
+                  player={player}
+                  livePoints={livePoints}
+                  matchup={matchups[player.team_code]}
+                  selected={isSelected}
+                  eligible={eligible}
+                  dimmed={dimmed}
+                  isSwapping={swapping.has(player.id)}
+                  onCardClick={e => handleCardClick(player, e)}
+                  onShowStats={liveData ? () => setModal({ player, stats: liveData }) : undefined}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Sub / View Profile menu — fixed to the viewport from the clicked
+          card's on-screen position, so it's never clipped by the pitch's
+          overflow:hidden or the bench row's horizontal scroll. */}
+      {menuAnchor && (() => {
+        const menuPlayer = allPlayers.find(p => p.id === menuAnchor.id);
+        if (!menuPlayer) return null;
+        const rect = menuAnchor.rect;
+        const menuWidth = 136;
+        const estHeight = 96;
+        const flipUp = rect.bottom + estHeight + 12 > window.innerHeight;
+        const left = Math.min(
+          Math.max(rect.left + rect.width / 2, menuWidth / 2 + 8),
+          window.innerWidth - menuWidth / 2 - 8,
+        );
+        const top = flipUp ? rect.top - 8 : rect.bottom + 8;
+        return (
+          <div style={{
+            position: 'fixed', left, top, zIndex: 200,
+            transform: flipUp ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+          }}>
+            <ActionMenu onSub={() => handleSub(menuPlayer)} onProfile={() => handleViewProfile(menuPlayer)} />
+          </div>
+        );
+      })()}
+
+      {/* Live stats modal */}
       {modal && (
         <LiveStatsModal
           player={modal.player}
@@ -495,6 +806,11 @@ export default function LiveTeamField({ positions, losY, hidePrices = false, mat
           onClose={() => setModal(null)}
           hidePrices={hidePrices}
         />
+      )}
+
+      {/* Player profile modal */}
+      {profileId != null && (
+        <PlayerProfileModal playerId={profileId} season={season} onClose={() => setProfileId(null)} />
       )}
     </>
   );

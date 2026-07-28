@@ -3,12 +3,11 @@
 import Image from 'next/image';
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { formatPrice, formatPoints } from '@/lib/format';
+import { formatPrice, formatPoints, formatPlayerName } from '@/lib/format';
 import { sellProceeds } from '@/lib/pricing';
 import CapBreakdown from './CapBreakdown';
 import TeamLogo from '@/components/TeamLogo';
 import PlayerProfileModal from '@/components/PlayerProfileModal';
-import MatchupBadge from '@/components/MatchupBadge';
 import type { Matchup } from '@/lib/schedule';
 
 export interface CatalogPlayer {
@@ -171,10 +170,10 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
         continue;
       }
       const label = t.outgoing && t.incoming
-        ? `${t.outgoing.full_name} → ${t.incoming.full_name}`
+        ? `${formatPlayerName(t.outgoing.full_name)} → ${formatPlayerName(t.incoming.full_name)}`
         : t.outgoing
-          ? `Sold ${t.outgoing.full_name} — slot left open`
-          : `Signed ${t.incoming!.full_name}`;
+          ? `Sold ${formatPlayerName(t.outgoing.full_name)} — slot left open`
+          : `Signed ${formatPlayerName(t.incoming!.full_name)}`;
       try {
         if (t.outgoing) {
           const sellRes = await fetch('/api/market/sell', {
@@ -257,7 +256,7 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                     <Avatar player={p} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(p.full_name)}</span>
                         <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 5px' }}>{p.position}</span>
                         <TeamLogo code={p.team_code} size={12} />
                         <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
@@ -267,10 +266,11 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <MatchupBadge matchup={matchups[p.team_code]} />
-                        {p.last_week_points != null && <span>· {formatPoints(p.last_week_points)} last wk</span>}
-                      </div>
+                      {p.last_week_points != null && (
+                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>{formatPoints(p.last_week_points)} last wk</span>
+                        </div>
+                      )}
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>{formatPrice(p.current_price)}</div>
@@ -413,7 +413,7 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                           <>
                             <Avatar player={t.outgoing} size={28} />
                             <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.outgoing.full_name}</div>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(t.outgoing.full_name)}</div>
                               <div style={{ fontSize: 9, color: '#94a3b8' }}>sells for {formatPrice(sellProceeds(Number(t.outgoing.current_price)))}</div>
                             </div>
                           </>
@@ -443,7 +443,7 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                           </svg>
                           <Avatar player={t.incoming} size={28} />
                           <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.incoming.full_name}</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(t.incoming.full_name)}</div>
                             <div style={{ fontSize: 9, color: '#94a3b8' }}>{formatPrice(t.incoming.current_price)}</div>
                           </div>
                           <button
@@ -495,13 +495,10 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                                   <Avatar player={p} size={26} />
                                   <div style={{ minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                      <span style={{ fontSize: 11.5, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
+                                      <span style={{ fontSize: 11.5, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(p.full_name)}</span>
                                       <span style={{ fontSize: 8, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 4px' }}>{p.position}</span>
                                       <TeamLogo code={p.team_code} size={11} />
                                       <span style={{ fontSize: 9, color: '#94a3b8' }}>{p.team_code}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                      <MatchupBadge matchup={matchups[p.team_code]} size={9} />
                                     </div>
                                   </div>
                                 </div>

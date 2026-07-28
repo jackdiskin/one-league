@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
-import { formatPrice, formatPoints, formatWeekLong } from '@/lib/format';
+import { formatPrice, formatPoints, formatWeekLong, formatPlayerName } from '@/lib/format';
 import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import PriceChart, { type PriceWeek } from './_components/PriceChart';
@@ -296,7 +296,7 @@ export default async function PlayerPage({
                   WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                   display: 'inline-block', lineHeight: 1.1,
                 }}>
-                  {player.full_name}
+                  {formatPlayerName(player.full_name)}
                 </h1>
                 <div style={{ display: 'flex', gap: 20, marginTop: 10, flexWrap: 'wrap' }}>
                   {[

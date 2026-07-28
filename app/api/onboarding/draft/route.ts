@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Build slot assignments
-  // Starting lineup: 1 QB, 2 RB, 4 WR/TE, 1 K — extras go to BENCH
+  // Starting lineup: 1 QB, 2 RB, 3 WR/TE, 1 K — extras go to BENCH
   function shuffle<T>(arr: T[]): T[] {
     return [...arr].sort(() => Math.random() - 0.5);
   }
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
   // Starters first, bench after
   qbs.forEach((p, i)  => slotMap.set(p.id, i < 1 ? `QB${i + 1}` : 'BENCH'));
   rbs.forEach((p, i)  => slotMap.set(p.id, i < 2 ? `RB${i + 1}` : 'BENCH'));
-  flex.forEach((p, i) => slotMap.set(p.id, i < 4 ? `WR${i + 1}` : 'BENCH'));
+  flex.forEach((p, i) => slotMap.set(p.id, i < 3 ? `WR${i + 1}` : 'BENCH'));
   ks.forEach((p, i)   => slotMap.set(p.id, `K${i + 1}`));
 
   const budgetRemaining = CAP - totalCost;

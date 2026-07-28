@@ -1,8 +1,7 @@
 import Image from 'next/image';
 import { query } from '@/lib/mysql';
-import { formatPrice } from '@/lib/format';
+import { formatPrice, formatPlayerName } from '@/lib/format';
 import ClickablePlayerRow from '@/components/ClickablePlayerRow';
-import MatchupBadge from '@/components/MatchupBadge';
 import { getNextMatchupByTeam } from '@/lib/schedule';
 
 const SCHEDULE_SEASON = 2026;
@@ -50,7 +49,7 @@ export default async function MarketPulse({ seasonYear }: Props) {
           const total  = p.buy_orders_count + p.sell_orders_count;
           const buyPct = total > 0 ? (p.buy_orders_count / total) * 100 : 50;
           const netUp  = p.net_order_flow >= 0;
-          const lastName = p.full_name.split(' ').slice(1).join(' ') || p.full_name;
+          const displayName = formatPlayerName(p.full_name);
 
           return (
             <ClickablePlayerRow
@@ -76,8 +75,7 @@ export default async function MarketPulse({ seasonYear }: Props) {
                     <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold shrink-0 bg-slate-100 text-slate-600">
                       {p.position}
                     </span>
-                    <span className="text-xs font-semibold text-slate-900 truncate">{lastName}</span>
-                    <MatchupBadge matchup={matchups[p.team_code]} />
+                    <span className="text-xs font-semibold text-slate-900 truncate">{displayName}</span>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 ml-2">
                     <span className="text-[10px] text-emerald-600 font-medium">{p.buy_orders_count}B</span>

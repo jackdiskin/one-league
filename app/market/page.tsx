@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
-import { formatPrice, formatPoints, formatWeekLong } from '@/lib/format';
+import { formatPrice, formatPoints, formatWeekLong, formatPlayerName } from '@/lib/format';
 import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import ClickablePlayerRow from '@/components/ClickablePlayerRow';
@@ -313,18 +313,18 @@ export default async function MarketPage({
               {
                 label: 'Biggest Gainer',
                 value: biggestGainer ? `+${formatPrice(Math.abs(Number(biggestGainer.price_delta)))}` : '—',
-                sub:   biggestGainer?.full_name ?? 'No movers yet',
+                sub:   biggestGainer ? formatPlayerName(biggestGainer.full_name) : 'No movers yet',
                 color: '#10b981',
               },
               {
                 label: 'Biggest Drop',
                 value: biggestLoser ? `-${formatPrice(Math.abs(Number(biggestLoser.price_delta)))}` : '—',
-                sub:   biggestLoser?.full_name ?? 'No drops yet',
+                sub:   biggestLoser ? formatPlayerName(biggestLoser.full_name) : 'No drops yet',
                 color: '#f43f5e',
               },
               {
                 label: 'Top Demand',
-                value: topDemand?.full_name ?? '—',
+                value: topDemand ? formatPlayerName(topDemand.full_name) : '—',
                 sub:   topDemand ? `+${topDemand.net_order_flow} net flow` : 'No demand data',
                 color: '#0ea5e9',
               },
@@ -369,7 +369,7 @@ export default async function MarketPage({
                       <PlayerAvatar player={p} size={32} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(p.full_name)}</span>
                           <PosBadge pos={p.position} />
                           <TeamLogo code={p.team_code} size={11} />
                           <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
@@ -404,7 +404,7 @@ export default async function MarketPage({
                       <PlayerAvatar player={p} size={32} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(p.full_name)}</span>
                           <PosBadge pos={p.position} />
                           <TeamLogo code={p.team_code} size={11} />
                           <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
@@ -445,7 +445,7 @@ export default async function MarketPage({
                         <PlayerAvatar player={p} size={28} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(p.full_name)}</span>
                             <PosBadge pos={p.position} />
                             <TeamLogo code={p.team_code} size={11} />
                             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>{p.team_code}</span>
@@ -485,7 +485,7 @@ export default async function MarketPage({
                         <PlayerAvatar player={p} size={28} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(p.full_name)}</span>
                             <PosBadge pos={p.position} />
                             <TeamLogo code={p.team_code} size={11} />
                             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>{p.team_code}</span>
@@ -526,7 +526,7 @@ export default async function MarketPage({
                         <PlayerAvatar player={p} size={28} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(p.full_name)}</span>
                             <PosBadge pos={p.position} />
                             <MatchupBadge matchup={matchups[p.team_code]} />
                           </div>
@@ -593,7 +593,7 @@ export default async function MarketPage({
                     <ClickablePlayerRow playerId={tx.id} season={SEASON}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {tx.full_name}
+                          {formatPlayerName(tx.full_name)}
                         </span>
                         <PosBadge pos={tx.position} />
                         <TeamLogo code={tx.team_code} size={11} />

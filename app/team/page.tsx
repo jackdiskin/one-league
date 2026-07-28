@@ -116,20 +116,32 @@ async function fetchRoster(season: number, teamId: number, lastWeek: number): Pr
             p.external_player_id,
             pms.current_price, ftr.purchase_price, ftr.acquired_week, ftr.roster_slot,
             pws.fantasy_points           AS last_week_points,
-            tot.season_points
+            pwp.expected_points          AS projected_points,
+            tot.season_points,
+            ranked.pos_rank              AS position_rank
      FROM fantasy_team_roster ftr
      JOIN players p          ON p.id = ftr.player_id
      JOIN player_market_state pms
        ON pms.player_id = ftr.player_id AND pms.season_year = ?
      LEFT JOIN player_weekly_scores pws
        ON pws.player_id = ftr.player_id AND pws.season_year = ? AND pws.week = ?
+     LEFT JOIN player_weekly_projections pwp
+       ON pwp.player_id = ftr.player_id AND pwp.season_year = ? AND pwp.week = ?
+          AND pwp.projection_source = 'internal_model'
      LEFT JOIN (
        SELECT player_id, SUM(fantasy_points) AS season_points
        FROM player_weekly_scores WHERE season_year = ? GROUP BY player_id
      ) tot ON tot.player_id = ftr.player_id
+     LEFT JOIN (
+       SELECT p2.id AS player_id,
+              RANK() OVER (PARTITION BY p2.position ORDER BY COALESCE(SUM(pws2.fantasy_points),0) DESC) AS pos_rank
+       FROM players p2
+       LEFT JOIN player_weekly_scores pws2 ON pws2.player_id = p2.id AND pws2.season_year = ?
+       GROUP BY p2.id, p2.position
+     ) ranked ON ranked.player_id = ftr.player_id
      WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE
      ORDER BY FIELD(p.position,'QB','RB','WR','TE','K'), pms.current_price DESC`,
-    [season, season, lastWeek, season, teamId]
+    [season, season, lastWeek, season, lastWeek, season, season, teamId]
   );
 }
 
@@ -268,7 +280,7 @@ export default async function TeamPage({
 
           {/* Formation */}
           <Suspense fallback={<Skeleton h={580} />}>
-            <MyTeamSummary userId={userId} seasonYear={SEASON} />
+            <MyTeamSummary userId={userId} seasonYear={SEASON} hidePrices interactive />
           </Suspense>
 
           {/* Roster list — starters/bench lineup management only */}
@@ -276,6 +288,7 @@ export default async function TeamPage({
             roster={roster}
             teamId={team.id}
             matchups={matchups}
+            season={SEASON}
           />
 
           {/* Weekly performance */}
