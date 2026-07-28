@@ -7,8 +7,8 @@ Claude Code reads this file automatically on startup. Keep it updated as decisio
 ## Core format
 
 - Budget: $100M per manager
-- Roster: 11 players — 2 QB, 3 RB, 5 WR/TE, 1 Kicker
-- Starting XI: 1 QB, 2 RB, 3 WR/TE, 1 FLEX (RB/WR/TE), 1 Kicker
+- Roster: 10 players — 2 QB, 3 RB, 5 WR/TE
+- Starting XI: 1 QB, 2 RB, 3 WR/TE, 1 FLEX (RB/WR/TE)
 - Transfers: 1 free/week, max 2 banked, -8pts per extra transfer
 - Auto-subs: DNP triggers sub, position-locked, bench order priority
 
@@ -37,7 +37,6 @@ Claude Code reads this file automatically on startup. Keep it updated as decisio
 - WR mirrors FPL midfielders — deep pool: $5M floor, $15-17M ceiling
 - TE — bifurcated, elite TE expensive, rest cheap: $4.5M floor, $13-15M ceiling
 - QB mirrors FPL defenders — budget position: $4.5M floor, $8-9M ceiling
-- Kicker mirrors FPL keepers — dirt cheap, hard cap: $3.5M floor, $5.5M ceiling
 
 **Other pricing mechanics:**
 - Daily price changes from ownership % + performance + projections

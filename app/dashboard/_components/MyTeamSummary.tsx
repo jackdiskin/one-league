@@ -16,7 +16,7 @@ type Player = FieldPlayer;
 // out wide, right on the line; the 3rd spot is either a TE lined up tight
 // on the line next to the tackle, or a 3rd WR off the line in the slot.
 // Recomputed fresh from the current starters, so subbing auto-updates it.
-function getPositions(wrs: Player[], tes: Player[], qbs: Player[], rbs: Player[], ks: Player[]) {
+function getPositions(wrs: Player[], tes: Player[], qbs: Player[], rbs: Player[]) {
   const out: FieldSlot[] = [];
 
   const LOS = 16; // O-line / line-of-scrimmage depth — see the bar in LiveTeamField
@@ -41,9 +41,6 @@ function getPositions(wrs: Player[], tes: Player[], qbs: Player[], rbs: Player[]
   // ── RBs split, flanking the QB ────────────────────────────────────────
   out.push({ player: rbs[0] ?? null, pos: 'RB', x: 32, y: LOS + 32 });
   out.push({ player: rbs[1] ?? null, pos: 'RB', x: 68, y: LOS + 32 });
-
-  // ── Kicker tucked in the corner (y = 90%) — always 1 slot ────────────────
-  out.push({ player: ks[0] ?? null, pos: 'K', x: 88, y: 90 });
 
   return out;
 }
@@ -108,7 +105,7 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
          ON pwp.player_id = ftr.player_id AND pwp.season_year = ? AND pwp.week = ?
             AND pwp.projection_source = 'internal_model'
        WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE
-       ORDER BY FIELD(p.position,'WR','TE','QB','RB','K'), pms.current_price DESC`,
+       ORDER BY FIELD(p.position,'WR','TE','QB','RB'), pms.current_price DESC`,
       [seasonYear, seasonYear, lastWeek, team.id]
     ),
     getNextMatchupByTeam(SCHEDULE_SEASON),
@@ -121,8 +118,7 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
   const rbs = starters.filter(p => p.position === 'RB');
   const wrs = starters.filter(p => p.position === 'WR');
   const tes = starters.filter(p => p.position === 'TE');
-  const ks  = starters.filter(p => p.position === 'K');
-  const positions = getPositions(wrs, tes, qbs, rbs, ks);
+  const positions = getPositions(wrs, tes, qbs, rbs);
 
   const rankLabel = team.rank === 1 ? '1st' : team.rank === 2 ? '2nd' : team.rank === 3 ? '3rd' : `${team.rank}th`;
   const rankMedal = team.rank === 1 ? '🥇' : team.rank === 2 ? '🥈' : team.rank === 3 ? '🥉' : null;

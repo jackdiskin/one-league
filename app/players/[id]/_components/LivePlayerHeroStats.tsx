@@ -31,12 +31,6 @@ const POS_STATS: Record<string, Array<{ key: keyof LiveStatDelta; label: string 
     { key: 'receivingYards', label: 'Rec Yds'  },
     { key: 'receivingTds',   label: 'Rec TD'   },
   ],
-  K: [
-    { key: 'fg0_39',   label: '0–39 yd' },
-    { key: 'fg40_49',  label: '40–49 yd' },
-    { key: 'fg50Plus', label: '50+ yd'  },
-    { key: 'xpMade',   label: 'XP'      },
-  ],
 };
 
 export default function LivePlayerHeroStats({
@@ -55,10 +49,6 @@ export default function LivePlayerHeroStats({
   const statDefs = POS_STATS[position] ?? POS_STATS.WR;
   // Only show stats with a non-zero value
   const visibleStats = statDefs.filter(s => (t[s.key] ?? 0) > 0);
-
-  // Kicker: also build FG total
-  const fgMade = (t.fg0_39 ?? 0) + (t.fg40_49 ?? 0) + (t.fg50Plus ?? 0);
-  const fgAtt  = fgMade + (t.fgMissed ?? 0);
 
   return (
     <div style={{
@@ -107,43 +97,25 @@ export default function LivePlayerHeroStats({
 
       {/* Stat grid */}
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-        {position === 'K' ? (
-          // Kicker: show FG total + XP
-          <>
-            {fgAtt > 0 && (
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>FG</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{fgMade}/{fgAtt}</div>
+        {visibleStats.map(s => {
+          const val = t[s.key] ?? 0;
+          const isTd = s.key.endsWith('Tds') || s.key === 'twoPtConversions';
+          const isNeg = s.key === 'interceptions' || s.key === 'fumblesLost';
+          return (
+            <div key={s.key}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                {s.label}
               </div>
-            )}
-            {t.xpMade > 0 && (
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>XP</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{t.xpMade}</div>
+              <div style={{
+                fontSize: 18, fontWeight: 800,
+                color: isTd ? '#d97706' : isNeg ? '#e11d48' : '#0f172a',
+              }}>
+                {val}
               </div>
-            )}
-          </>
-        ) : (
-          visibleStats.map(s => {
-            const val = t[s.key] ?? 0;
-            const isTd = s.key.endsWith('Tds') || s.key === 'twoPtConversions';
-            const isNeg = s.key === 'interceptions' || s.key === 'fumblesLost';
-            return (
-              <div key={s.key}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  {s.label}
-                </div>
-                <div style={{
-                  fontSize: 18, fontWeight: 800,
-                  color: isTd ? '#d97706' : isNeg ? '#e11d48' : '#0f172a',
-                }}>
-                  {val}
-                </div>
-              </div>
-            );
-          })
-        )}
-        {visibleStats.length === 0 && position !== 'K' && (
+            </div>
+          );
+        })}
+        {visibleStats.length === 0 && (
           <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>No stats yet this game</div>
         )}
       </div>

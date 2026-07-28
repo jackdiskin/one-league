@@ -10,7 +10,6 @@ const POS_COLORS: Record<string, { bar: string; label: string }> = {
   RB: { bar: '#10b981', label: 'Running Backs' },
   WR: { bar: '#f59e0b', label: 'Wide Receivers' },
   TE: { bar: '#a855f7', label: 'Tight Ends' },
-  K:  { bar: '#94a3b8', label: 'Kicker' },
 };
 
 const TOTAL_CAP = 100_000_000;

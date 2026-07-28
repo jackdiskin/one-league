@@ -84,7 +84,7 @@ async function fetchPlayers(season: number, lastWeek: number, teamId: number | n
      ) own ON own.player_id = p.id
      LEFT JOIN fantasy_team_roster my_ftr
        ON my_ftr.player_id = p.id AND my_ftr.fantasy_team_id = ? AND my_ftr.is_active = TRUE
-     WHERE p.position IN ('QB','RB','WR','TE','K')
+     WHERE p.position IN ('QB','RB','WR','TE')
      ORDER BY COALESCE(pms.current_price, 0) DESC`,
     [season, season, lastWeek, season, teamId]
   );
@@ -190,7 +190,7 @@ export default async function TransfersPage({
                 </div>
                 <div>
                   <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4, textAlign: 'right' }}>Roster</p>
-                  <p style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', textAlign: 'right' }}>{owned.length}/11</p>
+                  <p style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', textAlign: 'right' }}>{owned.length}/10</p>
                 </div>
               </div>
 

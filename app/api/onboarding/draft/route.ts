@@ -5,10 +5,10 @@ import { query, withTransaction } from '@/lib/mysql';
 
 const SEASON      = 2026;
 const CAP         = 100_000_000;
-const QUOTA       = { QB: 2, RB: 3, FLEX: 5, K: 1 };
+const QUOTA       = { QB: 2, RB: 3, FLEX: 5 };
 
 // POST /api/onboarding/draft
-// Body: { team_name, player_ids[11], season_year, league_id? | invite_code? }
+// Body: { team_name, player_ids[10], season_year, league_id? | invite_code? }
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'team_name must be at least 2 characters' }, { status: 400 });
   }
 
-  if (!Array.isArray(player_ids) || player_ids.length !== 11) {
-    return NextResponse.json({ error: 'Must select exactly 11 players' }, { status: 400 });
+  if (!Array.isArray(player_ids) || player_ids.length !== 10) {
+    return NextResponse.json({ error: 'Must select exactly 10 players' }, { status: 400 });
   }
 
   // Validate user doesn't already have a team this season
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     [season_year, ...player_ids]
   );
 
-  if (players.length !== 11) {
+  if (players.length !== 10) {
     return NextResponse.json({ error: 'One or more players not found' }, { status: 400 });
   }
 
@@ -85,11 +85,10 @@ export async function POST(request: NextRequest) {
   const qbCount   = players.filter(p => p.position === 'QB').length;
   const rbCount   = players.filter(p => p.position === 'RB').length;
   const flexCount = players.filter(p => p.position === 'WR' || p.position === 'TE').length;
-  const kCount    = players.filter(p => p.position === 'K').length;
 
-  if (qbCount !== QUOTA.QB || rbCount !== QUOTA.RB || flexCount !== QUOTA.FLEX || kCount !== QUOTA.K) {
+  if (qbCount !== QUOTA.QB || rbCount !== QUOTA.RB || flexCount !== QUOTA.FLEX) {
     return NextResponse.json({
-      error: `Invalid roster composition. Required: ${QUOTA.QB} QB, ${QUOTA.RB} RB, ${QUOTA.FLEX} WR/TE, ${QUOTA.K} K`,
+      error: `Invalid roster composition. Required: ${QUOTA.QB} QB, ${QUOTA.RB} RB, ${QUOTA.FLEX} WR/TE`,
     }, { status: 400 });
   }
 
@@ -99,7 +98,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Build slot assignments
-  // Starting lineup: 1 QB, 2 RB, 3 WR/TE, 1 K — extras go to BENCH
+  // Starting lineup: 1 QB, 2 RB, 3 WR/TE — extras go to BENCH
   function shuffle<T>(arr: T[]): T[] {
     return [...arr].sort(() => Math.random() - 0.5);
   }
@@ -108,13 +107,11 @@ export async function POST(request: NextRequest) {
   const qbs    = shuffle(players.filter(p => p.position === 'QB'));
   const rbs    = shuffle(players.filter(p => p.position === 'RB'));
   const flex   = shuffle(players.filter(p => p.position === 'WR' || p.position === 'TE'));
-  const ks     = players.filter(p => p.position === 'K');
 
   // Starters first, bench after
   qbs.forEach((p, i)  => slotMap.set(p.id, i < 1 ? `QB${i + 1}` : 'BENCH'));
   rbs.forEach((p, i)  => slotMap.set(p.id, i < 2 ? `RB${i + 1}` : 'BENCH'));
   flex.forEach((p, i) => slotMap.set(p.id, i < 3 ? `WR${i + 1}` : 'BENCH'));
-  ks.forEach((p, i)   => slotMap.set(p.id, `K${i + 1}`));
 
   const budgetRemaining = CAP - totalCost;
 

@@ -53,42 +53,25 @@ export default function FinalPlayerHeroStats({ position, statCols, score }: Prop
 
       {/* Stat grid */}
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-        {position === 'K' ? (
-          <>
-            {score.field_goals_made > 0 && (
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>FG Made</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{score.field_goals_made}</div>
+        {visibleCols.map((c) => {
+          const val = score[c.key] ?? 0;
+          const isTd  = c.key.endsWith('_tds');
+          const isNeg = c.key === 'interceptions_thrown' || c.key === 'fumbles_lost';
+          return (
+            <div key={c.key}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                {c.label}
               </div>
-            )}
-            {score.extra_points_made > 0 && (
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>XP</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{score.extra_points_made}</div>
+              <div style={{
+                fontSize: 18, fontWeight: 800,
+                color: isTd ? '#d97706' : isNeg ? '#e11d48' : '#0f172a',
+              }}>
+                {val}
               </div>
-            )}
-          </>
-        ) : (
-          visibleCols.map((c) => {
-            const val = score[c.key] ?? 0;
-            const isTd  = c.key.endsWith('_tds');
-            const isNeg = c.key === 'interceptions_thrown' || c.key === 'fumbles_lost';
-            return (
-              <div key={c.key}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  {c.label}
-                </div>
-                <div style={{
-                  fontSize: 18, fontWeight: 800,
-                  color: isTd ? '#d97706' : isNeg ? '#e11d48' : '#0f172a',
-                }}>
-                  {val}
-                </div>
-              </div>
-            );
-          })
-        )}
-        {visibleCols.length === 0 && position !== 'K' && (
+            </div>
+          );
+        })}
+        {visibleCols.length === 0 && (
           <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>No stats recorded</div>
         )}
       </div>

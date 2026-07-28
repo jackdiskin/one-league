@@ -140,7 +140,7 @@ async function fetchRoster(season: number, teamId: number, lastWeek: number): Pr
        GROUP BY p2.id, p2.position
      ) ranked ON ranked.player_id = ftr.player_id
      WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE
-     ORDER BY FIELD(p.position,'QB','RB','WR','TE','K'), pms.current_price DESC`,
+     ORDER BY FIELD(p.position,'QB','RB','WR','TE'), pms.current_price DESC`,
     [season, season, lastWeek, season, lastWeek, season, season, teamId]
   );
 }

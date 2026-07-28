@@ -75,7 +75,7 @@ async function fetchMovers(season: number, lastWeek: number): Promise<MoverRow[]
      JOIN player_market_state pms ON pms.player_id = p.id AND pms.season_year = ?
      LEFT JOIN player_weekly_scores pws
        ON pws.player_id = p.id AND pws.season_year = ? AND pws.week = ?
-     WHERE p.position IN ('QB','RB','WR','TE','K')
+     WHERE p.position IN ('QB','RB','WR','TE')
        AND pms.base_weekly_price > 0
      ORDER BY ABS(pms.current_price - pms.base_weekly_price) DESC
      LIMIT 20`,
@@ -91,7 +91,7 @@ async function fetchMostTraded(season: number): Promise<TradedRow[]> {
             pms.net_order_flow
      FROM players p
      JOIN player_market_state pms ON pms.player_id = p.id AND pms.season_year = ?
-     WHERE p.position IN ('QB','RB','WR','TE','K')
+     WHERE p.position IN ('QB','RB','WR','TE')
        AND (pms.buy_orders_count + pms.sell_orders_count) > 0
      ORDER BY total_orders DESC
      LIMIT 10`,
@@ -107,7 +107,7 @@ async function fetchHighDemand(season: number): Promise<TradedRow[]> {
             pms.net_order_flow
      FROM players p
      JOIN player_market_state pms ON pms.player_id = p.id AND pms.season_year = ?
-     WHERE p.position IN ('QB','RB','WR','TE','K')
+     WHERE p.position IN ('QB','RB','WR','TE')
        AND pms.net_order_flow > 0
      ORDER BY pms.net_order_flow DESC
      LIMIT 10`,
@@ -123,7 +123,7 @@ async function fetchSellPressure(season: number): Promise<TradedRow[]> {
             pms.net_order_flow
      FROM players p
      JOIN player_market_state pms ON pms.player_id = p.id AND pms.season_year = ?
-     WHERE p.position IN ('QB','RB','WR','TE','K')
+     WHERE p.position IN ('QB','RB','WR','TE')
        AND pms.net_order_flow < 0
      ORDER BY pms.net_order_flow ASC
      LIMIT 10`,

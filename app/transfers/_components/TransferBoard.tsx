@@ -52,17 +52,15 @@ const POS_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
   RB: { bg: '#f0fdf4', text: '#10b981', bar: '#10b981' },
   WR: { bg: '#fffbeb', text: '#f59e0b', bar: '#f59e0b' },
   TE: { bg: '#faf5ff', text: '#a855f7', bar: '#a855f7' },
-  K:  { bg: '#f8fafc', text: '#64748b', bar: '#94a3b8' },
 };
 
 // Mirrors the quota enforced server-side in app/api/market/buy/route.ts
-const QUOTA: Record<string, number> = { QB: 2, RB: 3, FLEX: 5, K: 1 };
+const QUOTA: Record<string, number> = { QB: 2, RB: 3, FLEX: 5 };
 
 const GROUPS: { key: string; label: string; positions: string[] }[] = [
   { key: 'QB',   label: 'Quarterbacks',  positions: ['QB'] },
   { key: 'RB',   label: 'Running Backs', positions: ['RB'] },
   { key: 'FLEX', label: 'Receivers',     positions: ['WR', 'TE'] },
-  { key: 'K',    label: 'Kicker',        positions: ['K'] },
 ];
 
 // Reads an error message from a failed fetch response without crashing if the
@@ -225,7 +223,7 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
           const pendingEmptyInGroup = pending.filter(t => !t.outgoing && t.groupLabel === group.label).length;
           const openSlots = Math.max(0, QUOTA[group.key] - groupPlayers.length - pendingEmptyInGroup);
           if (!groupPlayers.length && !openSlots) return null;
-          const col = POS_COLORS[group.positions[0]] ?? POS_COLORS.K;
+          const col = POS_COLORS[group.positions[0]] ?? POS_COLORS.QB;
           return (
             <div key={group.key}>
               <div style={{

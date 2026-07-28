@@ -175,12 +175,11 @@ const POS_COLORS: Record<string, { pill: string; bar: string; light: string; rin
   RB: { pill: 'bg-emerald-100 text-emerald-700', bar: '#10b981', light: '#f0fdf4', ring: '#10b981' },
   WR: { pill: 'bg-amber-100 text-amber-700',     bar: '#f59e0b', light: '#fffbeb', ring: '#f59e0b' },
   TE: { pill: 'bg-purple-100 text-purple-700',   bar: '#a855f7', light: '#faf5ff', ring: '#a855f7' },
-  K:  { pill: 'bg-slate-100 text-slate-600',     bar: '#94a3b8', light: '#f8fafc', ring: '#94a3b8' },
 };
 
-const POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'K'];
+const POS_ORDER = ['QB', 'RB', 'WR', 'TE'];
 const POS_LABELS: Record<string, string> = {
-  QB: 'Quarterback', RB: 'Running Backs', WR: 'Wide Receivers', TE: 'Tight Ends', K: 'Kicker',
+  QB: 'Quarterback', RB: 'Running Backs', WR: 'Wide Receivers', TE: 'Tight Ends',
 };
 
 // Starter slot groups: defines expected named slots per position group
@@ -188,7 +187,6 @@ const STARTER_SLOT_GROUPS = [
   { key: 'QB',   positions: ['QB'],       maxStarters: 1, slotPrefix: 'QB', label: 'Quarterbacks', singularLabel: 'QB Starter'  },
   { key: 'RB',   positions: ['RB'],       maxStarters: 2, slotPrefix: 'RB', label: 'Running Backs', singularLabel: 'RB Starter' },
   { key: 'FLEX', positions: ['WR', 'TE'], maxStarters: 3, slotPrefix: 'WR', label: 'Receivers',     singularLabel: 'WR/TE Starter' },
-  { key: 'K',    positions: ['K'],        maxStarters: 1, slotPrefix: 'K',  label: 'Kicker',        singularLabel: 'K Starter'   },
 ] as const;
 
 // Extracted so PlayerRow (defined outside RosterList) can call it without closures
@@ -236,7 +234,7 @@ function Avatar({ player, size = 40 }: { player: RosterPlayer; size?: number }) 
 const PlayerRow = memo(function PlayerRow({
   p, selected, swapping, liveData, onPlayerClick, onProfileClick, matchups,
 }: PlayerRowProps) {
-  const col        = POS_COLORS[p.position] ?? POS_COLORS.K;
+  const col        = POS_COLORS[p.position] ?? POS_COLORS.QB;
   const isSelected = selected?.id === p.id;
   const eligible   = isEligibleForSwap(p, selected);
   const isSwapping = swapping.has(p.id);
@@ -756,7 +754,7 @@ export default function RosterList({ roster, teamId, matchups, season }: {
 
           // Use the first position's color; for FLEX use WR color
           const firstPos  = group.positions[0] as string;
-          const col       = POS_COLORS[firstPos] ?? POS_COLORS.K;
+          const col       = POS_COLORS[firstPos] ?? POS_COLORS.QB;
           const eligible  = isEmptyStarterEligible(group.positions);
           const totalCount = groupPlayers.length + (eligible ? emptySlots.length : 0);
 
@@ -849,7 +847,7 @@ export default function RosterList({ roster, teamId, matchups, season }: {
         {POS_ORDER.map(pos => {
           const players = bench.filter(p => p.position === pos);
           if (!players.length) return null;
-          const col = POS_COLORS[pos] ?? POS_COLORS.K;
+          const col = POS_COLORS[pos] ?? POS_COLORS.QB;
           return (
             <div key={pos}>
               <div style={{
