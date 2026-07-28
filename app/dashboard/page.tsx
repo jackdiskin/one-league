@@ -10,7 +10,7 @@ import WeekScoreSection from './_components/WeekScoreSection';
 import TopMovers       from './_components/TopMovers';
 import StandingsCard   from './_components/StandingsCard';
 import DiscoverLeagues from './_components/DiscoverLeagues';
-import MarketPulse     from './_components/MarketPulse';
+import LeaderboardCard  from './_components/LeaderboardCard';
 import Sidebar, { type SidebarLeague } from './_components/Sidebar';
 import { formatWeekLong } from '@/lib/format';
 import SeasonModeSwitcher from './_components/SeasonModeSwitcher';
@@ -196,7 +196,7 @@ export default async function DashboardPage({
             <DiscoverLeagues leagues={discoverLeagues} />
 
             <Suspense fallback={<Skeleton className="h-72" />}>
-              <MarketPulse seasonYear={SEASON} />
+              <LeaderboardCard userId={userId} seasonYear={SEASON} />
             </Suspense>
           </div>
 

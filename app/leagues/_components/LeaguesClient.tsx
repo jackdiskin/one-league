@@ -138,7 +138,6 @@ export default function LeaguesClient({ initialLeagues, season }: { initialLeagu
   const [joining, setJoining]       = useState(false);
   const [joinError, setJoinError]   = useState('');
 
-  const globalLeague  = leagues.find(l => l.is_global);
   const privateLeagues = leagues.filter(l => !l.is_global);
 
   async function handleLeave(leagueId: number) {
@@ -191,16 +190,6 @@ export default function LeaguesClient({ initialLeagues, season }: { initialLeagu
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Global Leaderboard */}
-      {globalLeague && (
-        <section>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
-            Global Leaderboard
-          </div>
-          <LeagueRow league={globalLeague} />
-        </section>
-      )}
-
       {/* Private leagues */}
       <section>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
