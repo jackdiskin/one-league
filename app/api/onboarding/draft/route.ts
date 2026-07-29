@@ -14,6 +14,15 @@ const GLOBAL_LEADERBOARD_NAME = 'Global Leaderboard';
 // league selection at draft time. Every drafted team is auto-enrolled in the
 // season's Global Leaderboard; private leagues are joined separately via a code.
 export async function POST(request: NextRequest) {
+  try {
+    return await handleDraft(request);
+  } catch (e) {
+    console.error('POST /api/onboarding/draft failed:', e);
+    return NextResponse.json({ error: 'Unexpected server error' }, { status: 500 });
+  }
+}
+
+async function handleDraft(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 

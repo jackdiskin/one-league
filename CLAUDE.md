@@ -1,6 +1,6 @@
 # OneLeague — Project Context
 
-OneLeague is an FPL-style, budget-based fantasy football platform for the NFL. One global league, one standardized format for all users — no custom leagues, no custom rules.
+OneLeague is an FPL-style, budget-based fantasy football platform for the NFL. One global league, one standardized format for all users, no custom rules.
 
 Claude Code reads this file automatically on startup. Keep it updated as decisions change; it's the fastest way to get a fresh session up to speed.
 
