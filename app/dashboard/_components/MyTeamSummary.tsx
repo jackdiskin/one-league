@@ -15,6 +15,10 @@ type Player = FieldPlayer;
 // The flex trio adapts to who's actually starting (like FPL): WR1/WR2 always
 // out wide, right on the line; WR3 is the true FLEX slot (RB/WR/TE) and can
 // be a TE lined up tight next to the tackle, a 3rd WR in the slot, or a RB.
+// A RB in the flex slot drops into the backfield instead of lining up as a
+// receiver — directly behind the QB, deeper than RB1/RB2, so the four
+// backfield players form a diamond: QB at the front point, RB1/RB2 flanking
+// the sides, and the flex RB at the back point.
 // Looked up by named roster_slot (not position), so subbing auto-updates it
 // and a RB sitting in the FLEX slot renders in the right spot.
 function getPositions(starters: Player[]) {
@@ -30,12 +34,10 @@ function getPositions(starters: Player[]) {
   const out: FieldSlot[] = [];
   const LOS = 16; // O-line / line-of-scrimmage depth — see the bar in LiveTeamField
   const flexIsTE = flex?.position === 'TE';
+  const flexIsRB = flex?.position === 'RB';
 
   out.push({ player: wr1,  pos: wr1?.position  ?? 'WR',   x: 6,  y: LOS });
   out.push({ player: wr2,  pos: wr2?.position  ?? 'WR',   x: 94, y: LOS });
-  // TE lines up on the line too, tight next to the tackle; a flex WR/RB
-  // lines up just off the line in the slot (has to be off the line to be eligible).
-  out.push({ player: flex, pos: flex?.position ?? 'FLEX', x: flexIsTE ? 74 : 50, y: flexIsTE ? LOS : LOS + 7 });
 
   // ── QB in shotgun, well behind the line ───────────────────────────────
   out.push({ player: qb1, pos: 'QB', x: 50, y: LOS + 24 });
@@ -43,6 +45,16 @@ function getPositions(starters: Player[]) {
   // ── RBs split, flanking the QB ────────────────────────────────────────
   out.push({ player: rb1, pos: 'RB', x: 32, y: LOS + 32 });
   out.push({ player: rb2, pos: 'RB', x: 68, y: LOS + 32 });
+
+  // TE lines up on the line too, tight next to the tackle; a flex WR lines
+  // up just off the line in the slot (has to be off the line to be
+  // eligible); a flex RB drops deepest of all, directly behind the QB,
+  // completing the backfield diamond.
+  out.push({
+    player: flex, pos: flex?.position ?? 'FLEX',
+    x: flexIsTE ? 74 : 50,
+    y: flexIsTE ? LOS : flexIsRB ? LOS + 56 : LOS + 7,
+  });
 
   return out;
 }

@@ -30,6 +30,87 @@ export interface FieldSlot {
 
 const SELECT_COLOR = '#f59e0b';
 
+// ---------------------------------------------------------------------------
+// Pseudo-3D perspective field — same treatment as the draft screen
+// (app/onboarding/draft/_components/DraftBoard.tsx): a low camera behind our
+// own goal, tilted down, looking toward the far/small end zone. Player x/y
+// (0-100, already tuned by MyTeamSummary's getPositions) get remapped
+// through these so everything converges toward a vanishing point at the top.
+// ---------------------------------------------------------------------------
+const FIELD_TOP_Y = 24;
+const FIELD_TOP_WIDTH_PCT = 68;
+const SCALE_AT_TOP    = 0.75;
+const SCALE_AT_BOTTOM = 1.15;
+const FIELD_BOTTOM_OVERFLOW_PCT = 35;
+
+function widthAtDepth(y: number): number {
+  return FIELD_TOP_WIDTH_PCT + (100 - FIELD_TOP_WIDTH_PCT) * (y / 100);
+}
+function remapX(x: number, y: number): number {
+  return 50 + (x - 50) * (widthAtDepth(y) / 100);
+}
+function depthScale(y: number): number {
+  return SCALE_AT_TOP + (SCALE_AT_BOTTOM - SCALE_AT_TOP) * (y / 100);
+}
+
+const CAMERA_Y             = 96;
+const CAMERA_YARDS_TO_GOAL = 25;
+const THEIR_GOAL_Y = 3;
+const GOALPOST_Y   = 1;
+function yardToY(yardsFromCamera: number): number {
+  const t = Math.max(0, Math.min(1, yardsFromCamera / CAMERA_YARDS_TO_GOAL));
+  const eased = 1 - Math.pow(1 - t, 1.25);
+  return CAMERA_Y - eased * (CAMERA_Y - THEIR_GOAL_Y);
+}
+
+const YARD_LINES = [5, 15].map(yardsFromCamera => ({ key: yardsFromCamera, y: yardToY(yardsFromCamera) }));
+const YARD_TICKS = Array.from({ length: 24 }, (_, i) => i + 1).map(yardsFromCamera => ({
+  key: yardsFromCamera, y: yardToY(yardsFromCamera),
+}));
+
+// Deterministic PRNG (mulberry32) — Math.random() here would give the server
+// render and the client's first render different values for the exact same
+// dots, and React would throw a hydration mismatch on every one of them.
+function mulberry32(seed: number) {
+  return function random() {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const CROWD_COLORS = [
+  '#c53030', '#dd6b20', '#d69e2e', '#38a169', '#3182ce', '#5a67d8',
+  '#805ad5', '#d53f8c', '#e2e8f0', '#a0aec0', '#718096', '#2d3748',
+  '#f6e05e', '#fefcbf', '#fbd38d', '#feb2b2', '#9ae6b4', '#90cdf4',
+];
+
+interface CrowdDot { x: number; y: number; w: number; h: number; color: string; opacity: number }
+
+function generateCrowd(seed: number, count: number, yMin: number, yMax: number, sizeMin: number, sizeMax: number): CrowdDot[] {
+  const rand = mulberry32(seed);
+  const dots: CrowdDot[] = [];
+  for (let i = 0; i < count; i++) {
+    const y = yMin + rand() * (yMax - yMin);
+    const depth = (y - yMin) / (yMax - yMin);
+    const size = sizeMin + depth * (sizeMax - sizeMin) + rand() * 1.1;
+    dots.push({
+      x: rand() * 100,
+      y,
+      w: size,
+      h: size * (1.1 + rand() * 0.3),
+      color: CROWD_COLORS[Math.floor(rand() * CROWD_COLORS.length)],
+      opacity: 0.5 + depth * 0.35 + rand() * 0.15,
+    });
+  }
+  return dots;
+}
+
+const UPPER_DECK_CROWD = generateCrowd(1001, 240, 6, 40, 2, 3.6);
+const LOWER_DECK_CROWD = generateCrowd(2002, 300, 50, 97, 3.2, 6);
+const STADIUM_LIGHT_X = [12, 34, 66, 88];
+
 // Named starter slots and which positions may occupy them — WR3 is the true
 // FLEX slot (RB/WR/TE); everyone else is fixed to their own position.
 const SLOT_ELIGIBLE_POSITIONS: Record<string, string[]> = {
@@ -316,11 +397,11 @@ function LiveStatsModal({
 // PlayerCard (on the pitch)
 // ---------------------------------------------------------------------------
 function PlayerCard({
-  player, x, y, livePoints, hidePrices = false, matchup,
+  player, x, y, scale = 1, livePoints, hidePrices = false, matchup,
   interactive = false, selected = false, eligible = false, dimmed = false, isSwapping = false,
   onCardClick, onShowStats,
 }: {
-  player: FieldPlayer; x: number; y: number; livePoints: number | null;
+  player: FieldPlayer; x: number; y: number; scale?: number; livePoints: number | null;
   hidePrices?: boolean;
   matchup?: Matchup;
   interactive?: boolean;
@@ -342,9 +423,9 @@ function PlayerCard({
       style={{
         position: 'absolute',
         left: `${x}%`, top: `${y}%`,
-        transform: 'translate(-50%, -50%)',
+        transform: `translate(-50%, -50%) scale(${scale})`,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: 5, cursor: clickable ? 'pointer' : 'default', zIndex: selected ? 12 : 10,
+        gap: 5, cursor: clickable ? 'pointer' : 'default', zIndex: selected ? 12 : 10 + Math.round(y),
         opacity: isSwapping ? 0.5 : dimmed ? 0.35 : 1,
         filter: dimmed ? 'grayscale(1)' : 'none',
         transition: 'opacity 0.15s, filter 0.15s',
@@ -363,34 +444,32 @@ function PlayerCard({
         </div>
       )}
 
-      {/* Avatar */}
-      <div style={{ position: 'relative' }}>
+      {/* Avatar — square framed card, same treatment as the draft board's
+          FilledSlot: dark rounded-rect frame, uncropped cutout photo inside
+          (objectFit: contain, no circular crop). Border/glow color still
+          carries selected/live state, never position. */}
+      <div style={{
+        position: 'relative', width: 84, height: 84, borderRadius: 10,
+        background: 'linear-gradient(160deg, rgba(15,23,42,0.82), rgba(15,23,42,0.62))',
+        border: selected ? `1.5px solid ${SELECT_COLOR}` : isLive ? '1.5px solid #10b981' : '1px solid rgba(255,255,255,0.25)',
+        boxShadow: selected
+          ? '0 6px 18px rgba(0,0,0,0.35), 0 0 14px rgba(245,158,11,0.5)'
+          : isLive
+            ? '0 6px 18px rgba(0,0,0,0.35), 0 0 14px rgba(16,185,129,0.45)'
+            : '0 6px 18px rgba(0,0,0,0.35)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+      }}>
         {player.headshot_url ? (
           <Image
             src={player.headshot_url} alt={player.full_name}
-            width={72} height={72} unoptimized
-            style={{
-              width: 72, height: 72, objectFit: 'cover', display: 'block',
-              border: selected ? `3px solid ${SELECT_COLOR}` : isLive ? '3px solid #10b981' : '3px solid #fff',
-              borderRadius: '50%',
-              boxShadow: selected
-                ? `0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(245,158,11,0.5)`
-                : isLive
-                  ? '0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(16,185,129,0.45)'
-                  : '0 4px 18px rgba(0,0,0,0.45)',
-            }}
+            width={68} height={68} unoptimized
+            style={{ width: 68, height: 68, objectFit: 'contain', display: 'block' }}
           />
         ) : (
           <div style={{
-            width: 72, height: 72, borderRadius: '50%', background: '#334155',
-            border: selected ? `3px solid ${SELECT_COLOR}` : isLive ? '3px solid #10b981' : '3px solid #fff',
-            boxShadow: selected
-              ? '0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(245,158,11,0.5)'
-              : isLive
-                ? '0 4px 18px rgba(0,0,0,0.45), 0 0 16px rgba(16,185,129,0.45)'
-                : '0 4px 18px rgba(0,0,0,0.45)',
+            width: 60, height: 60, borderRadius: '50%', background: '#334155',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 24, fontWeight: 700, color: '#fff',
+            fontSize: 22, fontWeight: 700, color: '#fff',
           }}>
             {player.full_name[0]}
           </div>
@@ -399,7 +478,7 @@ function PlayerCard({
         {/* Eligible-target ring */}
         {eligible && (
           <div style={{
-            position: 'absolute', inset: -4, borderRadius: '50%',
+            position: 'absolute', inset: -4, borderRadius: 12,
             border: `2.5px dashed ${SELECT_COLOR}`, pointerEvents: 'none',
           }} />
         )}
@@ -502,29 +581,30 @@ function BenchCard({
         transition: 'opacity 0.15s, filter 0.15s',
       }}
     >
-      <div style={{ position: 'relative' }}>
+      <div style={{
+        position: 'relative', width: 62, height: 62, borderRadius: 9,
+        background: 'linear-gradient(160deg, rgba(15,23,42,0.82), rgba(15,23,42,0.62))',
+        border: selected ? `1.5px solid ${SELECT_COLOR}` : isLive ? '1.5px solid #10b981' : '1px solid rgba(255,255,255,0.25)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+      }}>
         {player.headshot_url ? (
           <Image
             src={player.headshot_url} alt={player.full_name}
             width={52} height={52} unoptimized
-            style={{
-              width: 52, height: 52, objectFit: 'cover', display: 'block', borderRadius: '50%',
-              border: selected ? `2.5px solid ${SELECT_COLOR}` : isLive ? '2.5px solid #10b981' : '2.5px solid #e2e8f0',
-            }}
+            style={{ width: 52, height: 52, objectFit: 'contain', display: 'block' }}
           />
         ) : (
           <div style={{
-            width: 52, height: 52, borderRadius: '50%', background: '#e2e8f0',
-            border: selected ? `2.5px solid ${SELECT_COLOR}` : isLive ? '2.5px solid #10b981' : '2.5px solid #e2e8f0',
+            width: 44, height: 44, borderRadius: '50%', background: '#334155',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 17, fontWeight: 700, color: '#64748b',
+            fontSize: 15, fontWeight: 700, color: '#fff',
           }}>
             {player.full_name[0]}
           </div>
         )}
         {eligible && (
           <div style={{
-            position: 'absolute', inset: -4, borderRadius: '50%',
+            position: 'absolute', inset: -4, borderRadius: 11,
             border: `2px dashed ${SELECT_COLOR}`, pointerEvents: 'none',
           }} />
         )}
@@ -570,13 +650,13 @@ function BenchCard({
 // ---------------------------------------------------------------------------
 // EmptySlotCard
 // ---------------------------------------------------------------------------
-function EmptySlotCard({ pos, x, y }: { pos: string; x: number; y: number }) {
+function EmptySlotCard({ pos, x, y, scale = 1 }: { pos: string; x: number; y: number; scale?: number }) {
   return (
     <div style={{
       position: 'absolute', left: `${x}%`, top: `${y}%`,
-      transform: 'translate(-50%, -50%)',
+      transform: `translate(-50%, -50%) scale(${scale})`,
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      gap: 5, zIndex: 10, opacity: 0.55,
+      gap: 5, zIndex: 10 + Math.round(y), opacity: 0.55,
     }}>
       <div style={{
         background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(8px)',
@@ -697,16 +777,7 @@ export default function LiveTeamField({
         <div onClick={() => setMenuAnchor(null)} style={{ position: 'fixed', inset: 0, zIndex: 150 }} />
       )}
 
-      <div style={{
-        position: 'relative', height: 400, overflow: 'hidden',
-        boxShadow: 'inset 0 0 70px rgba(0,0,0,0.28)',
-        background: `
-          radial-gradient(ellipse 90% 45% at 50% 0%, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0) 60%),
-          radial-gradient(ellipse 150% 100% at 50% 50%, rgba(0,0,0,0) 35%, rgba(0,0,0,0.4) 100%),
-          linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 14%),
-          repeating-linear-gradient(180deg, #1e9a44 0px, #1e9a44 48px, #147333 48px, #147333 96px)
-        `,
-      }}>
+      <div style={{ position: 'relative', height: 400, overflow: 'hidden', background: '#fff' }}>
         <style>{`
           @keyframes live-dot-pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
@@ -714,51 +785,138 @@ export default function LiveTeamField({
           }
         `}</style>
 
-        {/* O-line — a branded block marking the line of scrimmage, sized to
-            roughly the tackle-box width. Every skill player lines up even
-            with this line or behind it, never ahead of it. */}
+        {/* Stadium crowd — fills the blank margin above the field. Two tiers
+            (upper deck far/dim, lower deck near/bright) separated by a
+            concourse walkway, stadium lights along the top, a wall band
+            right where the stands meet the turf. Same treatment as the
+            draft screen's field. */}
         <div style={{
-          position: 'absolute', left: '31%', right: '31%', top: '11%', height: 30,
-          transform: 'translateY(-50%)', zIndex: 2, borderRadius: 7,
-          background: 'linear-gradient(180deg, #f4f4f3 0%, #d9d9d7 100%)',
-          border: '1px solid rgba(255,255,255,0.5)',
-          boxShadow: '0 3px 10px rgba(0,0,0,0.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          overflow: 'hidden', padding: '0 8px',
+          position: 'absolute', top: 0, left: 0, right: 0, height: `${FIELD_TOP_Y}%`,
+          overflow: 'hidden',
+          background: 'linear-gradient(180deg, #10131b 0%, #191f2c 28%, #222a3c 52%, #2a3247 76%, #333c53 100%)',
         }}>
-          <span style={{
-            fontSize: 12, fontWeight: 900, color: '#475569',
-            letterSpacing: '0.08em', whiteSpace: 'nowrap',
-          }}>
-            ONELEAGUE
-          </span>
+          {STADIUM_LIGHT_X.map((x, i) => (
+            <div key={i} style={{
+              position: 'absolute', top: '3%', left: `${x}%`, transform: 'translate(-50%, 0)',
+              width: 12, height: 6, borderRadius: 3,
+              background: 'radial-gradient(circle, #fffbeb 0%, #fef3c7 55%, transparent 100%)',
+              boxShadow: '0 0 14px 5px rgba(254,243,199,0.45)',
+            }} />
+          ))}
+          {UPPER_DECK_CROWD.map((d, i) => (
+            <div key={`u${i}`} style={{
+              position: 'absolute', top: `${d.y}%`, left: `${d.x}%`,
+              width: d.w, height: d.h, borderRadius: '50%',
+              background: d.color, opacity: d.opacity,
+            }} />
+          ))}
+          <div style={{
+            position: 'absolute', top: '41%', left: 0, right: 0, height: '6%',
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.4), rgba(0,0,0,0.15))',
+          }} />
+          {LOWER_DECK_CROWD.map((d, i) => (
+            <div key={`l${i}`} style={{
+              position: 'absolute', top: `${d.y}%`, left: `${d.x}%`,
+              width: d.w, height: d.h, borderRadius: '50%',
+              background: d.color, opacity: d.opacity,
+            }} />
+          ))}
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '6%',
+            background: 'linear-gradient(180deg, #3d4358, #20233a)',
+            borderBottom: '2px solid rgba(255,255,255,0.15)',
+          }} />
         </div>
 
-        {/* Players */}
-        {positions.map(({ player, pos, x, y }, i) => {
-          if (!player) return <EmptySlotCard key={`empty-${pos}-${i}`} pos={pos} x={x} y={y} />;
-          const liveData = liveStats.get(player.external_player_id ?? '');
-          const livePoints = liveData?.totals.fantasyPointsTotal ?? null;
-          const isSelected = selected?.id === player.id;
-          const eligible = selected != null && !isSelected && isEligibleSwap(selected, player);
-          const dimmed = selected != null && !isSelected && !eligible;
-          return (
-            <PlayerCard
-              key={player.id}
-              player={player} x={x} y={y}
-              livePoints={livePoints}
-              hidePrices={hidePrices}
-              matchup={matchups[player.team_code]}
-              interactive={interactive}
-              selected={isSelected}
-              eligible={eligible}
-              dimmed={dimmed}
-              isSwapping={swapping.has(player.id)}
-              onCardClick={e => handleCardClick(player, e)}
-              onShowStats={liveData ? () => setModal({ player, stats: liveData }) : undefined}
-            />
-          );
-        })}
+        {/* Turf — clipped to the trapezoid, purely decorative */}
+        <div style={{
+          position: 'absolute', top: `${FIELD_TOP_Y}%`, left: 0, right: 0, bottom: 0,
+          clipPath: `polygon(${50 - FIELD_TOP_WIDTH_PCT / 2}% 0%, ${50 + FIELD_TOP_WIDTH_PCT / 2}% 0%, ${100 + FIELD_BOTTOM_OVERFLOW_PCT}% 100%, ${-FIELD_BOTTOM_OVERFLOW_PCT}% 100%)`,
+          background: `repeating-linear-gradient(180deg, #1a7a32 0px, #1a7a32 34px, #1e8838 34px, #1e8838 68px)`,
+        }}>
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0) 14%)',
+          }} />
+
+          {/* Their end zone — the scoring target, far away and small */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: `${THEIR_GOAL_Y}%`,
+            background: 'rgba(0,0,0,0.25)', borderBottom: '1.5px solid rgba(255,255,255,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{ fontSize: 7, fontWeight: 900, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+              END ZONE
+            </div>
+          </div>
+
+          {YARD_LINES.map(({ key, y }) => (
+            <div key={key} style={{ position: 'absolute', left: 0, right: 0, top: `${y}%`, height: 1.5, background: 'rgba(255,255,255,0.32)' }} />
+          ))}
+
+          {YARD_TICKS.map(({ key, y }) => (
+            <div key={`hash-${key}`}>
+              {[38, 62].map(nominalX => (
+                <div key={nominalX} style={{
+                  position: 'absolute', top: `${y}%`, left: `${remapX(nominalX, y)}%`,
+                  width: 8 * depthScale(y), height: 1.2,
+                  background: 'rgba(255,255,255,0.3)', transform: 'translate(-50%, -50%)',
+                }} />
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {/* Player layer — not clipped, so cards never get sliced by the
+            trapezoid edge, but positioned with the same perspective math. */}
+        <div style={{ position: 'absolute', top: `${FIELD_TOP_Y}%`, left: 0, right: 0, bottom: 0 }}>
+          {/* Goalpost — back of the end zone */}
+          <div style={{
+            position: 'absolute',
+            left: `${remapX(50, GOALPOST_Y)}%`,
+            top: `${GOALPOST_Y}%`,
+            transform: 'translate(-50%, -100%)',
+            zIndex: 1,
+          }}>
+            <svg
+              width="70" height="100" viewBox="0 0 90 130"
+              style={{ display: 'block', overflow: 'visible', transform: `scale(${depthScale(GOALPOST_Y)})`, transformOrigin: 'bottom center' }}
+            >
+              <line x1="45" y1="130" x2="45" y2="70" stroke="#f2c14e" strokeWidth="6" strokeLinecap="round" />
+              <line x1="13" y1="70"  x2="77" y2="70" stroke="#f2c14e" strokeWidth="6" strokeLinecap="round" />
+              <line x1="13" y1="70"  x2="13" y2="8"  stroke="#f2c14e" strokeWidth="6" strokeLinecap="round" />
+              <line x1="77" y1="70"  x2="77" y2="8"  stroke="#f2c14e" strokeWidth="6" strokeLinecap="round" />
+            </svg>
+          </div>
+
+          {/* Players */}
+          {positions.map(({ player, pos, x, y }, i) => {
+            const leftPct = remapX(x, y);
+            const scale = depthScale(y);
+            if (!player) return <EmptySlotCard key={`empty-${pos}-${i}`} pos={pos} x={leftPct} y={y} scale={scale} />;
+            const liveData = liveStats.get(player.external_player_id ?? '');
+            const livePoints = liveData?.totals.fantasyPointsTotal ?? null;
+            const isSelected = selected?.id === player.id;
+            const eligible = selected != null && !isSelected && isEligibleSwap(selected, player);
+            const dimmed = selected != null && !isSelected && !eligible;
+            return (
+              <PlayerCard
+                key={player.id}
+                player={player} x={leftPct} y={y} scale={scale}
+                livePoints={livePoints}
+                hidePrices={hidePrices}
+                matchup={matchups[player.team_code]}
+                interactive={interactive}
+                selected={isSelected}
+                eligible={eligible}
+                dimmed={dimmed}
+                isSwapping={swapping.has(player.id)}
+                onCardClick={e => handleCardClick(player, e)}
+                onShowStats={liveData ? () => setModal({ player, stats: liveData }) : undefined}
+              />
+            );
+          })}
+        </div>
       </div>
 
       {/* Bench — only on interactive (My Team) usage */}

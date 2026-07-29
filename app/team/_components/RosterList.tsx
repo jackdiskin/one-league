@@ -170,48 +170,63 @@ function LiveStatChips({ totals }: { totals: LiveStatDelta }) {
   );
 }
 
-const POS_COLORS: Record<string, { pill: string; bar: string; light: string; ring: string }> = {
-  QB: { pill: 'bg-blue-100 text-blue-700',       bar: '#3b82f6', light: '#eff6ff', ring: '#3b82f6' },
-  RB: { pill: 'bg-emerald-100 text-emerald-700', bar: '#10b981', light: '#f0fdf4', ring: '#10b981' },
-  WR: { pill: 'bg-amber-100 text-amber-700',     bar: '#f59e0b', light: '#fffbeb', ring: '#f59e0b' },
-  TE: { pill: 'bg-purple-100 text-purple-700',   bar: '#a855f7', light: '#faf5ff', ring: '#a855f7' },
-};
+// Single neutral accent used for all selection/eligibility highlighting on
+// this screen — never varies by position, per the standing no-color-coded-
+// positions rule.
+const ACCENT_RING  = '#059669';
+const ACCENT_LIGHT = '#f0fdf4';
+const ACCENT_BAR   = '#059669';
 
 const POS_ORDER = ['QB', 'RB', 'WR', 'TE'];
-const POS_LABELS: Record<string, string> = {
-  QB: 'Quarterback', RB: 'Running Backs', WR: 'Wide Receivers', TE: 'Tight Ends',
-};
 
 // Named starter slots, in display order. WR3 is the true FLEX slot — RB,
-// WR, or TE — everyone else is fixed to their own position. Rendered by
-// exact slot name (not position category) so a RB sitting in WR3 shows up
-// in the right place instead of overflowing the Running Backs group.
+// WR, or TE — everyone else is fixed to their own position. badgeLabel is
+// the short gray pill shown inline on the player's own row (no group
+// headers on this screen). Rendered by exact slot name (not position
+// category) so a RB sitting in WR3 shows up in the right place instead of
+// overflowing the Running Backs group.
 const STARTER_SLOTS = [
-  { slot: 'QB1', eligiblePositions: ['QB'],           sectionKey: 'QB',   sectionLabel: 'Quarterbacks',  singularLabel: 'QB Starter'      },
-  { slot: 'RB1', eligiblePositions: ['RB'],           sectionKey: 'RB',   sectionLabel: 'Running Backs', singularLabel: 'RB Starter'      },
-  { slot: 'RB2', eligiblePositions: ['RB'],           sectionKey: 'RB',   sectionLabel: 'Running Backs', singularLabel: 'RB Starter'      },
-  { slot: 'WR1', eligiblePositions: ['WR', 'TE'],      sectionKey: 'FLEX', sectionLabel: 'Receivers',     singularLabel: 'WR/TE Starter'   },
-  { slot: 'WR2', eligiblePositions: ['WR', 'TE'],      sectionKey: 'FLEX', sectionLabel: 'Receivers',     singularLabel: 'WR/TE Starter'   },
-  { slot: 'WR3', eligiblePositions: ['RB', 'WR', 'TE'], sectionKey: 'FLEX', sectionLabel: 'Receivers',    singularLabel: 'FLEX (RB/WR/TE)' },
+  { slot: 'QB1', eligiblePositions: ['QB'],            badgeLabel: 'QB'    },
+  { slot: 'RB1', eligiblePositions: ['RB'],            badgeLabel: 'RB'    },
+  { slot: 'RB2', eligiblePositions: ['RB'],            badgeLabel: 'RB'    },
+  { slot: 'WR1', eligiblePositions: ['WR', 'TE'],       badgeLabel: 'WR/TE' },
+  { slot: 'WR2', eligiblePositions: ['WR', 'TE'],       badgeLabel: 'WR/TE' },
+  { slot: 'WR3', eligiblePositions: ['RB', 'WR', 'TE'], badgeLabel: 'FLEX'  },
 ] as const;
 
-const SECTION_ORDER = ['QB', 'RB', 'FLEX'] as const;
-const SECTION_COLOR_POS: Record<string, string> = { QB: 'QB', RB: 'RB', FLEX: 'WR' };
+// Gray pill badge — matches PosBadge in app/market/page.tsx. Never
+// color-coded by position; shows the slot's badge label for starters
+// (QB / RB / WR/TE / FLEX) or the raw position for bench players.
+function rowBadgeLabel(p: RosterPlayer): string {
+  return STARTER_SLOTS.find(s => s.slot === p.roster_slot)?.badgeLabel ?? p.position;
+}
+
+function PosBadge({ label }: { label: string }) {
+  return (
+    <span style={{
+      fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9',
+      borderRadius: 20, padding: '1px 5px', flexShrink: 0,
+    }}>{label}</span>
+  );
+}
 
 function eligiblePositionsForSlot(slot: string): readonly string[] {
   return STARTER_SLOTS.find(s => s.slot === slot)?.eligiblePositions ?? [];
 }
 
-// Extracted so PlayerRow (defined outside RosterList) can call it without closures
+// Extracted so PlayerRow (defined outside RosterList) can call it without closures.
+// Two players can swap whenever each is eligible for the other's current slot —
+// bench accepts anyone, so this still covers ordinary bench<->starter swaps, but
+// it also allows direct starter<->starter swaps (e.g. a WR sitting in WR1 and
+// whoever's in the FLEX slot), so any eligible player can move into FLEX
+// regardless of whether they're currently starting elsewhere or on the bench.
 function isEligibleForSwap(p: RosterPlayer, selected: RosterPlayer | null): boolean {
   if (!selected) return false;
   if (p.id === selected.id) return false;
-  const selectedOnBench = selected.roster_slot === 'BENCH';
-  const pOnBench = p.roster_slot === 'BENCH';
-  if (selectedOnBench === pOnBench) return false; // one must be a starter, the other bench
-  const starter = selectedOnBench ? p : selected;
-  const bench   = selectedOnBench ? selected : p;
-  return eligiblePositionsForSlot(starter.roster_slot).includes(bench.position);
+  if (p.roster_slot === 'BENCH' && selected.roster_slot === 'BENCH') return false;
+  const pAcceptsSelected = p.roster_slot === 'BENCH' || eligiblePositionsForSlot(p.roster_slot).includes(selected.position);
+  const selectedAcceptsP = selected.roster_slot === 'BENCH' || eligiblePositionsForSlot(selected.roster_slot).includes(p.position);
+  return pAcceptsSelected && selectedAcceptsP;
 }
 
 interface PlayerRowProps {
@@ -249,7 +264,6 @@ function Avatar({ player, size = 40 }: { player: RosterPlayer; size?: number }) 
 const PlayerRow = memo(function PlayerRow({
   p, selected, swapping, liveData, onPlayerClick, onProfileClick, matchups,
 }: PlayerRowProps) {
-  const col        = POS_COLORS[p.position] ?? POS_COLORS.QB;
   const isSelected = selected?.id === p.id;
   const eligible   = isEligibleForSwap(p, selected);
   const isSwapping = swapping.has(p.id);
@@ -276,14 +290,14 @@ const PlayerRow = memo(function PlayerRow({
         cursor: isSwapping ? 'default' : 'pointer',
         position: 'relative',
         background: isSelected
-          ? col.light
+          ? ACCENT_LIGHT
           : isLive
             ? 'linear-gradient(135deg, rgba(5,150,105,0.04) 0%, rgba(255,255,255,0) 60%)'
             : 'transparent',
         outline: isSelected
-          ? `1.5px solid ${col.ring}`
+          ? `1.5px solid ${ACCENT_RING}`
           : eligible
-            ? `1.5px dashed ${col.ring}`
+            ? `1.5px dashed ${ACCENT_RING}`
             : 'none',
         outlineOffset: '-2px',
         borderRadius: (isSelected || eligible) ? 10 : 0,
@@ -304,7 +318,7 @@ const PlayerRow = memo(function PlayerRow({
       {isSelected && (
         <div style={{
           position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
-          width: 4, height: '60%', minHeight: 18, borderRadius: 4, background: col.bar, opacity: 0.8,
+          width: 4, height: '60%', minHeight: 18, borderRadius: 4, background: ACCENT_BAR, opacity: 0.8,
         }} />
       )}
 
@@ -316,6 +330,7 @@ const PlayerRow = memo(function PlayerRow({
           <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {formatPlayerName(p.full_name)}
           </span>
+          <PosBadge label={rowBadgeLabel(p)} />
           <TeamLogo code={p.team_code} size={12} />
           <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
           {isLive && (
@@ -370,9 +385,9 @@ const PlayerRow = memo(function PlayerRow({
           disabled={isSwapping}
           style={{
             padding: '5px 10px', borderRadius: 8,
-            border: isSelected ? `1px solid ${col.ring}` : '1px solid #e2e8f0',
-            background: isSelected ? col.light : '#fff',
-            color: isSelected ? col.ring : '#475569',
+            border: isSelected ? `1px solid ${ACCENT_RING}` : '1px solid #e2e8f0',
+            background: isSelected ? ACCENT_LIGHT : '#fff',
+            color: isSelected ? ACCENT_RING : '#475569',
             fontSize: 11, fontWeight: 700,
             cursor: isSwapping ? 'default' : 'pointer',
             display: 'flex', alignItems: 'center', gap: 4,
@@ -516,17 +531,18 @@ export default function RosterList({ roster, teamId, matchups, season }: {
   // (2) nothing is selected — click the "+" to open a picker of every
   // eligible bench player and choose one, no pre-selection needed.
   function EmptySlotRow({
-    label, barColor, ringColor, lightColor, eligible, onMove,
+    label, eligible, onMove,
     pickable, pickerOpen, onTogglePicker, onPick,
   }: {
     targetSlot: string; label: string;
-    barColor: string; ringColor: string; lightColor: string;
     eligible: boolean; onMove: () => void;
     pickable: RosterPlayer[]; pickerOpen: boolean;
     onTogglePicker: () => void; onPick: (p: RosterPlayer) => void;
   }) {
     const canPick = !isSelectionActive && pickable.length > 0;
     const active  = eligible || canPick;
+    const ringColor  = ACCENT_RING;
+    const lightColor = ACCENT_LIGHT;
 
     function handleClick() {
       if (eligible) { onMove(); return; }
@@ -747,14 +763,14 @@ export default function RosterList({ roster, teamId, matchups, season }: {
       {selected && (
         <div style={{
           padding: '10px 20px',
-          background: POS_COLORS[selected.position]?.light ?? '#f8fafc',
-          borderBottom: `2px solid ${POS_COLORS[selected.position]?.ring ?? '#94a3b8'}`,
+          background: ACCENT_LIGHT,
+          borderBottom: `2px solid ${ACCENT_RING}`,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{
               width: 8, height: 8, borderRadius: '50%',
-              background: POS_COLORS[selected.position]?.ring ?? '#94a3b8',
+              background: ACCENT_RING,
             }} />
             <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>
               {selected.roster_slot === 'BENCH' ? 'Starting' : 'Moving'} {formatPlayerName(selected.full_name)}
@@ -762,7 +778,7 @@ export default function RosterList({ roster, teamId, matchups, season }: {
             <span style={{ fontSize: 11, color: '#64748b' }}>
               {selected.roster_slot === 'BENCH'
                 ? '— select an open starter slot or player to swap with'
-                : '— select a bench player to swap with, or move to bench'}
+                : '— select an eligible player to swap with, or move to bench'}
             </span>
           </div>
           <button
@@ -794,68 +810,34 @@ export default function RosterList({ roster, teamId, matchups, season }: {
           Starters
         </div>
 
-        {SECTION_ORDER.map(sectionKey => {
-          const slotsInSection = STARTER_SLOTS.filter(s => s.sectionKey === sectionKey);
-          const col = POS_COLORS[SECTION_COLOR_POS[sectionKey]] ?? POS_COLORS.QB;
-          const filledCount = slotsInSection.filter(s => starters.some(p => p.roster_slot === s.slot)).length;
-          const openCount = slotsInSection.length - filledCount;
-
+        {STARTER_SLOTS.map(slotDef => {
+          const occupant = starters.find(p => p.roster_slot === slotDef.slot);
+          if (occupant) {
+            return (
+              <PlayerRow
+                key={occupant.id} p={occupant}
+                selected={selected} swapping={swapping}
+                liveData={liveStats.get(occupant.external_player_id ?? '') ?? undefined}
+                onPlayerClick={handlePlayerClick}
+                onProfileClick={p => setProfileId(p.id)}
+                matchups={matchups}
+              />
+            );
+          }
+          const eligible = isEmptyStarterEligible(slotDef.slot);
+          const pickable = bench.filter(p => (slotDef.eligiblePositions as readonly string[]).includes(p.position) && !swapping.has(p.id));
           return (
-            <div key={sectionKey}>
-              <div style={{
-                padding: '6px 20px',
-                borderTop: '1px solid #f1f5f9',
-                borderBottom: '1px solid #f1f5f9',
-                display: 'flex', alignItems: 'center', gap: 8,
-                background: '#fafafa',
-              }}>
-                <div style={{ width: 3, height: 12, borderRadius: 2, background: col.bar, flexShrink: 0 }} />
-                <span style={{ fontSize: 10, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                  {slotsInSection[0].sectionLabel}
-                </span>
-                <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>
-                  · {filledCount}/{slotsInSection.length}
-                </span>
-                {openCount > 0 && (
-                  <span style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 20, padding: '1px 6px' }}>
-                    {openCount} open
-                  </span>
-                )}
-              </div>
-              {slotsInSection.map(slotDef => {
-                const occupant = starters.find(p => p.roster_slot === slotDef.slot);
-                if (occupant) {
-                  return (
-                    <PlayerRow
-                      key={occupant.id} p={occupant}
-                      selected={selected} swapping={swapping}
-                      liveData={liveStats.get(occupant.external_player_id ?? '') ?? undefined}
-                      onPlayerClick={handlePlayerClick}
-                      onProfileClick={p => setProfileId(p.id)}
-                      matchups={matchups}
-                    />
-                  );
-                }
-                const eligible = isEmptyStarterEligible(slotDef.slot);
-                const pickable = bench.filter(p => (slotDef.eligiblePositions as readonly string[]).includes(p.position) && !swapping.has(p.id));
-                return (
-                  <EmptySlotRow
-                    key={slotDef.slot}
-                    targetSlot={slotDef.slot}
-                    label={slotDef.singularLabel}
-                    barColor={col.bar}
-                    ringColor={col.ring}
-                    lightColor={col.light}
-                    eligible={eligible}
-                    onMove={() => selected && executeMove(selected, slotDef.slot)}
-                    pickable={pickable}
-                    pickerOpen={pickerSlot === slotDef.slot}
-                    onTogglePicker={() => setPickerSlot(prev => (prev === slotDef.slot ? null : slotDef.slot))}
-                    onPick={p => executeMove(p, slotDef.slot)}
-                  />
-                );
-              })}
-            </div>
+            <EmptySlotRow
+              key={slotDef.slot}
+              targetSlot={slotDef.slot}
+              label={slotDef.badgeLabel}
+              eligible={eligible}
+              onMove={() => selected && executeMove(selected, slotDef.slot)}
+              pickable={pickable}
+              pickerOpen={pickerSlot === slotDef.slot}
+              onTogglePicker={() => setPickerSlot(prev => (prev === slotDef.slot ? null : slotDef.slot))}
+              onPick={p => executeMove(p, slotDef.slot)}
+            />
           );
         })}
       </div>
@@ -885,7 +867,7 @@ export default function RosterList({ roster, teamId, matchups, season }: {
           {isSelectionActive && (
             <span style={{
               marginLeft: 'auto', fontSize: 10,
-              color: POS_COLORS[selected!.position]?.ring ?? '#94a3b8',
+              color: ACCENT_RING,
               fontWeight: 700,
             }}>
               {isEmptyBenchEligible()
@@ -897,38 +879,16 @@ export default function RosterList({ roster, teamId, matchups, season }: {
           )}
         </div>
 
-        {POS_ORDER.map(pos => {
-          const players = bench.filter(p => p.position === pos);
-          if (!players.length) return null;
-          const col = POS_COLORS[pos] ?? POS_COLORS.QB;
-          return (
-            <div key={pos}>
-              <div style={{
-                padding: '6px 20px',
-                borderTop: '1px solid #f1f5f9',
-                borderBottom: '1px solid #f1f5f9',
-                display: 'flex', alignItems: 'center', gap: 8,
-                background: '#fafafa',
-              }}>
-                <div style={{ width: 3, height: 12, borderRadius: 2, background: col.bar, flexShrink: 0, opacity: 0.5 }} />
-                <span style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                  {POS_LABELS[pos]}
-                </span>
-                <span style={{ fontSize: 10, color: '#cbd5e1', fontWeight: 500 }}>· {players.length}</span>
-              </div>
-              {players.map(p => (
-                <PlayerRow
-                  key={p.id} p={p}
-                  selected={selected} swapping={swapping}
-                  liveData={liveStats.get(p.external_player_id ?? '') ?? undefined}
-                  onPlayerClick={handlePlayerClick}
-                  onProfileClick={p => setProfileId(p.id)}
-                  matchups={matchups}
-                />
-              ))}
-            </div>
-          );
-        })}
+        {POS_ORDER.flatMap(pos => bench.filter(p => p.position === pos)).map(p => (
+          <PlayerRow
+            key={p.id} p={p}
+            selected={selected} swapping={swapping}
+            liveData={liveStats.get(p.external_player_id ?? '') ?? undefined}
+            onPlayerClick={handlePlayerClick}
+            onProfileClick={p => setProfileId(p.id)}
+            matchups={matchups}
+          />
+        ))}
 
         {/* Empty bench slot — only shown when the bench actually has room */}
         {bench.length < MAX_BENCH && (
