@@ -27,11 +27,14 @@ async function fetchRoster(season: number, teamId: number, lastWeek: number): Pr
        SELECT player_id, SUM(fantasy_points) AS season_points
        FROM player_weekly_scores WHERE season_year = ? GROUP BY player_id
      ) tot ON tot.player_id = ftr.player_id
-     WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE`,
+     WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE AND ftr.roster_slot != 'BENCH'`,
     [season, season, lastWeek, season, teamId]
   );
 }
 
+// Bench points never count toward the score (only starters do — see
+// api/admin/scores and api/admin/finalize-games, which apply the same
+// roster_slot != 'BENCH' filter when computing the official total_points).
 async function fetchProjectedTotal(season: number, teamId: number, week: number): Promise<number> {
   const [row] = await query<{ total: number }>(
     `SELECT COALESCE(SUM(pwp.expected_points), 0) AS total
@@ -39,7 +42,7 @@ async function fetchProjectedTotal(season: number, teamId: number, week: number)
      LEFT JOIN player_weekly_projections pwp
        ON pwp.player_id = ftr.player_id AND pwp.season_year = ? AND pwp.week = ?
           AND pwp.projection_source = 'internal_model'
-     WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE`,
+     WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE AND ftr.roster_slot != 'BENCH'`,
     [season, week, teamId]
   );
   return Number(row?.total ?? 0);

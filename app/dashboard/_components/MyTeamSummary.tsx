@@ -1,9 +1,6 @@
 import { query } from '@/lib/mysql';
 import { formatPrice, formatPoints } from '@/lib/format';
 import LiveTeamField, { type FieldPlayer, type FieldSlot } from './LiveTeamField';
-import { getNextMatchupByTeam } from '@/lib/schedule';
-
-const SCHEDULE_SEASON = 2026;
 
 interface Props { userId: string; seasonYear: number; hidePrices?: boolean; interactive?: boolean }
 
@@ -14,12 +11,16 @@ type Player = FieldPlayer;
 // lines up even with it or behind it (nobody lines up ahead of the ball).
 // WR1/WR2/WR3 are fixed WR/TE slots, always out on the line. FLEX1 is the
 // true flex (RB/WR/TE) and adapts to who's actually starting there: a TE
-// lines up tight next to the tackle, a WR lines up off the line in the slot
-// (has to be off the line to be eligible), and a RB drops into the
-// backfield instead of lining up as a receiver — directly behind the QB,
+// lines up tight next to the tackle, a WR lines up in the slot — both stay
+// in the front row alongside WR1/WR2/WR3 — and a RB drops into the
+// backfield instead of lining up as a receiver, directly behind the QB and
 // deeper than RB1/RB2, so the four backfield players form a diamond: QB at
-// the front point, RB1/RB2 flanking the sides, and the flex RB at the back
-// point.
+// the front point, RB1/RB2 flanking the sides slightly behind him, and the
+// flex RB at the back point.
+// Coordinates are tuned against LiveTeamField's fixed-height layout bands
+// (CROWD_H/PITCH_H/BENCH_H) and card sizes (STARTER_W/H) so every slot
+// clears its neighbors with real pixel margin — no two cards' boxes
+// intersect at any depth.
 // Looked up by named roster_slot (not position), so subbing auto-updates it
 // and a RB sitting in the FLEX slot renders in the right spot.
 function getPositions(starters: Player[]) {
@@ -34,29 +35,31 @@ function getPositions(starters: Player[]) {
   const rb2  = bySlot('RB2');
 
   const out: FieldSlot[] = [];
-  const LOS = 16; // O-line / line-of-scrimmage depth — see the bar in LiveTeamField
+  const LOS = 17; // front row — WR/TE line of scrimmage depth, clear of the end zone band
   const flexIsTE = flex?.position === 'TE';
   const flexIsRB = flex?.position === 'RB';
 
-  out.push({ player: wr1, pos: wr1?.position ?? 'WR', x: 6,  y: LOS });
+  // ── Front row: WR1/WR3/WR2 always on the line ─────────────────────────
+  out.push({ player: wr1, pos: wr1?.position ?? 'WR', x: 8,  y: LOS });
   out.push({ player: wr3, pos: wr3?.position ?? 'WR', x: 50, y: LOS });
-  out.push({ player: wr2, pos: wr2?.position ?? 'WR', x: 94, y: LOS });
+  out.push({ player: wr2, pos: wr2?.position ?? 'WR', x: 92, y: LOS });
 
   // ── QB in shotgun, well behind the line ───────────────────────────────
-  out.push({ player: qb1, pos: 'QB', x: 50, y: LOS + 24 });
+  out.push({ player: qb1, pos: 'QB', x: 50, y: 48 });
 
-  // ── RBs split, flanking the QB ────────────────────────────────────────
-  out.push({ player: rb1, pos: 'RB', x: 32, y: LOS + 32 });
-  out.push({ player: rb2, pos: 'RB', x: 68, y: LOS + 32 });
+  // ── RBs split, flanking the QB, only slightly deeper than him ─────────
+  out.push({ player: rb1, pos: 'RB', x: 26, y: 55 });
+  out.push({ player: rb2, pos: 'RB', x: 74, y: 55 });
 
   // TE lines up on the line too, tight next to the tackle; a flex WR lines
-  // up just off the line in the slot, offset from WR3 so they don't
-  // overlap; a flex RB drops deepest of all, directly behind the QB,
-  // completing the backfield diamond.
+  // up in its own lane in that same front row, between WR1 and WR3; a flex
+  // RB drops deepest of all, directly behind the QB, completing the
+  // backfield diamond — needs a big depth gap from the QB since both sit at
+  // the same x=50 center lane (no horizontal separation to fall back on).
   out.push({
     player: flex, pos: flex?.position ?? 'FLEX',
-    x: flexIsTE ? 74 : flexIsRB ? 50 : 26,
-    y: flexIsTE ? LOS : flexIsRB ? LOS + 56 : LOS + 7,
+    x: flexIsTE ? 72 : flexIsRB ? 50 : 29,
+    y: flexIsRB ? 83 : LOS,
   });
 
   return out;
@@ -111,22 +114,19 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
   );
   const lastWeek = weekRow?.w ?? 1;
 
-  const [roster, matchups] = await Promise.all([
-    query<Player>(
-      `SELECT p.id, p.full_name, p.position, p.team_code, pms.current_price, p.headshot_url,
-              p.external_player_id, ftr.roster_slot, pwp.expected_points AS projected_points
-       FROM fantasy_team_roster ftr
-       JOIN players p ON p.id = ftr.player_id
-       JOIN player_market_state pms ON pms.player_id = ftr.player_id AND pms.season_year = ?
-       LEFT JOIN player_weekly_projections pwp
-         ON pwp.player_id = ftr.player_id AND pwp.season_year = ? AND pwp.week = ?
-            AND pwp.projection_source = 'internal_model'
-       WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE
-       ORDER BY FIELD(p.position,'WR','TE','QB','RB'), pms.current_price DESC`,
-      [seasonYear, seasonYear, lastWeek, team.id]
-    ),
-    getNextMatchupByTeam(SCHEDULE_SEASON),
-  ]);
+  const roster = await query<Player>(
+    `SELECT p.id, p.full_name, p.position, p.team_code, pms.current_price, p.headshot_url,
+            p.external_player_id, ftr.roster_slot, pwp.expected_points AS projected_points
+     FROM fantasy_team_roster ftr
+     JOIN players p ON p.id = ftr.player_id
+     JOIN player_market_state pms ON pms.player_id = ftr.player_id AND pms.season_year = ?
+     LEFT JOIN player_weekly_projections pwp
+       ON pwp.player_id = ftr.player_id AND pwp.season_year = ? AND pwp.week = ?
+          AND pwp.projection_source = 'internal_model'
+     WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE
+     ORDER BY FIELD(p.position,'WR','TE','QB','RB'), pms.current_price DESC`,
+    [seasonYear, seasonYear, lastWeek, team.id]
+  );
 
   const starters = roster.filter(p => p.roster_slot !== 'BENCH');
   const bench    = roster.filter(p => p.roster_slot === 'BENCH');
@@ -134,7 +134,6 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
   const positions = getPositions(starters);
 
   const rankLabel = team.rank === 1 ? '1st' : team.rank === 2 ? '2nd' : team.rank === 3 ? '3rd' : `${team.rank}th`;
-  const rankMedal = team.rank === 1 ? '🥇' : team.rank === 2 ? '🥈' : team.rank === 3 ? '🥉' : null;
 
   return (
     <div className="rounded-2xl overflow-hidden ring-1 ring-slate-200 shadow-sm">
@@ -146,9 +145,6 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
       }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>
-            {team.league_name}
-          </div>
           <div style={{
             fontSize: 21, fontWeight: 900, letterSpacing: '-0.03em',
             background: 'linear-gradient(135deg, #0f172a 0%, #334155 55%, #059669 100%)',
@@ -162,7 +158,7 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
           {[
             { label: 'Points', value: formatPoints(team.total_points), bg: '#f8fafc', border: '#e2e8f0', color: '#0f172a', labelColor: '#94a3b8' },
             ...(hidePrices ? [] : [{ label: 'Cap Space', value: formatPrice(team.budget_remaining), bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d', labelColor: '#16a34a' }]),
-            { label: 'Rank',   value: `${rankMedal ?? ''}${rankLabel}`,  bg: team.rank <= 3 ? '#fffbeb' : '#f8fafc', border: team.rank <= 3 ? '#fde68a' : '#e2e8f0', color: '#0f172a', labelColor: '#94a3b8' },
+            { label: 'Rank',   value: rankLabel,  bg: team.rank <= 3 ? '#fffbeb' : '#f8fafc', border: team.rank <= 3 ? '#fde68a' : '#e2e8f0', color: '#0f172a', labelColor: '#94a3b8' },
           ].map(s => (
             <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 12, padding: '6px 12px', textAlign: 'center' }}>
               <div style={{ fontSize: 9, fontWeight: 600, color: s.labelColor, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.label}</div>
@@ -174,7 +170,7 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
 
       {/* ── Field ── */}
       <LiveTeamField
-        positions={positions} hidePrices={hidePrices} matchups={matchups}
+        positions={positions} hidePrices={hidePrices}
         bench={bench} teamId={team.id} interactive={interactive} season={seasonYear}
       />
     </div>

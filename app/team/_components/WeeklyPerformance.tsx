@@ -13,6 +13,7 @@ export interface PerfPlayer {
   position: string;
   team_code: string;
   headshot_url: string | null;
+  roster_slot: string;
   last_week_points: number | null;
   projected_points: number | null;
 }
@@ -20,9 +21,15 @@ export interface PerfPlayer {
 export default function WeeklyPerformance({ players, week, season, matchups }: {
   players: PerfPlayer[]; week: number; season?: number; matchups: Record<string, Matchup>;
 }) {
-  const played = players.filter(p => p.last_week_points != null);
-  const totalActual   = played.reduce((s, p) => s + Number(p.last_week_points ?? 0), 0);
-  const totalExpected = played.reduce((s, p) => s + Number(p.projected_points ?? 0), 0);
+  // Bench points never count toward the score (only starters do — see
+  // api/admin/scores and api/admin/finalize-games, which apply the same
+  // roster_slot != 'BENCH' filter when computing the official total_points),
+  // so the header totals below only sum starters even though every rostered
+  // player (bench included) still gets its own row for visibility.
+  const starters = players.filter(p => p.roster_slot !== 'BENCH');
+  const startersPlayed = starters.filter(p => p.last_week_points != null).length;
+  const totalActual   = starters.reduce((s, p) => s + Number(p.last_week_points ?? 0), 0);
+  const totalExpected = starters.reduce((s, p) => s + Number(p.projected_points ?? 0), 0);
   const teamDiff = totalActual - totalExpected;
   const teamUp = teamDiff >= 0;
 
@@ -32,7 +39,7 @@ export default function WeeklyPerformance({ players, week, season, matchups }: {
       <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>{formatWeekLong(week)} Performance</h3>
-          <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{played.length} players scored</p>
+          <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{startersPlayed} of {starters.length} starters scored</p>
         </div>
         {/* Team totals */}
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>

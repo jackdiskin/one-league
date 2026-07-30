@@ -147,7 +147,7 @@ async function fetchRoster(season: number, teamId: number, lastWeek: number): Pr
 
 async function fetchWeeklyPerf(season: number, teamId: number, lastWeek: number): Promise<PerfPlayer[]> {
   return query<PerfPlayer>(
-    `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url,
+    `SELECT p.id, p.full_name, p.position, p.team_code, p.headshot_url, ftr.roster_slot,
             pws.fantasy_points   AS last_week_points,
             pwp.expected_points  AS projected_points
      FROM fantasy_team_roster ftr
@@ -243,9 +243,6 @@ export default async function TeamPage({
 
           {/* Page title */}
           <div style={{ paddingLeft: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-              {team.league_name}
-            </div>
             <h1 style={{
               fontSize: 26, fontWeight: 900, letterSpacing: '-0.03em',
               backgroundImage: 'linear-gradient(135deg, #0f172a 0%, #334155 55%, #059669 100%)',

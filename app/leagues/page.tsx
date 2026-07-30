@@ -1,9 +1,11 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import LeaguesClient, { type MyLeague } from './_components/LeaguesClient';
+import LeaderboardCard from './_components/LeaderboardCard';
 
 const PREV_SEASON = 2025;
 const SEASON = 2026;
@@ -111,7 +113,14 @@ export default async function LeaguesPage({
               <p className="text-sm text-slate-500 mt-1">You're auto-enrolled in the Global Leaderboard the moment you draft — private leagues can wait until after.</p>
             </div>
           ) : (
-            <LeaguesClient initialLeagues={myLeagues} season={SEASON_YEAR} />
+            <>
+              <div style={{ maxWidth: 280 }}>
+                <Suspense fallback={<div className="rounded-2xl bg-slate-100 animate-pulse h-32" />}>
+                  <LeaderboardCard userId={userId} seasonYear={SEASON_YEAR} />
+                </Suspense>
+              </div>
+              <LeaguesClient initialLeagues={myLeagues} season={SEASON_YEAR} />
+            </>
           )}
         </main>
       </div>

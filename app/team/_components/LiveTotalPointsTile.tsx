@@ -21,18 +21,23 @@ export default function LiveTotalPointsTile({ roster, seasonBasePoints }: Props)
   );
   const liveStats = useLiveStats(playerIds);
 
+  // Bench points never count toward the score (only starters do — see
+  // api/admin/scores and api/admin/finalize-games, which apply the same
+  // roster_slot != 'BENCH' filter when computing the official total_points).
   const weekTotal = useMemo(() => {
-    return roster.reduce((sum, p) => {
-      const live = p.external_player_id ? liveStats.get(p.external_player_id) : undefined;
-      const pts  = live
-        ? Number(live.totals.fantasyPointsTotal)
-        : Number(p.last_week_points ?? 0);
-      return sum + pts;
-    }, 0);
+    return roster
+      .filter(p => p.roster_slot !== 'BENCH')
+      .reduce((sum, p) => {
+        const live = p.external_player_id ? liveStats.get(p.external_player_id) : undefined;
+        const pts  = live
+          ? Number(live.totals.fantasyPointsTotal)
+          : Number(p.last_week_points ?? 0);
+        return sum + pts;
+      }, 0);
   }, [roster, liveStats]);
 
   const total   = Number(seasonBasePoints) + weekTotal;
-  const anyLive = playerIds.some(id => liveStats.has(id));
+  const anyLive = roster.some(p => p.roster_slot !== 'BENCH' && p.external_player_id && liveStats.has(p.external_player_id));
 
   return (
     <div className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm" style={{ padding: '14px 16px' }}>

@@ -10,7 +10,6 @@ import WeekScoreSection from './_components/WeekScoreSection';
 import TopMovers       from './_components/TopMovers';
 import StandingsCard   from './_components/StandingsCard';
 import DiscoverLeagues from './_components/DiscoverLeagues';
-import LeaderboardCard  from './_components/LeaderboardCard';
 import Sidebar, { type SidebarLeague } from './_components/Sidebar';
 import { formatWeekLong } from '@/lib/format';
 import SeasonModeSwitcher from './_components/SeasonModeSwitcher';
@@ -188,16 +187,10 @@ export default async function DashboardPage({
           </Suspense>
 
           {/* Bottom row */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <Suspense fallback={<Skeleton className="h-72" />}>
-              <StandingsCard userId={userId} seasonYear={SEASON} />
-            </Suspense>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <StandingsCard leagues={userLeagues} />
 
             <DiscoverLeagues leagues={discoverLeagues} />
-
-            <Suspense fallback={<Skeleton className="h-72" />}>
-              <LeaderboardCard userId={userId} seasonYear={SEASON} />
-            </Suspense>
           </div>
 
         </main>
