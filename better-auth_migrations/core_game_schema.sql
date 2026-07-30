@@ -36,7 +36,7 @@ create table leagues (
   season_year     smallint not null,
   salary_cap      decimal(14,2) not null default 100000000.00,
   is_public       boolean not null default false,
-  invite_code     varchar(6),
+  invite_code     varchar(64), -- widened from varchar(6): league password, user-chosen, min 4 chars, no fixed max
   max_members     int not null default 12,
   created_at      datetime not null default current_timestamp,
   key idx_public_season (is_public, season_year),

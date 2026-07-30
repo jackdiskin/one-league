@@ -34,13 +34,13 @@ export default function LeaderboardModalTrigger({ standings, myRank, userId }: {
       >
         <div className="flex items-center gap-2 mb-4">
           <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-600 text-xs">🏆</span>
-          <h3 className="font-semibold text-slate-900">Global Leaderboard</h3>
+          <h3 className="font-semibold text-slate-900">Global Rank</h3>
         </div>
 
         {myRank ? (
           <>
             <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: '-0.03em', color: '#0f172a', lineHeight: 1 }}>
-              #{myRank}
+              {myRank}
             </div>
             <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
               of {standings.length} manager{standings.length === 1 ? '' : 's'}
@@ -81,7 +81,7 @@ export default function LeaderboardModalTrigger({ standings, myRank, userId }: {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 18 }}>🏆</span>
-                <span style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>Global Leaderboard</span>
+                <span style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>Global Rank</span>
               </div>
               <button
                 onClick={() => setOpen(false)}

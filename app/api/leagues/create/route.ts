@@ -5,18 +5,14 @@ import { withTransaction } from '@/lib/mysql';
 import type { ResultSetHeader } from 'mysql2';
 
 const SEASON = 2026;
-
-function generateInviteCode(): string {
-  // Unambiguous alphanumeric characters (no 0/O, 1/I/L)
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-}
+const PASSWORD_MIN_LENGTH = 4;
+const PASSWORD_MAX_LENGTH = 64;
 
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { name, visibility } = await req.json();
+  const { name, visibility, password } = await req.json();
 
   if (!name?.trim() || name.trim().length < 2) {
     return NextResponse.json({ error: 'League name must be at least 2 characters' }, { status: 400 });
@@ -25,24 +21,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Visibility must be public or private' }, { status: 400 });
   }
 
-  const isPublic    = visibility === 'public';
-  const invite_code = isPublic ? null : generateInviteCode();
+  const isPublic = visibility === 'public';
 
-  const result = await withTransaction(async (conn) => {
-    const [res] = await conn.execute<ResultSetHeader>(
-      `INSERT INTO leagues (name, season_year, salary_cap, max_members, is_public, invite_code, owner_user_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name.trim(), SEASON, 100_000_000, 2_147_483_647, isPublic ? 1 : 0, invite_code, session.user.id]
-    );
-    const leagueId = res.insertId;
+  let invite_code: string | null = null;
+  if (!isPublic) {
+    invite_code = String(password ?? '').trim();
+    if (invite_code.length < PASSWORD_MIN_LENGTH || invite_code.length > PASSWORD_MAX_LENGTH) {
+      return NextResponse.json(
+        { error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters` },
+        { status: 400 }
+      );
+    }
+  }
 
-    await conn.execute(
-      `INSERT INTO league_members (league_id, user_id, role) VALUES (?, ?, 'commissioner')`,
-      [leagueId, session.user.id]
-    );
+  let result: { league_id: number; invite_code: string | null };
+  try {
+    result = await withTransaction(async (conn) => {
+      const [res] = await conn.execute<ResultSetHeader>(
+        `INSERT INTO leagues (name, season_year, salary_cap, max_members, is_public, invite_code, owner_user_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [name.trim(), SEASON, 100_000_000, 2_147_483_647, isPublic ? 1 : 0, invite_code, session.user.id]
+      );
+      const leagueId = res.insertId;
 
-    return { league_id: leagueId, invite_code };
-  });
+      await conn.execute(
+        `INSERT INTO league_members (league_id, user_id, role) VALUES (?, ?, 'commissioner')`,
+        [leagueId, session.user.id]
+      );
+
+      return { league_id: leagueId, invite_code };
+    });
+  } catch (err) {
+    if (!isPublic && (err as { code?: string }).code === 'ER_DUP_ENTRY') {
+      return NextResponse.json({ error: 'That password is already taken — try another' }, { status: 409 });
+    }
+    throw err;
+  }
 
   return NextResponse.json({ data: result }, { status: 201 });
 }

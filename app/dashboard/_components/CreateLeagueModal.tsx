@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-type PublicLeague = { id: number; name: string; member_count: number };
+type SearchLeague = { id: number; name: string; is_public: number; member_count: number };
 
 // ── Shared animation styles ────────────────────────────────────────────────────
 const STYLES = `
@@ -121,6 +121,7 @@ export default function LeagueHubModal({ onClose }: { onClose: () => void }) {
 function CreatePanel({ onClose, router }: { onClose: () => void; router: ReturnType<typeof useRouter> }) {
   const [name, setName]             = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
+  const [password, setPassword]     = useState('');
   const [step, setStep]             = useState<'form' | 'success'>('form');
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [leagueId, setLeagueId]     = useState<number | null>(null);
@@ -128,14 +129,18 @@ function CreatePanel({ onClose, router }: { onClose: () => void; router: ReturnT
   const [error, setError]           = useState('');
   const [copied, setCopied]         = useState(false);
 
+  const needsPassword = visibility === 'private';
+  const canSubmit = name.trim().length > 0 && (!needsPassword || password.trim().length >= 4);
+
   async function handleCreate() {
     if (!name.trim()) { setError('League name is required'); return; }
+    if (needsPassword && password.trim().length < 4) { setError('Password must be at least 4 characters'); return; }
     setLoading(true); setError('');
     try {
       const res  = await fetch('/api/leagues/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), visibility }),
+        body: JSON.stringify({ name: name.trim(), visibility, password: password.trim() }),
       });
       const json = await res.json();
       if (!res.ok) { setError(json.error ?? 'Failed to create league'); return; }
@@ -185,26 +190,19 @@ function CreatePanel({ onClose, router }: { onClose: () => void; router: ReturnT
           {visibility === 'private' && inviteCode && (
             <div style={{ padding: '16px 18px', background: '#f0fdf4' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>
-                Invite Code — share this with your league
+                Password — share this with your league
               </div>
-              <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-                {inviteCode.split('').map((char, i) => (
-                  <span
-                    key={i}
-                    className="code-char"
-                    style={{
-                      animationDelay: `${i * 0.065}s`,
-                      width: 40, height: 48, borderRadius: 10,
-                      background: '#fff',
-                      border: '1.5px solid #6ee7b7',
-                      alignItems: 'center', justifyContent: 'center',
-                      fontSize: 22, fontWeight: 900, color: '#065f46',
-                      fontFamily: 'ui-monospace, SFMono-Regular, monospace',
-                    }}
-                  >
-                    {char}
-                  </span>
-                ))}
+              <div
+                className="code-char"
+                style={{
+                  marginBottom: 12, padding: '12px 14px', borderRadius: 10,
+                  background: '#fff', border: '1.5px solid #6ee7b7',
+                  fontSize: 18, fontWeight: 900, color: '#065f46',
+                  fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+                  wordBreak: 'break-all',
+                }}
+              >
+                {inviteCode}
               </div>
               <button
                 onClick={copyCode}
@@ -220,7 +218,7 @@ function CreatePanel({ onClose, router }: { onClose: () => void; router: ReturnT
               >
                 {copied
                   ? <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!</>
-                  : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Code</>
+                  : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Password</>
                 }
               </button>
             </div>
@@ -283,7 +281,7 @@ function CreatePanel({ onClose, router }: { onClose: () => void; router: ReturnT
           {([
             { value: 'public'  as const, label: 'Public',  sub: 'Anyone can join',      activeColor: '#059669', activeBg: '#f0fdf4', activeBorder: '#6ee7b7',
               icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> },
-            { value: 'private' as const, label: 'Private', sub: 'Invite code required', activeColor: '#d97706', activeBg: '#fffbeb', activeBorder: '#fcd34d',
+            { value: 'private' as const, label: 'Private', sub: 'You set the password', activeColor: '#d97706', activeBg: '#fffbeb', activeBorder: '#fcd34d',
               icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> },
           ]).map(opt => {
             const active = visibility === opt.value;
@@ -307,21 +305,50 @@ function CreatePanel({ onClose, router }: { onClose: () => void; router: ReturnT
         </div>
       </div>
 
+      {/* Password — only for private leagues, chosen by the creator */}
+      {needsPassword && (
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.12em', display: 'block', marginBottom: 6 }}>
+            Password
+          </label>
+          <input
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={e => { setPassword(e.target.value); setError(''); }}
+            onKeyDown={e => e.key === 'Enter' && handleCreate()}
+            placeholder="At least 4 characters"
+            maxLength={64}
+            style={{
+              width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 11,
+              border: '1.5px solid #e2e8f0', background: '#f8fafc',
+              fontSize: 14, fontWeight: 600, color: '#0f172a', outline: 'none',
+              transition: 'all 0.15s',
+            }}
+            onFocus={e => { e.target.style.borderColor = '#10b981'; e.target.style.background = '#fff'; }}
+            onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
+          />
+          <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
+            At least 4 characters. Share it with anyone you want to invite.
+          </p>
+        </div>
+      )}
+
       {error && <div style={{ marginBottom: 14, padding: '8px 12px', borderRadius: 9, background: '#fef2f2', border: '1px solid #fecaca', fontSize: 12, color: '#dc2626', fontWeight: 600 }}>{error}</div>}
 
       <button
         onClick={handleCreate}
-        disabled={loading || !name.trim()}
+        disabled={loading || !canSubmit}
         style={{
           width: '100%', padding: '12px 0', borderRadius: 12, border: 'none',
-          background: name.trim() && !loading ? 'linear-gradient(135deg, #0f172a, #1e293b)' : '#f1f5f9',
-          color: name.trim() && !loading ? '#fff' : '#94a3b8',
-          fontSize: 13, fontWeight: 800, cursor: name.trim() && !loading ? 'pointer' : 'not-allowed',
-          boxShadow: name.trim() && !loading ? '0 3px 12px rgba(15,23,42,0.22)' : 'none',
+          background: canSubmit && !loading ? 'linear-gradient(135deg, #0f172a, #1e293b)' : '#f1f5f9',
+          color: canSubmit && !loading ? '#fff' : '#94a3b8',
+          fontSize: 13, fontWeight: 800, cursor: canSubmit && !loading ? 'pointer' : 'not-allowed',
+          boxShadow: canSubmit && !loading ? '0 3px 12px rgba(15,23,42,0.22)' : 'none',
           transition: 'all 0.15s',
         }}
-        onMouseEnter={e => { if (name.trim() && !loading) (e.currentTarget.style.background = 'linear-gradient(135deg, #1e293b, #334155)'); }}
-        onMouseLeave={e => { if (name.trim() && !loading) (e.currentTarget.style.background = 'linear-gradient(135deg, #0f172a, #1e293b)'); }}
+        onMouseEnter={e => { if (canSubmit && !loading) (e.currentTarget.style.background = 'linear-gradient(135deg, #1e293b, #334155)'); }}
+        onMouseLeave={e => { if (canSubmit && !loading) (e.currentTarget.style.background = 'linear-gradient(135deg, #0f172a, #1e293b)'); }}
       >
         {loading ? 'Creating…' : 'Create League'}
       </button>
@@ -333,37 +360,49 @@ function CreatePanel({ onClose, router }: { onClose: () => void; router: ReturnT
 // JOIN PANEL
 // ─────────────────────────────────────────────────────────────────────────────
 function JoinPanel({ onClose, router }: { onClose: () => void; router: ReturnType<typeof useRouter> }) {
-  const [tab, setTab]                   = useState<'browse' | 'code'>('browse');
-  const [publicLeagues, setPublicLeagues] = useState<PublicLeague[]>([]);
-  const [loadingLeagues, setLoadingLeagues] = useState(true);
-  const [selectedId, setSelectedId]     = useState<number | null>(null);
-  const [inviteCode, setInviteCode]     = useState('');
-  const [loading, setLoading]           = useState(false);
-  const [error, setError]               = useState('');
-  const [joinedName, setJoinedName]     = useState<string | null>(null);
-  const [joinedId, setJoinedId]         = useState<number | null>(null);
+  const [searchName, setSearchName]   = useState('');
+  const [searching, setSearching]     = useState(false);
+  const [results, setResults]         = useState<SearchLeague[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [selected, setSelected]       = useState<SearchLeague | null>(null);
+  const [password, setPassword]       = useState('');
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState('');
+  const [joinedName, setJoinedName]   = useState<string | null>(null);
+  const [joinedId, setJoinedId]       = useState<number | null>(null);
 
+  // Debounced search-as-you-type by league name
   useEffect(() => {
-    fetch('/api/leagues/public')
-      .then(r => r.json())
-      .then(j => setPublicLeagues(j.data ?? []))
-      .catch(() => {})
-      .finally(() => setLoadingLeagues(false));
-  }, []);
+    const q = searchName.trim();
+    if (q.length < 2) { setResults([]); setHasSearched(false); setSearching(false); return; }
+    setSearching(true);
+    const timer = setTimeout(() => {
+      fetch(`/api/leagues/search?name=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(j => { setResults(j.data ?? []); setHasSearched(true); })
+        .catch(() => {})
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchName]);
 
-  const canJoin = tab === 'browse' ? selectedId !== null : inviteCode.trim().length >= 4;
+  function selectLeague(league: SearchLeague) {
+    setSelected(league);
+    setPassword('');
+    setError('');
+  }
+
+  const needsPassword = selected != null && !selected.is_public;
+  const canJoin = selected != null && (!needsPassword || password.trim().length > 0);
 
   async function handleJoin() {
-    if (!canJoin || loading) return;
+    if (!selected || !canJoin || loading) return;
     setLoading(true); setError('');
     try {
-      const body = tab === 'browse'
-        ? { league_id: selectedId }
-        : { invite_code: inviteCode.trim() };
       const res  = await fetch('/api/leagues/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ league_id: selected.id, password: needsPassword ? password.trim() : undefined }),
       });
       const json = await res.json();
       if (!res.ok) { setError(json.error ?? 'Failed to join league'); return; }
@@ -423,106 +462,104 @@ function JoinPanel({ onClose, router }: { onClose: () => void; router: ReturnTyp
 
   return (
     <div style={{ padding: '20px 28px 28px' }}>
-      {/* Sub-tabs */}
-      <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 10, padding: 3, marginBottom: 18, gap: 3 }}>
-        {([
-          { key: 'browse' as const, label: '🌐  Browse Public' },
-          { key: 'code'   as const, label: '🔒  Invite Code'   },
-        ]).map(t => (
-          <button
-            key={t.key}
-            onClick={() => { setTab(t.key); setSelectedId(null); setInviteCode(''); setError(''); }}
-            style={{
-              flex: 1, padding: '7px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
-              fontSize: 11, fontWeight: 700,
-              background: tab === t.key ? '#fff' : 'transparent',
-              color: tab === t.key ? '#0f172a' : '#94a3b8',
-              boxShadow: tab === t.key ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-              transition: 'all 0.15s',
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* League name search */}
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.12em', display: 'block', marginBottom: 6 }}>
+          League Name
+        </label>
+        <input
+          autoFocus
+          value={searchName}
+          onChange={e => { setSearchName(e.target.value); setSelected(null); setError(''); }}
+          placeholder="Start typing a league name…"
+          style={{
+            width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 11,
+            border: '1.5px solid #e2e8f0', background: '#f8fafc',
+            fontSize: 14, fontWeight: 600, color: '#0f172a', outline: 'none', transition: 'all 0.15s',
+          }}
+          onFocus={e => { e.target.style.borderColor = '#10b981'; e.target.style.background = '#fff'; }}
+          onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
+        />
       </div>
 
-      {/* Browse tab */}
-      {tab === 'browse' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 252, overflowY: 'auto', marginBottom: 16 }}>
-          {loadingLeagues && (
-            <div style={{ textAlign: 'center', padding: '28px 0', color: '#94a3b8', fontSize: 12 }}>Loading leagues…</div>
+      {/* Search results */}
+      {!selected && searchName.trim().length >= 2 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto', marginBottom: 16 }}>
+          {searching && (
+            <div style={{ textAlign: 'center', padding: '20px 0', color: '#94a3b8', fontSize: 12 }}>Searching…</div>
           )}
-          {!loadingLeagues && publicLeagues.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '28px 0', color: '#94a3b8', fontSize: 12 }}>
-              No public leagues available right now.
+          {!searching && hasSearched && results.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '20px 0', color: '#94a3b8', fontSize: 12 }}>
+              No league found with that name.
             </div>
           )}
-          {publicLeagues.map(league => {
-            const active = selectedId === league.id;
-            return (
-              <div
-                key={league.id}
-                className="league-row"
-                onClick={() => setSelectedId(active ? null : league.id)}
-                style={{
-                  padding: '10px 13px', borderRadius: 11, cursor: 'pointer',
-                  border: `1.5px solid ${active ? '#10b981' : '#e2e8f0'}`,
-                  background: active ? '#f0fdf4' : '#fff',
-                  transition: 'all 0.15s',
-                  display: 'flex', alignItems: 'center', gap: 10,
-                }}
-              >
-                <div style={{
-                  width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                  background: active ? '#10b981' : '#f1f5f9',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'background 0.15s',
-                }}>
-                  {active
-                    ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                  }
+          {!searching && results.map(league => (
+            <div
+              key={league.id}
+              className="league-row"
+              onClick={() => selectLeague(league)}
+              style={{
+                padding: '10px 13px', borderRadius: 11, cursor: 'pointer',
+                border: '1.5px solid #e2e8f0', background: '#fff',
+                transition: 'all 0.15s',
+                display: 'flex', alignItems: 'center', gap: 10,
+              }}
+            >
+              <div style={{
+                width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                background: '#f1f5f9',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 13,
+              }}>
+                {league.is_public ? '🌐' : '🔒'}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {league.name}
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {league.name}
-                  </div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', marginTop: 4 }}>
-                    {league.member_count} member{league.member_count === 1 ? '' : 's'}
-                  </div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', marginTop: 4 }}>
+                  {league.member_count} member{league.member_count === 1 ? '' : 's'} · {league.is_public ? 'Public' : 'Private'}
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Code tab */}
-      {tab === 'code' && (
-        <div style={{ marginBottom: 18 }}>
-          <label style={{ fontSize: 10, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.12em', display: 'block', marginBottom: 6 }}>
-            Invite Code
-          </label>
-          <input
-            autoFocus
-            value={inviteCode}
-            onChange={e => { setInviteCode(e.target.value.toUpperCase()); setError(''); }}
-            onKeyDown={e => e.key === 'Enter' && handleJoin()}
-            placeholder="e.g. AB3K9Z"
-            maxLength={6}
-            style={{
-              width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 11,
-              border: '1.5px solid #e2e8f0', background: '#f8fafc',
-              fontSize: 18, fontWeight: 800, color: '#0f172a', outline: 'none',
-              letterSpacing: '0.25em', textTransform: 'uppercase', transition: 'all 0.15s',
-              fontFamily: 'ui-monospace, SFMono-Regular, monospace',
-            }}
-            onFocus={e => { e.target.style.borderColor = '#10b981'; e.target.style.background = '#fff'; }}
-            onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
-          />
-          <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
-            Ask your commissioner for the 6-character code.
-          </p>
+      {/* Selected league — prompts for a password only if it's private */}
+      {selected && (
+        <div style={{ padding: '12px 14px', borderRadius: 12, border: '1.5px solid #10b981', background: '#f0fdf4', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: needsPassword ? 10 : 0 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {selected.name}
+              </div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#059669', marginTop: 2 }}>
+                {selected.member_count} member{selected.member_count === 1 ? '' : 's'} · {selected.is_public ? 'Public' : 'Private'}
+              </div>
+            </div>
+            <button
+              onClick={() => { setSelected(null); setPassword(''); setError(''); }}
+              style={{ fontSize: 11, fontWeight: 700, color: '#059669', background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}
+            >
+              Change
+            </button>
+          </div>
+          {needsPassword && (
+            <input
+              type="password"
+              autoFocus
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleJoin()}
+              placeholder="Enter password"
+              style={{
+                width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10,
+                border: '1.5px solid #a7f3d0', background: '#fff',
+                fontSize: 14, fontWeight: 600, color: '#0f172a', outline: 'none',
+              }}
+            />
+          )}
         </div>
       )}
 

@@ -5,44 +5,35 @@ import { query } from '@/lib/mysql';
 
 const SEASON = 2026;
 
+// POST /api/leagues/join — join by league_id (resolved via /api/leagues/search
+// or the public browser). Private leagues require the matching password;
+// public leagues need nothing else.
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
-  const { league_id, invite_code } = await req.json();
+  const { league_id, password } = await req.json();
 
-  // Resolve league by id or invite code
-  let league: { id: number; is_public: number; invite_code: string | null; max_members: number; member_count: number; name: string } | undefined;
-
-  if (league_id) {
-    [league] = await query<typeof league & {}>(
-      `SELECT l.id, l.is_public, l.invite_code, l.max_members, l.name,
-              COUNT(lm.id) AS member_count
-       FROM leagues l
-       LEFT JOIN league_members lm ON lm.league_id = l.id
-       WHERE l.id = ? AND l.season_year = ?
-       GROUP BY l.id`,
-      [league_id, SEASON]
-    );
-  } else if (invite_code) {
-    [league] = await query<typeof league & {}>(
-      `SELECT l.id, l.is_public, l.invite_code, l.max_members, l.name,
-              COUNT(lm.id) AS member_count
-       FROM leagues l
-       LEFT JOIN league_members lm ON lm.league_id = l.id
-       WHERE l.invite_code = ? AND l.season_year = ?
-       GROUP BY l.id`,
-      [invite_code.trim().toUpperCase(), SEASON]
-    );
-    if (league && league.invite_code !== invite_code.trim().toUpperCase()) {
-      return NextResponse.json({ error: 'Invalid invite code' }, { status: 403 });
-    }
-  } else {
-    return NextResponse.json({ error: 'Provide league_id or invite_code' }, { status: 400 });
+  if (!league_id) {
+    return NextResponse.json({ error: 'Provide league_id' }, { status: 400 });
   }
 
+  const [league] = await query<{
+    id: number; is_public: number; invite_code: string | null; name: string;
+  }>(
+    `SELECT l.id, l.is_public, l.invite_code, l.name
+     FROM leagues l
+     WHERE l.id = ? AND l.season_year = ?`,
+    [league_id, SEASON]
+  );
   if (!league) return NextResponse.json({ error: 'League not found' }, { status: 404 });
+
+  if (!league.is_public) {
+    if (!password || password !== league.invite_code) {
+      return NextResponse.json({ error: 'Invalid password' }, { status: 403 });
+    }
+  }
 
   // Check not already a member
   const [alreadyMember] = await query<{ id: number }>(

@@ -371,7 +371,7 @@ const PlayerRow = memo(function PlayerRow({
           {p.projected_points != null ? formatPoints(p.projected_points) : '—'}
         </div>
         <div style={{ width: 56, textAlign: 'right', fontSize: 12, fontWeight: 700, color: '#64748b' }}>
-          {p.position_rank != null ? `#${p.position_rank}` : '—'}
+          {p.position_rank != null ? `${p.position_rank}` : '—'}
         </div>
         <div style={{ width: 72, textAlign: 'right', fontSize: 12, color: '#64748b' }}>
           {p.season_points != null ? formatPoints(p.season_points) : '—'}

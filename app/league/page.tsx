@@ -736,7 +736,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
                           <span style={{
                             fontSize: 9, fontWeight: 800, color: '#94a3b8', background: '#f8fafc',
                             border: '1px solid #e2e8f0', borderRadius: 20, padding: '1px 5px',
-                          }}>#{i + 1}</span>
+                          }}>{i + 1}</span>
                           <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{team.team_name}</span>
                         </div>
                         <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>

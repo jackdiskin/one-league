@@ -244,7 +244,7 @@ export default function Page() {
             />
             <FeatureCard
               title="Leagues with friends"
-              body="Private leagues with invite codes, standings, activity feed, and member team pages."
+              body="Private leagues with passwords, standings, activity feed, and member team pages."
             />
             <FeatureCard
               title="Global, regional, and affinity leaderboards"

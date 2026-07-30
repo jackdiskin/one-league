@@ -140,7 +140,7 @@ export default function LiveStandings({
         textTransform: 'uppercase', letterSpacing: '0.1em',
         minWidth: 520,
       }}>
-        <span>#</span>
+        <span>Rank</span>
         <span>Team</span>
         <span style={{ textAlign: 'right' }}>Points</span>
         <span style={{ textAlign: 'right' }}>
