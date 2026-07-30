@@ -54,11 +54,21 @@ export function foreshorten(u: number): number {
 // 50 yards of field of play plus a 10-yard end zone at the far end.
 export const FIELD_YARDS   = 50;
 export const ENDZONE_YARDS = 10;
-const TOTAL_YARDS = FIELD_YARDS + ENDZONE_YARDS;
 
-/** Convert yards downfield from the near edge into a depth fraction. */
+/**
+ * Convert yards downfield from the near edge into a depth fraction.
+ *
+ * The divisor is written inline rather than hoisted into a `TOTAL_YARDS` const,
+ * and it must stay that way. The production minifier inlines this function into
+ * the module-eval-time `Array.from` calls below; a const holding a *computed*
+ * expression does not constant-fold, so its declaration was tree-shaken while
+ * the inlined copies kept referencing it — throwing "TOTAL_YARDS is not defined"
+ * on the client, in production only. Literal-valued consts like the two above do
+ * fold, so this form is safe. Dev builds don't minify, which is why it never
+ * reproduced locally.
+ */
 export function yardsToU(yards: number): number {
-  return yards / TOTAL_YARDS;
+  return yards / (FIELD_YARDS + ENDZONE_YARDS);
 }
 
 export const GOAL_LINE_U = yardsToU(FIELD_YARDS);
