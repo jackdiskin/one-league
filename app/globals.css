@@ -1,6 +1,90 @@
 @import "tailwindcss";
 @import "@daveyplate/better-auth-ui/css";
 
+/* ─── Draft page design tokens ───────────────────────────────────────────────
+   Emerald-on-white. The field panel is the one bold element; all surrounding
+   chrome stays quiet. Turf greens and chrome emeralds are deliberately
+   separate scales and must never sit against each other. */
+@theme {
+  /* surfaces */
+  --color-surface:         #FFFFFF;
+  --color-surface-sunken:  #FAFAF9;
+  --color-line:            #E7E5E4;
+  --color-line-strong:     #D6D3D1;
+
+  /* ink */
+  --color-ink:             #0A0A0A;
+  --color-ink-2:           #52525B;
+  /* Spec proposed #A1A1AA, which is only 2.57:1 on white and fails the 4.5:1
+     floor at the 13px chip sizes it is used for. Darkened to zinc-500, which
+     measures 4.83:1. */
+  --color-ink-3:           #71717A;
+
+  /* emerald — chrome accent only, never on turf */
+  --color-emerald:         #00A86B;
+  --color-emerald-hover:   #008F5A;
+  --color-emerald-press:   #00794C;
+  --color-emerald-tint:    #E8F7F0;
+  --color-emerald-line:    #B9E6D3;
+
+  /* turf — the field panel only */
+  --color-turf:            #0B3B2A;
+  --color-turf-stripe:     #0E4632;
+  --color-turf-deep:       #072A1E;
+  --color-turf-chalk:      #FFFFFF;
+
+  /* semantic */
+  --color-up:              #00A86B;
+  --color-down:            #DC2626;
+  --color-warn:            #D97706;
+
+  /* radii */
+  --radius-card:           12px;
+  --radius-slot:           8px;
+  --radius-control:        8px;
+  --radius-pill:           999px;
+
+  /* motion */
+  --ease-out-quart:        cubic-bezier(0.25, 1, 0.5, 1);
+  --animate-slot-in:       slot-in 180ms var(--ease-out-quart) both;
+  --animate-modal-in:      modal-in 200ms var(--ease-out-quart) both;
+
+  /* type scale — six roles, nothing else. None of these sizes exist in
+     Tailwind's default scale, and arbitrary values are banned, so each role
+     is a token. Numerals use the Label/Body size with font-mono + tabular. */
+  --text-display:                 32px;
+  --text-display--line-height:    36px;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight:    700;
+
+  --text-section:                 20px;
+  --text-section--line-height:    28px;
+  --text-section--letter-spacing: -0.01em;
+  --text-section--font-weight:    700;
+
+  --text-body:                    15px;
+  --text-body--line-height:       22px;
+
+  --text-label:                   13px;
+  --text-label--line-height:      18px;
+  --text-label--font-weight:      500;
+
+  --text-eyebrow:                 11px;
+  --text-eyebrow--line-height:    14px;
+  --text-eyebrow--letter-spacing: 0.08em;
+  --text-eyebrow--font-weight:    500;
+}
+
+@keyframes slot-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -47,7 +131,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-dm-sans);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -61,5 +145,5 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
 }
