@@ -12,13 +12,14 @@ type Player = FieldPlayer;
 // Compute (x%, y%) for each slot — a real NFL pre-snap shotgun look: the
 // O-line marks the line of scrimmage near the top, and every skill player
 // lines up even with it or behind it (nobody lines up ahead of the ball).
-// The flex trio adapts to who's actually starting (like FPL): WR1/WR2 always
-// out wide, right on the line; WR3 is the true FLEX slot (RB/WR/TE) and can
-// be a TE lined up tight next to the tackle, a 3rd WR in the slot, or a RB.
-// A RB in the flex slot drops into the backfield instead of lining up as a
-// receiver — directly behind the QB, deeper than RB1/RB2, so the four
-// backfield players form a diamond: QB at the front point, RB1/RB2 flanking
-// the sides, and the flex RB at the back point.
+// WR1/WR2/WR3 are fixed WR/TE slots, always out on the line. FLEX1 is the
+// true flex (RB/WR/TE) and adapts to who's actually starting there: a TE
+// lines up tight next to the tackle, a WR lines up off the line in the slot
+// (has to be off the line to be eligible), and a RB drops into the
+// backfield instead of lining up as a receiver — directly behind the QB,
+// deeper than RB1/RB2, so the four backfield players form a diamond: QB at
+// the front point, RB1/RB2 flanking the sides, and the flex RB at the back
+// point.
 // Looked up by named roster_slot (not position), so subbing auto-updates it
 // and a RB sitting in the FLEX slot renders in the right spot.
 function getPositions(starters: Player[]) {
@@ -26,7 +27,8 @@ function getPositions(starters: Player[]) {
 
   const wr1  = bySlot('WR1');
   const wr2  = bySlot('WR2');
-  const flex = bySlot('WR3');
+  const wr3  = bySlot('WR3');
+  const flex = bySlot('FLEX1');
   const qb1  = bySlot('QB1');
   const rb1  = bySlot('RB1');
   const rb2  = bySlot('RB2');
@@ -36,8 +38,9 @@ function getPositions(starters: Player[]) {
   const flexIsTE = flex?.position === 'TE';
   const flexIsRB = flex?.position === 'RB';
 
-  out.push({ player: wr1,  pos: wr1?.position  ?? 'WR',   x: 6,  y: LOS });
-  out.push({ player: wr2,  pos: wr2?.position  ?? 'WR',   x: 94, y: LOS });
+  out.push({ player: wr1, pos: wr1?.position ?? 'WR', x: 6,  y: LOS });
+  out.push({ player: wr3, pos: wr3?.position ?? 'WR', x: 50, y: LOS });
+  out.push({ player: wr2, pos: wr2?.position ?? 'WR', x: 94, y: LOS });
 
   // ── QB in shotgun, well behind the line ───────────────────────────────
   out.push({ player: qb1, pos: 'QB', x: 50, y: LOS + 24 });
@@ -47,12 +50,12 @@ function getPositions(starters: Player[]) {
   out.push({ player: rb2, pos: 'RB', x: 68, y: LOS + 32 });
 
   // TE lines up on the line too, tight next to the tackle; a flex WR lines
-  // up just off the line in the slot (has to be off the line to be
-  // eligible); a flex RB drops deepest of all, directly behind the QB,
+  // up just off the line in the slot, offset from WR3 so they don't
+  // overlap; a flex RB drops deepest of all, directly behind the QB,
   // completing the backfield diamond.
   out.push({
     player: flex, pos: flex?.position ?? 'FLEX',
-    x: flexIsTE ? 74 : 50,
+    x: flexIsTE ? 74 : flexIsRB ? 50 : 26,
     y: flexIsTE ? LOS : flexIsRB ? LOS + 56 : LOS + 7,
   });
 

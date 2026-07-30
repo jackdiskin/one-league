@@ -5,11 +5,11 @@ import { query, withTransaction } from '@/lib/mysql';
 
 const SEASON      = 2026;
 const CAP         = 100_000_000;
-const QUOTA       = { QB: 2, RB: 3, FLEX: 5 };
+const QUOTA       = { QB: 2, RB: 4, FLEX: 5 };
 const GLOBAL_LEADERBOARD_NAME = 'Global Leaderboard';
 
 // POST /api/onboarding/draft
-// Body: { team_name, player_ids[10], season_year? }
+// Body: { team_name, player_ids[11], season_year? }
 // One team per user per season, shared across every league (FPL model) — no
 // league selection at draft time. Every drafted team is auto-enrolled in the
 // season's Global Leaderboard; private leagues are joined separately via a code.
@@ -34,8 +34,8 @@ async function handleDraft(request: NextRequest) {
     return NextResponse.json({ error: 'team_name must be at least 2 characters' }, { status: 400 });
   }
 
-  if (!Array.isArray(player_ids) || player_ids.length !== 10) {
-    return NextResponse.json({ error: 'Must select exactly 10 players' }, { status: 400 });
+  if (!Array.isArray(player_ids) || player_ids.length !== 11) {
+    return NextResponse.json({ error: 'Must select exactly 11 players' }, { status: 400 });
   }
 
   // Validate user doesn't already have a team this season
@@ -57,7 +57,7 @@ async function handleDraft(request: NextRequest) {
     [season_year, ...player_ids]
   );
 
-  if (players.length !== 10) {
+  if (players.length !== 11) {
     return NextResponse.json({ error: 'One or more players not found' }, { status: 400 });
   }
 
@@ -78,7 +78,7 @@ async function handleDraft(request: NextRequest) {
   }
 
   // Build slot assignments
-  // Starting lineup: 1 QB, 2 RB, 3 WR/TE — extras go to BENCH
+  // Starting lineup: 1 QB, 2 RB, 3 WR/TE, 1 FLEX (RB/WR/TE) — extras go to BENCH
   function shuffle<T>(arr: T[]): T[] {
     return [...arr].sort(() => Math.random() - 0.5);
   }
@@ -88,10 +88,15 @@ async function handleDraft(request: NextRequest) {
   const rbs    = shuffle(players.filter(p => p.position === 'RB'));
   const flex   = shuffle(players.filter(p => p.position === 'WR' || p.position === 'TE'));
 
-  // Starters first, bench after
+  // Starters first, bench after. The 4th WR/TE fills the true FLEX slot
+  // (FLEX1); the 5th and any extra RBs land on the bench.
   qbs.forEach((p, i)  => slotMap.set(p.id, i < 1 ? `QB${i + 1}` : 'BENCH'));
   rbs.forEach((p, i)  => slotMap.set(p.id, i < 2 ? `RB${i + 1}` : 'BENCH'));
-  flex.forEach((p, i) => slotMap.set(p.id, i < 3 ? `WR${i + 1}` : 'BENCH'));
+  flex.forEach((p, i) => {
+    if (i < 3) slotMap.set(p.id, `WR${i + 1}`);
+    else if (i === 3) slotMap.set(p.id, 'FLEX1');
+    else slotMap.set(p.id, 'BENCH');
+  });
 
   const budgetRemaining = CAP - totalCost;
 

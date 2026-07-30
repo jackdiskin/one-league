@@ -26,8 +26,8 @@ export interface DraftPlayer {
 
 // ─── Quotas ───────────────────────────────────────────────────────────────────
 const CAP          = 100_000_000;
-const QUOTA        = { QB: 2, RB: 3, FLEX: 5 }; // FLEX = WR+TE combined
-const TOTAL_SLOTS  = 10;
+const QUOTA        = { QB: 2, RB: 4, FLEX: 5 }; // FLEX = WR+TE combined
+const TOTAL_SLOTS  = 11;
 
 // Deep green HUD gradient — the app's actual brand tone (dark green / white / green
 // accent), replacing the generic navy-fintech background this screen had before.
@@ -204,20 +204,21 @@ const STADIUM_LIGHT_X = [12, 34, 66, 88];
 
 // ─── Formation slot definitions ───────────────────────────────────────────────
 // Nominal x/y (0=top/far, 100=bottom/near) — x gets remapped via remapX above.
-// All 10 drafted players (2 QB, 3 RB, 5 WR/TE) get an on-field slot — no
+// All 11 drafted players (2 QB, 4 RB, 5 WR/TE) get an on-field slot — no
 // separate bench area. Same front-to-back depth logic as a real shotgun snap:
 // the 5 WR/TE are shallowest (closest to their goal, on the line of
-// scrimmage), the 3 RBs a few yards behind that, and the 2 QBs deepest of all
-// ten (furthest from their goal).
+// scrimmage), the 4 RBs a few yards behind that, and the 2 QBs deepest of all
+// eleven (furthest from their goal).
 const FORMATION_SLOTS = [
   { id: 'FLEX1',  posGroup: 'FLEX', label: 'WR/TE', x: 8,  y: 18 },
   { id: 'FLEX2',  posGroup: 'FLEX', label: 'WR/TE', x: 29, y: 18 },
   { id: 'FLEX3',  posGroup: 'FLEX', label: 'WR/TE', x: 50, y: 18 },
   { id: 'FLEX4',  posGroup: 'FLEX', label: 'WR/TE', x: 71, y: 18 },
   { id: 'FLEX5',  posGroup: 'FLEX', label: 'WR/TE', x: 92, y: 18 },
-  { id: 'RB1',    posGroup: 'RB',   label: 'RB',    x: 25, y: 48 },
-  { id: 'RB2',    posGroup: 'RB',   label: 'RB',    x: 50, y: 48 },
-  { id: 'RB3',    posGroup: 'RB',   label: 'RB',    x: 75, y: 48 },
+  { id: 'RB1',    posGroup: 'RB',   label: 'RB',    x: 20, y: 48 },
+  { id: 'RB2',    posGroup: 'RB',   label: 'RB',    x: 40, y: 48 },
+  { id: 'RB3',    posGroup: 'RB',   label: 'RB',    x: 60, y: 48 },
+  { id: 'RB4',    posGroup: 'RB',   label: 'RB',    x: 80, y: 48 },
   { id: 'QB1',    posGroup: 'QB',   label: 'QB',    x: 35, y: 80 },
   { id: 'QB2',    posGroup: 'QB',   label: 'QB',    x: 65, y: 80 },
 ] as const;
@@ -421,11 +422,11 @@ const WELCOME_STEPS = [
     icon: '📋',
     eyebrow: 'Step 1',
     title: 'Draft Your Squad',
-    subtitle: '10 players. $100M cap. One shot.',
+    subtitle: '11 players. $100M cap. One shot.',
     body: null,
     bullets: [
       { icon: '🔵', label: '2 Quarterbacks', sub: 'Your franchise signal-callers' },
-      { icon: '🟢', label: '3 Running Backs', sub: 'Ground game and receiving threats' },
+      { icon: '🟢', label: '4 Running Backs', sub: 'Ground game and receiving threats' },
       { icon: '🟡', label: '5 Wide Receivers / Tight Ends', sub: 'Any mix — all count as flex spots' },
     ],
     accent: '#60a5fa',
@@ -449,7 +450,7 @@ const WELCOME_STEPS = [
     subtitle: 'Weekly lineups. Season-long standings.',
     body: 'Each week, set your starting lineup from your active roster. Your starters earn fantasy points based on real NFL performance. Compete in private leagues with friends or go head-to-head in global public leagues.',
     bullets: [
-      { icon: '📅', label: 'Weekly lineup decisions', sub: 'Start your best 6 — your other 4 sit on the bench and score nothing' },
+      { icon: '📅', label: 'Weekly lineup decisions', sub: 'Start your best 6 — your other 5 sit on the bench and score nothing' },
       { icon: '🌐', label: 'Global public leagues', sub: 'Compete against the world' },
       { icon: '🔒', label: 'Private leagues', sub: 'Invite friends with a code' },
     ],
@@ -1268,7 +1269,7 @@ export default function DraftBoard({
           borderLeft: '3px solid #fbbf24',
           fontSize: 11, color: 'rgba(255,255,255,0.8)', fontWeight: 600,
         }}>
-           Only 6 of these 10 will start each week — you'll set your exact lineup from your team page once the season begins.
+           Only 6 of these 11 will start each week — you'll set your exact lineup from your team page once the season begins.
         </div>
 
         {/* Football field — pseudo-3D trapezoid, low camera behind our own

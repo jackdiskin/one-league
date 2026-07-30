@@ -38,9 +38,15 @@ export function applySellImpact(currentPrice: number): number {
   return clampPrice(round2(currentPrice * (1 - PRICE_IMPACT_RATE)));
 }
 
-/** Amount the seller actually receives — current price minus the bid-ask spread */
+/**
+ * Amount the seller actually receives. Prices are frozen (see buy/sell
+ * routes) — no bid-ask spread either, so a full sell-off always returns
+ * exactly the $100M cap. BID_ASK_SPREAD is unused while this is disabled;
+ * re-enable by multiplying by (1 - BID_ASK_SPREAD) again if that ever
+ * becomes part of a future pricing formula.
+ */
 export function sellProceeds(currentPrice: number): number {
-  return round2(currentPrice * (1 - BID_ASK_SPREAD));
+  return round2(currentPrice);
 }
 
 /**

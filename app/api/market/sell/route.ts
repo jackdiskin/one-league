@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { ResultSetHeader } from 'mysql2';
 import { auth } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/mysql';
-import { applySellImpact, sellProceeds } from '@/lib/pricing';
+import { sellProceeds } from '@/lib/pricing';
 
 // POST /api/market/sell
 // Body: { fantasy_team_id, player_id, week }
@@ -52,21 +52,21 @@ async function handleSell(request: NextRequest) {
 
   // Seller receives current_price minus the bid-ask spread
   const proceeds = sellProceeds(current_price);
-  // Market price moves down by the standard impact rate
-  const newMarketPrice = applySellImpact(current_price);
+  // Prices are frozen — selling never moves current_price/intraday_low, only
+  // trade bookkeeping. Re-enabling market impact is future work (pending a
+  // formula), not a bug fix.
+  const newMarketPrice = current_price;
 
   const result = await withTransaction(async (conn) => {
-    // 1. Update market state
+    // 1. Update market state (bookkeeping only — no price fields)
     await conn.execute(
       `UPDATE player_market_state SET
-         current_price      = ?,
          sell_orders_count  = sell_orders_count + 1,
          sell_volume        = sell_volume + 1,
          net_order_flow     = net_order_flow - 1,
-         intraday_low       = LEAST(intraday_low, ?),
          last_trade_at      = NOW()
        WHERE player_id = ? AND season_year = ?`,
-      [newMarketPrice, newMarketPrice, player_id, season_year]
+      [player_id, season_year]
     );
 
     // 2. Record transaction (price = what seller receives, price_after = new market price)

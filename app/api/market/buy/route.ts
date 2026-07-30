@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { auth } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/mysql';
-import { applyBuyImpact } from '@/lib/pricing';
 
 // POST /api/market/buy
 // Body: { fantasy_team_id, player_id, week }
@@ -56,8 +55,8 @@ async function handleBuy(request: NextRequest) {
   );
   if (alreadyOwned) return NextResponse.json({ error: 'Player already on roster' }, { status: 409 });
 
-  // Enforce roster quota (10 total; 2 QB, 3 RB, 5 WR/TE combined)
-  const QUOTA = { QB: 2, RB: 3, FLEX: 5 };
+  // Enforce roster quota (11 total; 2 QB, 4 RB, 5 WR/TE combined)
+  const QUOTA = { QB: 2, RB: 4, FLEX: 5 };
   const [playerPos] = await query<{ position: string }>(
     `SELECT position FROM players WHERE id = ?`, [player_id]
   );
@@ -75,7 +74,7 @@ async function handleBuy(request: NextRequest) {
   const rosterTotal = Object.values(countMap).reduce((s, n) => s + n, 0);
   const flexCount   = (countMap.WR ?? 0) + (countMap.TE ?? 0);
 
-  if (rosterTotal >= 10) {
+  if (rosterTotal >= 11) {
     return NextResponse.json({ error: 'Roster full — sell a player first' }, { status: 409 });
   }
   if (playerPos.position === 'QB' && (countMap.QB ?? 0) >= QUOTA.QB) {
@@ -88,20 +87,21 @@ async function handleBuy(request: NextRequest) {
     return NextResponse.json({ error: `WR/TE slots full (max ${QUOTA.FLEX})` }, { status: 409 });
   }
 
-  const newPrice = applyBuyImpact(executionPrice);
+  // Prices are frozen — buying never moves current_price/intraday_high, only
+  // trade bookkeeping. Re-enabling market impact is future work (pending a
+  // formula), not a bug fix.
+  const newPrice = executionPrice;
 
   const result = await withTransaction(async (conn) => {
-    // 1. Update market state
+    // 1. Update market state (bookkeeping only — no price fields)
     await conn.execute(
       `UPDATE player_market_state SET
-         current_price      = ?,
          buy_orders_count   = buy_orders_count + 1,
          buy_volume         = buy_volume + 1,
          net_order_flow     = net_order_flow + 1,
-         intraday_high      = GREATEST(intraday_high, ?),
          last_trade_at      = NOW()
        WHERE player_id = ? AND season_year = ?`,
-      [newPrice, newPrice, player_id, season_year]
+      [player_id, season_year]
     );
 
     // 2. Record transaction

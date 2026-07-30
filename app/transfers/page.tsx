@@ -218,7 +218,7 @@ export default async function TransfersPage({
                 </div>
                 <div>
                   <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4, textAlign: 'right' }}>Roster</p>
-                  <p style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', textAlign: 'right' }}>{owned.length}/10</p>
+                  <p style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', textAlign: 'right' }}>{owned.length}/11</p>
                 </div>
               </div>
 

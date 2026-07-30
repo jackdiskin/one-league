@@ -7,7 +7,7 @@ Claude Code reads this file automatically on startup. Keep it updated as decisio
 ## Core format
 
 - Budget: $100M per manager
-- Roster: 10 players — 2 QB, 3 RB, 5 WR/TE
+- Roster: 11 players — 2 QB, 4 RB, 5 WR/TE
 - Starting XI: 1 QB, 2 RB, 3 WR/TE, 1 FLEX (RB/WR/TE)
 - Transfers: 1 free/week, max 2 banked, -8pts per extra transfer
 - Auto-subs: DNP triggers sub, position-locked, bench order priority
@@ -32,13 +32,15 @@ Claude Code reads this file automatically on startup. Keep it updated as decisio
 - Anchor: best player (Bijan/CMC/Chase tier) ≈ $18.5M, everything scales from there
 - Currently using manual tier-based pricing as the working approach; Net PAA formula not yet fully implemented
 
+**Prices are frozen (as of Jul 2026).** All automatic price movement is disabled in code — buying/selling never moves `current_price`, and the weekly admin reset endpoint is hard-disabled. Prices only change when Jesse gives an explicit formula and someone re-wires `lib/pricing.ts`'s `applyBuyImpact`/`applySellImpact` back into the buy/sell routes. Always express prices/budget in millions to the nearest tenth (`$X.XM`), never in thousands — this is enforced in `formatPrice()`, the single source of truth for every price display in the app.
+
 **FPL analogy (use this framing when discussing pricing):**
 - RB mirrors FPL forwards — scarce, expensive: $4.5M floor, $18.5M ceiling
 - WR mirrors FPL midfielders — deep pool: $5M floor, $15-17M ceiling
 - TE — bifurcated, elite TE expensive, rest cheap: $4.5M floor, $13-15M ceiling
 - QB mirrors FPL defenders — budget position: $4.5M floor, $8-9M ceiling
 
-**Other pricing mechanics:**
+**Other pricing mechanics (disabled — see freeze note above):**
 - Daily price changes from ownership % + performance + projections
 - Volatility discount for boom/bust players
 - IR players: price freeze; Questionable/doubtful: 50% drop rate

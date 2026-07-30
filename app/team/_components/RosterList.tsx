@@ -179,19 +179,20 @@ const ACCENT_BAR   = '#059669';
 
 const POS_ORDER = ['QB', 'RB', 'WR', 'TE'];
 
-// Named starter slots, in display order. WR3 is the true FLEX slot — RB,
-// WR, or TE — everyone else is fixed to their own position. badgeLabel is
-// the short gray pill shown inline on the player's own row (no group
-// headers on this screen). Rendered by exact slot name (not position
-// category) so a RB sitting in WR3 shows up in the right place instead of
-// overflowing the Running Backs group.
+// Named starter slots, in display order. WR1/WR2/WR3 are fixed WR/TE slots;
+// FLEX1 is the true FLEX slot — RB, WR, or TE — everyone else is fixed to
+// their own position. badgeLabel is the short gray pill shown inline on the
+// player's own row (no group headers on this screen). Rendered by exact
+// slot name (not position category) so a RB sitting in FLEX1 shows up in
+// the right place instead of overflowing the Running Backs group.
 const STARTER_SLOTS = [
-  { slot: 'QB1', eligiblePositions: ['QB'],            badgeLabel: 'QB'    },
-  { slot: 'RB1', eligiblePositions: ['RB'],            badgeLabel: 'RB'    },
-  { slot: 'RB2', eligiblePositions: ['RB'],            badgeLabel: 'RB'    },
-  { slot: 'WR1', eligiblePositions: ['WR', 'TE'],       badgeLabel: 'WR/TE' },
-  { slot: 'WR2', eligiblePositions: ['WR', 'TE'],       badgeLabel: 'WR/TE' },
-  { slot: 'WR3', eligiblePositions: ['RB', 'WR', 'TE'], badgeLabel: 'FLEX'  },
+  { slot: 'QB1',   eligiblePositions: ['QB'],            badgeLabel: 'QB'    },
+  { slot: 'RB1',   eligiblePositions: ['RB'],            badgeLabel: 'RB'    },
+  { slot: 'RB2',   eligiblePositions: ['RB'],            badgeLabel: 'RB'    },
+  { slot: 'WR1',   eligiblePositions: ['WR', 'TE'],       badgeLabel: 'WR/TE' },
+  { slot: 'WR2',   eligiblePositions: ['WR', 'TE'],       badgeLabel: 'WR/TE' },
+  { slot: 'WR3',   eligiblePositions: ['WR', 'TE'],       badgeLabel: 'WR/TE' },
+  { slot: 'FLEX1', eligiblePositions: ['RB', 'WR', 'TE'], badgeLabel: 'FLEX'  },
 ] as const;
 
 // Gray pill badge — matches PosBadge in app/market/page.tsx. Never
@@ -449,14 +450,20 @@ export default function RosterList({ roster, teamId, matchups, season }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [swapping]);
 
-  const starters = roster.filter(p => p.roster_slot !== 'BENCH');
-  const bench    = roster.filter(p => p.roster_slot === 'BENCH');
+  // Keyed off the named starter slots (not just "!== BENCH") so a stray or
+  // legacy roster_slot value (e.g. an old K1 from before Kickers were
+  // dropped from the format) can never miscount as a starter — it falls
+  // through to bench instead, keeping starters+bench always equal to the
+  // roster total.
+  const starterSlotNames = new Set<string>(STARTER_SLOTS.map(s => s.slot));
+  const starters = roster.filter(p => starterSlotNames.has(p.roster_slot));
+  const bench    = roster.filter(p => !starterSlotNames.has(p.roster_slot));
 
   // Total bench capacity = roster size minus the fixed number of named starter
   // slots, so the "empty bench slot" placeholder only shows up when the bench
   // genuinely has room (not just whenever the roster happens to be short a
   // starter, which used to show a phantom empty slot even at a full 4/4 bench).
-  const MAX_BENCH = 10 - STARTER_SLOTS.length;
+  const MAX_BENCH = 11 - STARTER_SLOTS.length;
 
   const isSelectionActive = selected !== null;
 

@@ -122,9 +122,9 @@ export default async function PlayerPage({
 
   // User's primary team
   const [userTeam] = await query<{
-    id: number; budget_remaining: number; league_id: number;
+    id: number; budget_remaining: number;
   }>(
-    `SELECT id, budget_remaining, league_id
+    `SELECT id, budget_remaining
      FROM fantasy_teams WHERE user_id = ? AND season_year = ?
      ORDER BY created_at DESC LIMIT 1`,
     [userId, SEASON]
@@ -140,7 +140,7 @@ export default async function PlayerPage({
   const canAfford = userTeam ? Number(userTeam.budget_remaining) >= Number(player.current_price) : false;
 
   // Count active roster slots by position to enforce quotas
-  const QUOTA = { QB: 2, RB: 3, FLEX: 5 } as const;
+  const QUOTA = { QB: 2, RB: 4, FLEX: 5 } as const;
   let blockReason: string | null = null;
 
   if (userTeam && !alreadyOwned) {
@@ -156,7 +156,7 @@ export default async function PlayerPage({
     const rosterTotal = Object.values(countMap).reduce((s, n) => s + n, 0);
     const flexCount   = (countMap.WR ?? 0) + (countMap.TE ?? 0);
 
-    if (rosterTotal >= 10) {
+    if (rosterTotal >= 11) {
       blockReason = 'Roster full — sell a player first';
     } else if (player.position === 'QB' && (countMap.QB ?? 0) >= QUOTA.QB) {
       blockReason = `QB slots full (${QUOTA.QB}/${QUOTA.QB})`;

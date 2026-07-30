@@ -9,19 +9,26 @@ export function parseNaiveDateTime(raw: string): { year: number; month: number; 
   return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]), hour: Number(m[4]), minute: Number(m[5]) };
 }
 
+// Generational suffixes — kept attached to the surname, not treated as it
+// (e.g. "Brian Thomas Jr." -> "B. Thomas Jr.", never "B. Jr.").
+const NAME_SUFFIXES = new Set(['jr', 'sr', 'ii', 'iii', 'iv', 'v']);
+
 /** "Bijan Robinson" -> "B. Robinson". Falls back to the name as-is if there's no space. */
 export function formatPlayerName(fullName: string): string {
   const parts = fullName.trim().split(/\s+/);
   if (parts.length < 2) return fullName;
-  return `${parts[0][0]}. ${parts[parts.length - 1]}`;
+  const last = parts[parts.length - 1];
+  const hasSuffix = parts.length >= 3 && NAME_SUFFIXES.has(last.toLowerCase().replace(/\.$/, ''));
+  const surname = hasSuffix ? parts.slice(-2).join(' ') : last;
+  return `${parts[0][0]}. ${surname}`;
 }
 
+// Always millions, always one decimal (nearest tenth of a million) — never
+// thousands, no exceptions, per standing pricing-display rule.
 export function formatPrice(dollars: number): string {
-  if (dollars >= 1_000_000)  return `$${Number((dollars / 1_000_000)).toFixed(1)}M`;
-  if (dollars >= 1_000)      return `$${Number((dollars / 1_000)).toFixed(0)}K`;
-  if (dollars <= -1_000_000) return `-$${Math.abs(dollars / 1_000_000).toFixed(0)}M`;
-  if (dollars < 0)           return `-$${Math.abs(dollars / 1000).toFixed(0)}K`;
-  return `$${Number(dollars).toFixed(0)}`;
+  const millions = Number(dollars) / 1_000_000;
+  const sign = millions < 0 ? '-' : '';
+  return `${sign}$${Math.abs(millions).toFixed(1)}M`;
 }
 
 export function formatPct(pct: number): string {

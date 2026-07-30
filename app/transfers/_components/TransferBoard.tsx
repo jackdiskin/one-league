@@ -61,7 +61,7 @@ const POS_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
 };
 
 // Mirrors the quota enforced server-side in app/api/market/buy/route.ts
-const QUOTA: Record<string, number> = { QB: 2, RB: 3, FLEX: 5 };
+const QUOTA: Record<string, number> = { QB: 2, RB: 4, FLEX: 5 };
 
 // $0.5M increments from $18M down to $1M, e.g. "$17.5M", "$17M", ... (same presets as the draft screen)
 const PRICE_PRESETS: { label: string; value: number | null }[] = [

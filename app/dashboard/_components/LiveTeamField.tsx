@@ -111,11 +111,12 @@ const UPPER_DECK_CROWD = generateCrowd(1001, 240, 6, 40, 2, 3.6);
 const LOWER_DECK_CROWD = generateCrowd(2002, 300, 50, 97, 3.2, 6);
 const STADIUM_LIGHT_X = [12, 34, 66, 88];
 
-// Named starter slots and which positions may occupy them — WR3 is the true
+// Named starter slots and which positions may occupy them — FLEX1 is the true
 // FLEX slot (RB/WR/TE); everyone else is fixed to their own position.
 const SLOT_ELIGIBLE_POSITIONS: Record<string, string[]> = {
   QB1: ['QB'], RB1: ['RB'], RB2: ['RB'],
-  WR1: ['WR', 'TE'], WR2: ['WR', 'TE'], WR3: ['RB', 'WR', 'TE'],
+  WR1: ['WR', 'TE'], WR2: ['WR', 'TE'], WR3: ['WR', 'TE'],
+  FLEX1: ['RB', 'WR', 'TE'],
 };
 
 function isEligibleSwap(a: FieldPlayer, b: FieldPlayer): boolean {
