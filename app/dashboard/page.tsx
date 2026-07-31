@@ -6,11 +6,10 @@ import { query } from '@/lib/mysql';
 import MyTeamSummary   from './_components/MyTeamSummary';
 import WeekScoreSection from './_components/WeekScoreSection';
 import TopMovers       from './_components/TopMovers';
-import StandingsCard   from './_components/StandingsCard';
+import StandingsCard, { type LeagueStanding } from './_components/StandingsCard';
 import DiscoverLeagues from './_components/DiscoverLeagues';
-import Sidebar, { type SidebarLeague } from './_components/Sidebar';
+import TopNav from '@/components/TopNav';
 import { formatWeekLong } from '@/lib/format';
-import SeasonModeSwitcher from './_components/SeasonModeSwitcher';
 
 function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`animate-pulse rounded-card bg-line ${className}`} />;
@@ -31,8 +30,8 @@ async function detectUserSeason(userId: string): Promise<number> {
   return row?.season_year ?? 2025;
 }
 
-async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
-  return query<SidebarLeague>(
+async function fetchUserLeagues(userId: string): Promise<LeagueStanding[]> {
+  return query<LeagueStanding>(
     `SELECT l.id, l.name, l.season_year,
             ft.team_name,
             CASE WHEN ft.id IS NOT NULL THEN
@@ -111,73 +110,55 @@ export default async function DashboardPage({
   ]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface md:flex-row">
+    <div className="flex min-h-screen flex-col bg-surface">
 
-      {/* Sidebar */}
-      <Sidebar
+      <TopNav
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-        leagues={userLeagues}
-        currentWeek={currentWeek}
         season={SEASON}
+        currentWeek={currentWeek}
         logoUri={String(process.env.LOGO_URI)}
       />
 
-      {/* Main column */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <main className="flex flex-1 flex-col gap-6 px-6 py-8">
 
-        {/* Header */}
-        <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
-          <div className="flex items-center justify-between px-6 py-3">
-            <SeasonModeSwitcher season={SEASON} currentWeek={currentWeek} />
-            <div className="flex items-center gap-3 ml-auto">
-              <div className="flex h-8 w-8 items-center justify-center rounded-pill bg-ink text-eyebrow text-surface">
-                {session.user.name?.[0]?.toUpperCase() ?? '?'}
-              </div>
-            </div>
+        {/* Greeting */}
+        <div>
+          <h1 className="text-display text-ink">
+            Welcome back, <span className="text-emerald">{firstName}</span>
+          </h1>
+          <p className="mt-1 text-label text-ink-3">
+            {formatWeekLong(currentWeek)} · <span className="font-mono tabular-nums">{SEASON}</span> NFL season
+          </p>
+        </div>
+
+        {/* Current week score — live once games kick off, projected until then */}
+        <Suspense fallback={<Skeleton className="h-40" />}>
+          <WeekScoreSection teamId={teamCheck.id} season={SEASON} currentWeek={currentWeek} />
+        </Suspense>
+
+        {/* My Team */}
+        <Suspense fallback={<Skeleton className="h-48" />}>
+          <MyTeamSummary userId={userId} seasonYear={SEASON} hidePrices />
+        </Suspense>
+
+        {/* Top Movers */}
+        <Suspense fallback={
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-72" />
+            <Skeleton className="h-72" />
           </div>
-        </header>
+        }>
+          <TopMovers seasonYear={SEASON} />
+        </Suspense>
 
-        <main className="flex flex-1 flex-col gap-6 px-6 py-8">
+        {/* Bottom row */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <StandingsCard leagues={userLeagues} />
 
-          {/* Greeting */}
-          <div>
-            <h1 className="text-display text-ink">
-              Welcome back, <span className="text-emerald">{firstName}</span>
-            </h1>
-            <p className="mt-1 text-label text-ink-3">
-              {formatWeekLong(currentWeek)} · <span className="font-mono tabular-nums">{SEASON}</span> NFL season
-            </p>
-          </div>
+          <DiscoverLeagues leagues={discoverLeagues} />
+        </div>
 
-          {/* Current week score — live once games kick off, projected until then */}
-          <Suspense fallback={<Skeleton className="h-40" />}>
-            <WeekScoreSection teamId={teamCheck.id} season={SEASON} currentWeek={currentWeek} />
-          </Suspense>
-
-          {/* My Team */}
-          <Suspense fallback={<Skeleton className="h-48" />}>
-            <MyTeamSummary userId={userId} seasonYear={SEASON} hidePrices />
-          </Suspense>
-
-          {/* Top Movers */}
-          <Suspense fallback={
-            <div className="grid grid-cols-2 gap-4">
-              <Skeleton className="h-72" />
-              <Skeleton className="h-72" />
-            </div>
-          }>
-            <TopMovers seasonYear={SEASON} />
-          </Suspense>
-
-          {/* Bottom row */}
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <StandingsCard leagues={userLeagues} />
-
-            <DiscoverLeagues leagues={discoverLeagues} />
-          </div>
-
-        </main>
-      </div>
+      </main>
     </div>
   );
 }

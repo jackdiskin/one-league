@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
 import { formatPoints, formatPrice, formatWeekLong, formatWeek, formatPlayerName } from '@/lib/format';
 import Image from 'next/image';
-import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
+import TopNav from '@/components/TopNav';
 import LeagueChart, { type TeamWeekScore } from './_components/LeagueChart';
 import LiveStandings, { type StandingRow as LiveStandingRow } from './_components/LiveStandings';
 import SeasonRecapWrapper from './_components/SeasonRecapWrapper';
@@ -76,40 +76,6 @@ async function fetchLastScoreWeek(season: number): Promise<number> {
     `SELECT MAX(week) AS w FROM fantasy_team_weekly_scores WHERE season_year = ?`, [season]
   );
   return row?.w ?? 1;
-}
-
-async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
-  return query<SidebarLeague>(
-    `SELECT l.id, l.name, l.season_year,
-            ft.team_name,
-            CASE WHEN ft.id IS NOT NULL THEN
-              (SELECT COUNT(*) + 1
-               FROM fantasy_teams ft2
-               JOIN league_members lm2 ON lm2.user_id = ft2.user_id AND lm2.league_id = l.id
-               LEFT JOIN (
-                 SELECT ftr2.fantasy_team_id, SUM(pms2.current_price) AS rv
-                 FROM fantasy_team_roster ftr2
-                 JOIN player_market_state pms2 ON pms2.player_id = ftr2.player_id AND pms2.season_year = l.season_year
-                 WHERE ftr2.is_active = TRUE GROUP BY ftr2.fantasy_team_id
-               ) rv2 ON rv2.fantasy_team_id = ft2.id
-               WHERE ft2.season_year = l.season_year
-                 AND (ft2.total_points > ft.total_points
-                      OR (ft2.total_points = ft.total_points
-                          AND COALESCE(rv2.rv, 0) > (
-                            SELECT COALESCE(SUM(pms3.current_price), 0)
-                            FROM fantasy_team_roster ftr3
-                            JOIN player_market_state pms3 ON pms3.player_id = ftr3.player_id AND pms3.season_year = l.season_year
-                            WHERE ftr3.fantasy_team_id = ft.id AND ftr3.is_active = TRUE
-                          ))))
-            ELSE NULL END AS \`rank\`,
-            (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
-     FROM league_members lm
-     JOIN leagues l ON l.id = lm.league_id
-     LEFT JOIN fantasy_teams ft ON ft.user_id = ? AND ft.season_year = l.season_year
-     WHERE lm.user_id = ?
-     ORDER BY l.created_at DESC`,
-    [userId, userId]
-  );
 }
 
 async function fetchLeagueSummary(userId: string, requestedLeagueId?: number | null) {
@@ -420,26 +386,25 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
   const SEASON = seasonParam ? parseInt(seasonParam, 10) : PREV_SEASON;
   const requestedLeagueId = leagueId ? Number(leagueId) : null;
 
-  const [currentWeek, lastScoreWeek, userLeagues, league] = await Promise.all([
+  const [currentWeek, lastScoreWeek, league] = await Promise.all([
     fetchCurrentWeek(SEASON),
     fetchLastScoreWeek(SEASON),
-    fetchUserLeagues(userId),
     fetchLeagueSummary(userId, requestedLeagueId),
   ]);
 
   if (!league) {
     return (
-      <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
-        <Sidebar
+      <div className="flex flex-col" style={{ minHeight: '100vh', background: '#f8fafc' }}>
+        <TopNav
           user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-          leagues={userLeagues} currentWeek={currentWeek} season={SEASON}
+          season={SEASON} currentWeek={currentWeek}
           logoUri={String(process.env.LOGO_URI)}
         />
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
             <p style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>No league selected</p>
-            <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>Join or create a league, then click it in the sidebar.</p>
+            <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>Join or create a league from the Leagues page, then select it.</p>
           </div>
         </div>
       </div>
@@ -493,7 +458,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
   const maxRosterVal = Number(rosterValues[0]?.roster_value ?? 1);
 
   return (
-    <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
+    <div className="flex flex-col" style={{ minHeight: '100vh', background: '#f8fafc' }}>
 
       {/* Background blobs */}
       <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', zIndex: -1, pointerEvents: 'none' }}>
@@ -501,30 +466,13 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
         <div style={{ position: 'absolute', bottom: 0, right: -80, width: 420, height: 420, borderRadius: '50%', background: 'radial-gradient(circle, rgba(14,165,233,0.15) 0%, rgba(99,102,241,0.08) 50%, transparent 70%)', filter: 'blur(40px)' }} />
       </div>
 
-      <Sidebar
+      <TopNav
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-        leagues={userLeagues} currentWeek={currentWeek} season={SEASON}
+        season={SEASON} currentWeek={currentWeek}
         logoUri={String(process.env.LOGO_URI)}
       />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-
-        {/* Header */}
-        <header style={{
-          position: 'sticky', top: 0, zIndex: 20,
-          background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)',
-          borderBottom: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '10px 24px' }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%', background: '#0f172a', color: '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, fontWeight: 800,
-            }}>
-              {session.user.name?.[0]?.toUpperCase() ?? '?'}
-            </div>
-          </div>
-        </header>
 
         <main style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 

@@ -4,8 +4,7 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
 import { formatPrice, formatPoints, formatWeekLong, formatPlayerName } from '@/lib/format';
-import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
-import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
+import TopNav from '@/components/TopNav';
 import PriceChart, { type PriceWeek } from './_components/PriceChart';
 import BuyButton from './_components/BuyButton';
 import BackLink from './_components/BackLink';
@@ -57,26 +56,6 @@ async function fetchCurrentWeek(season: number) {
   return r?.w ?? 1;
 }
 
-async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
-  return query<SidebarLeague>(
-    `SELECT l.id, l.name, l.season_year,
-            ft.team_name,
-            CASE WHEN ft.id IS NOT NULL THEN
-              (SELECT COUNT(*) + 1
-               FROM fantasy_teams ft2
-               JOIN league_members lm2 ON lm2.user_id = ft2.user_id AND lm2.league_id = l.id
-               WHERE ft2.season_year = l.season_year AND ft2.total_points > ft.total_points)
-            ELSE NULL END AS \`rank\`,
-            (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
-     FROM league_members lm
-     JOIN leagues l ON l.id = lm.league_id
-     LEFT JOIN fantasy_teams ft ON ft.user_id = ? AND ft.season_year = l.season_year
-     WHERE lm.user_id = ?
-     ORDER BY l.created_at DESC`,
-    [userId, userId]
-  );
-}
-
 export default async function PlayerPage({
   params,
   searchParams,
@@ -95,10 +74,7 @@ export default async function PlayerPage({
   const { season: seasonParam } = await searchParams;
   const SEASON = seasonParam ? parseInt(seasonParam, 10) : PREV_SEASON;
 
-  const [currentWeek, userLeagues] = await Promise.all([
-    fetchCurrentWeek(SEASON),
-    fetchUserLeagues(userId),
-  ]);
+  const currentWeek = await fetchCurrentWeek(SEASON);
 
   // Player + market state
   const [player] = await query<{
@@ -243,27 +219,16 @@ export default async function PlayerPage({
         <div className="absolute bottom-0 right-[-80px] h-[420px] w-[420px] rounded-full bg-gradient-to-br from-sky-200/40 via-indigo-200/25 to-emerald-200/20 blur-3xl" />
       </div>
 
-      <Sidebar
+      <TopNav
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-        leagues={userLeagues} currentWeek={currentWeek} season={PREV_SEASON}
+        season={SEASON} currentWeek={currentWeek}
         logoUri={String(process.env.LOGO_URI)}
       />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {/* Header */}
-        <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between px-6 py-3">
-            <BackLink href={SEASON !== PREV_SEASON ? `/team?season=${SEASON}` : '/team'} label="My Team" />
-            <div className="flex items-center gap-3 ml-auto">
-              <SeasonModeSwitcher season={SEASON} currentWeek={currentWeek} />
-              <div className="h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
-                {session.user.name?.[0]?.toUpperCase() ?? '?'}
-              </div>
-            </div>
-          </div>
-        </header>
-
         <main style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+          <BackLink href={SEASON !== PREV_SEASON ? `/team?season=${SEASON}` : '/team'} label="My Team" />
 
           {/* ── Hero card ── */}
           <div className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm" style={{ padding: '24px 28px' }}>

@@ -5,8 +5,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
 import { formatPrice, formatWeekLong, formatPlayerName } from '@/lib/format';
-import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
-import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
+import TopNav from '@/components/TopNav';
 import ClickablePlayerRow from '@/components/ClickablePlayerRow';
 import PositionChip from '@/components/ui/PositionChip';
 import EmptyState from '@/components/ui/EmptyState';
@@ -51,26 +50,6 @@ async function fetchLastScoreWeek(season: number): Promise<number> {
     `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [season]
   );
   return row?.w ?? 1;
-}
-
-async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
-  return query<SidebarLeague>(
-    `SELECT l.id, l.name, l.season_year,
-            ft.team_name,
-            CASE WHEN ft.id IS NOT NULL THEN
-              (SELECT COUNT(*) + 1
-               FROM fantasy_teams ft2
-               JOIN league_members lm2 ON lm2.user_id = ft2.user_id AND lm2.league_id = l.id
-               WHERE ft2.season_year = l.season_year AND ft2.total_points > ft.total_points)
-            ELSE NULL END AS \`rank\`,
-            (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
-     FROM league_members lm
-     JOIN leagues l ON l.id = lm.league_id
-     LEFT JOIN fantasy_teams ft ON ft.user_id = ? AND ft.season_year = l.season_year
-     WHERE lm.user_id = ?
-     ORDER BY l.created_at DESC`,
-    [userId, userId]
-  );
 }
 
 async function fetchMovers(season: number, lastWeek: number): Promise<MoverRow[]> {
@@ -382,14 +361,12 @@ export default async function MarketPage({
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/auth/sign-in');
 
-  const userId = session.user.id;
   const { season: seasonParam } = await searchParams;
   const SEASON = seasonParam ? parseInt(seasonParam, 10) : PREV_SEASON;
 
-  const [currentWeek, lastScoreWeek, userLeagues] = await Promise.all([
+  const [currentWeek, lastScoreWeek] = await Promise.all([
     fetchCurrentWeek(SEASON),
     fetchLastScoreWeek(SEASON),
-    fetchUserLeagues(userId),
   ]);
 
   const [movers, mostTraded, highDemand, sellPressure, recentTx, matchups] = await Promise.all([
@@ -418,281 +395,268 @@ export default async function MarketPage({
     sellPressure.length > 0 || recentTx.length > 0;
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface md:flex-row">
+    <div className="flex min-h-screen flex-col bg-surface">
 
-      <Sidebar
+      <TopNav
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-        leagues={userLeagues} currentWeek={currentWeek} season={SEASON}
+        season={SEASON} currentWeek={currentWeek}
         logoUri={String(process.env.LOGO_URI)}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <main className="flex flex-1 flex-col gap-6 px-6 py-7">
 
-        {/* Header */}
-        <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
-          <div className="flex items-center justify-between px-6 py-2.5">
-            <SeasonModeSwitcher season={SEASON} currentWeek={currentWeek} />
-            <div className="flex h-8 w-8 items-center justify-center rounded-pill bg-ink text-eyebrow text-surface">
-              {session.user.name?.[0]?.toUpperCase() ?? '?'}
-            </div>
-          </div>
-        </header>
+        {/* Page title */}
+        <div>
+          <p className="text-eyebrow uppercase text-emerald">Live pricing</p>
+          <h1 className="mt-1 text-display text-ink">Market</h1>
+          <p className="mt-1 text-label text-ink-3">
+            Supply and demand pricing · {formatWeekLong(currentWeek)} ·{' '}
+            <span className="font-mono tabular-nums">{SEASON}</span> season
+          </p>
+        </div>
 
-        <main className="flex flex-1 flex-col gap-6 px-6 py-7">
-
-          {/* Page title */}
-          <div>
-            <p className="text-eyebrow uppercase text-emerald">Live pricing</p>
-            <h1 className="mt-1 text-display text-ink">Market</h1>
-            <p className="mt-1 text-label text-ink-3">
-              Supply and demand pricing · {formatWeekLong(currentWeek)} ·{' '}
-              <span className="font-mono tabular-nums">{SEASON}</span> season
-            </p>
-          </div>
-
-          {!hasActivity ? (
-            <PreSeasonMarket />
-          ) : (
-            <>
-            {/* Stat tiles */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {[
-                {
-                  label: 'Biggest gainer',
-                  value: biggestGainer ? `+${formatPrice(Math.abs(Number(biggestGainer.price_delta)))}` : 'None yet',
-                  sub:   biggestGainer ? formatPlayerName(biggestGainer.full_name) : 'Prices move once games start',
-                  tone:  biggestGainer ? 'text-up' : 'text-ink-3',
-                  numeric: !!biggestGainer,
-                },
-                {
-                  label: 'Biggest drop',
-                  value: biggestLoser ? `-${formatPrice(Math.abs(Number(biggestLoser.price_delta)))}` : 'None yet',
-                  sub:   biggestLoser ? formatPlayerName(biggestLoser.full_name) : 'Prices move once games start',
-                  tone:  biggestLoser ? 'text-down' : 'text-ink-3',
-                  numeric: !!biggestLoser,
-                },
-                {
-                  label: 'Top demand',
-                  value: topDemand ? formatPlayerName(topDemand.full_name) : 'None yet',
-                  sub:   topDemand ? `+${topDemand.net_order_flow} net flow` : 'No transfers recorded yet',
-                  tone:  topDemand ? 'text-ink' : 'text-ink-3',
-                  numeric: false,
-                },
-                {
-                  label: 'Recent transactions',
-                  value: String(totalTxCount),
-                  sub:   'Across all leagues',
-                  tone:  totalTxCount > 0 ? 'text-ink' : 'text-ink-3',
-                  numeric: true,
-                },
-              ].map(tile => (
-                <div key={tile.label} className="rounded-card border border-line bg-surface p-4">
-                  <p className="text-eyebrow uppercase text-ink-3">{tile.label}</p>
-                  <p className={[
-                    'mt-1.5 truncate text-section',
-                    tile.numeric ? 'font-mono tabular-nums' : '',
-                    tile.tone,
-                  ].join(' ')}>
-                    {tile.value}
-                  </p>
-                  <p className="mt-1 truncate text-label text-ink-3">{tile.sub}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Movers: Gainers | Losers */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-
-              {/* Top Gainers */}
-              <SectionCard title="Top gainers" sub="Biggest price rises this week" badge={`${gainers.length} players`}>
-                {gainers.length === 0 && <EmptyState compact title="No price rises this week." />}
-                {gainers.map((p, i) => (
-                  <MoverListRow key={p.id} p={p} season={SEASON} matchups={matchups} up isLast={i === gainers.length - 1} />
-                ))}
-              </SectionCard>
-
-              {/* Top Losers */}
-              <SectionCard title="Biggest drops" sub="Biggest price falls this week" badge={`${losers.length} players`}>
-                {losers.length === 0 && <EmptyState compact title="No price falls this week." />}
-                {losers.map((p, i) => (
-                  <MoverListRow key={p.id} p={p} season={SEASON} matchups={matchups} up={false} isLast={i === losers.length - 1} />
-                ))}
-              </SectionCard>
-            </div>
-
-            {/* Demand Watch + Sell Pressure + Most Traded */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-
-              {/* High Demand */}
-              <SectionCard title="High demand" sub="Most net buying this week" dark>
-                {highDemand.length === 0 && <DarkEmpty msg="No buying recorded yet." />}
-                {highDemand.map((p, i) => {
-                  const maxFlow = Number(highDemand[0]?.net_order_flow ?? 1);
-                  return (
-                    <FlowListRow
-                      key={p.id} p={p} season={SEASON} matchups={matchups} up
-                      pct={(Number(p.net_order_flow) / maxFlow) * 100}
-                      isLast={i === highDemand.length - 1}
-                    />
-                  );
-                })}
-              </SectionCard>
-
-              {/* Sell Pressure */}
-              <SectionCard title="Sell pressure" sub="Most net selling this week" dark>
-                {sellPressure.length === 0 && <DarkEmpty msg="No selling recorded yet." />}
-                {sellPressure.map((p, i) => {
-                  const maxFlow = Math.abs(Number(sellPressure[0]?.net_order_flow ?? 1));
-                  return (
-                    <FlowListRow
-                      key={p.id} p={p} season={SEASON} matchups={matchups} up={false}
-                      pct={(Math.abs(Number(p.net_order_flow)) / maxFlow) * 100}
-                      isLast={i === sellPressure.length - 1}
-                    />
-                  );
-                })}
-              </SectionCard>
-
-              {/* Most Traded */}
-              <SectionCard title="Most traded" sub="Highest combined buy and sell volume">
-                {mostTraded.length === 0 && <EmptyState compact title="No trades recorded yet." />}
-                {mostTraded.map((p, i) => {
-                  const total   = Number(p.buy_orders_count) + Number(p.sell_orders_count);
-                  const maxTotal = Number(mostTraded[0]?.buy_orders_count ?? 0) + Number(mostTraded[0]?.sell_orders_count ?? 1);
-                  const buyPct  = total > 0 ? (Number(p.buy_orders_count) / total) * 100 : 50;
-                  const barPct  = (total / maxTotal) * 100;
-                  return (
-                    <ClickablePlayerRow key={p.id} playerId={p.id} season={SEASON} className="block">
-                      <div className={[
-                        'px-5 py-2.5 transition-colors duration-150 ease-out-quart hover:bg-surface-sunken',
-                        i < mostTraded.length - 1 ? 'border-b border-line' : '',
-                      ].join(' ')}>
-                        <div className="mb-1.5 flex items-center gap-2">
-                          <PlayerAvatar player={p} size={28} />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="truncate text-label text-ink">{formatPlayerName(p.full_name)}</span>
-                              <PosBadge pos={p.position} />
-                              <MatchupBadge matchup={matchups[p.team_code]} />
-                            </div>
-                            <span className="font-mono tabular-nums text-eyebrow text-ink-3">
-                              {p.buy_orders_count} bought / {p.sell_orders_count} sold
-                            </span>
-                          </div>
-                          <div className="shrink-0 font-mono tabular-nums text-body text-ink">
-                            {total}
-                          </div>
-                        </div>
-                        {/* Buy/sell split bar — the split point is data, so it stays computed */}
-                        <div className="h-[3px] overflow-hidden rounded-pill bg-line">
-                          <div
-                            className="h-full rounded-pill"
-                            style={{
-                              width: `${barPct}%`,
-                              background: `linear-gradient(90deg, var(--color-up) ${buyPct}%, var(--color-down) ${buyPct}%)`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </ClickablePlayerRow>
-                  );
-                })}
-              </SectionCard>
-            </div>
-
-            {/* Recent Transactions (full width) */}
-            <SectionCard title="Recent transactions" sub="Latest buys and sells across all leagues" badge={`Last ${recentTx.length}`}>
-              {recentTx.length === 0 ? (
-                <EmptyState compact title="No transactions yet this season." />
-              ) : (
-              <div className="overflow-x-auto">
-              {/* Column headers */}
-              <div
-                className="grid min-w-[640px] border-b border-line bg-surface-sunken px-5 py-2 text-eyebrow uppercase text-ink-3"
-                style={{ gridTemplateColumns: '36px 1fr 140px 80px 80px 80px 120px' }}
-              >
-                <span />
-                <span>Player</span>
-                <span>Team</span>
-                <span className="text-right">Price</span>
-                <span className="text-right">Before</span>
-                <span className="text-right">After</span>
-                <span className="text-right">Time</span>
+        {!hasActivity ? (
+          <PreSeasonMarket />
+        ) : (
+          <>
+          {/* Stat tiles */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              {
+                label: 'Biggest gainer',
+                value: biggestGainer ? `+${formatPrice(Math.abs(Number(biggestGainer.price_delta)))}` : 'None yet',
+                sub:   biggestGainer ? formatPlayerName(biggestGainer.full_name) : 'Prices move once games start',
+                tone:  biggestGainer ? 'text-up' : 'text-ink-3',
+                numeric: !!biggestGainer,
+              },
+              {
+                label: 'Biggest drop',
+                value: biggestLoser ? `-${formatPrice(Math.abs(Number(biggestLoser.price_delta)))}` : 'None yet',
+                sub:   biggestLoser ? formatPlayerName(biggestLoser.full_name) : 'Prices move once games start',
+                tone:  biggestLoser ? 'text-down' : 'text-ink-3',
+                numeric: !!biggestLoser,
+              },
+              {
+                label: 'Top demand',
+                value: topDemand ? formatPlayerName(topDemand.full_name) : 'None yet',
+                sub:   topDemand ? `+${topDemand.net_order_flow} net flow` : 'No transfers recorded yet',
+                tone:  topDemand ? 'text-ink' : 'text-ink-3',
+                numeric: false,
+              },
+              {
+                label: 'Recent transactions',
+                value: String(totalTxCount),
+                sub:   'Across all leagues',
+                tone:  totalTxCount > 0 ? 'text-ink' : 'text-ink-3',
+                numeric: true,
+              },
+            ].map(tile => (
+              <div key={tile.label} className="rounded-card border border-line bg-surface p-4">
+                <p className="text-eyebrow uppercase text-ink-3">{tile.label}</p>
+                <p className={[
+                  'mt-1.5 truncate text-section',
+                  tile.numeric ? 'font-mono tabular-nums' : '',
+                  tile.tone,
+                ].join(' ')}>
+                  {tile.value}
+                </p>
+                <p className="mt-1 truncate text-label text-ink-3">{tile.sub}</p>
               </div>
+            ))}
+          </div>
 
-              {recentTx.map((tx, i) => {
-                const isBuy = tx.transaction_type === 'buy';
-                const delta = Number(tx.price_after) - Number(tx.price_before);
+          {/* Movers: Gainers | Losers */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+
+            {/* Top Gainers */}
+            <SectionCard title="Top gainers" sub="Biggest price rises this week" badge={`${gainers.length} players`}>
+              {gainers.length === 0 && <EmptyState compact title="No price rises this week." />}
+              {gainers.map((p, i) => (
+                <MoverListRow key={p.id} p={p} season={SEASON} matchups={matchups} up isLast={i === gainers.length - 1} />
+              ))}
+            </SectionCard>
+
+            {/* Top Losers */}
+            <SectionCard title="Biggest drops" sub="Biggest price falls this week" badge={`${losers.length} players`}>
+              {losers.length === 0 && <EmptyState compact title="No price falls this week." />}
+              {losers.map((p, i) => (
+                <MoverListRow key={p.id} p={p} season={SEASON} matchups={matchups} up={false} isLast={i === losers.length - 1} />
+              ))}
+            </SectionCard>
+          </div>
+
+          {/* Demand Watch + Sell Pressure + Most Traded */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+
+            {/* High Demand */}
+            <SectionCard title="High demand" sub="Most net buying this week" dark>
+              {highDemand.length === 0 && <DarkEmpty msg="No buying recorded yet." />}
+              {highDemand.map((p, i) => {
+                const maxFlow = Number(highDemand[0]?.net_order_flow ?? 1);
                 return (
-                  <div
-                    key={tx.id}
-                    className={[
-                      'grid min-w-[640px] items-center px-5 py-2',
-                      i < recentTx.length - 1 ? 'border-b border-line' : '',
-                    ].join(' ')}
-                    style={{ gridTemplateColumns: '36px 1fr 140px 80px 80px 80px 120px' }}
-                  >
-                    {/* Avatar + buy/sell indicator */}
-                    <div className="relative h-7 w-7">
-                      <PlayerAvatar player={tx} size={28} />
-                      <div className={[
-                        'absolute -right-0.5 bottom-0 h-2.5 w-2.5 rounded-pill border-2 border-surface',
-                        isBuy ? 'bg-up' : 'bg-down',
-                      ].join(' ')} />
-                    </div>
-
-                    {/* Player */}
-                    <div className="min-w-0 pl-2">
-                      <ClickablePlayerRow playerId={tx.id} season={SEASON}>
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate text-label text-ink">
-                            {formatPlayerName(tx.full_name)}
-                          </span>
-                          <PosBadge pos={tx.position} />
-                          <TeamLogo code={tx.team_code} size={11} />
-                          <span className="shrink-0 text-eyebrow text-ink-3">{tx.team_code}</span>
-                        </div>
-                      </ClickablePlayerRow>
-                      <div className="mt-0.5 flex items-center gap-1.5 text-eyebrow text-ink-3">
-                        <MatchupBadge matchup={matchups[tx.team_code]} />
-                      </div>
-                    </div>
-
-                    {/* Fantasy team */}
-                    <div className="min-w-0">
-                      <div className="truncate text-label text-ink-2">{tx.team_name}</div>
-                      <div className="truncate text-eyebrow text-ink-3">{tx.user_name}</div>
-                    </div>
-
-                    <div className="text-right font-mono tabular-nums text-label text-ink">
-                      {formatPrice(tx.price)}
-                    </div>
-
-                    <div className="text-right font-mono tabular-nums text-label text-ink-3">
-                      {formatPrice(tx.price_before)}
-                    </div>
-
-                    <div className={['text-right font-mono tabular-nums', delta >= 0 ? 'text-up' : 'text-down'].join(' ')}>
-                      <div className="text-label">{formatPrice(tx.price_after)}</div>
-                      <div className="text-eyebrow">
-                        {delta >= 0 ? '+' : ''}{formatPrice(delta)}
-                      </div>
-                    </div>
-
-                    <div className="text-right font-mono tabular-nums text-eyebrow text-ink-3">
-                      {formatTime(tx.created_at)}
-                    </div>
-                  </div>
+                  <FlowListRow
+                    key={p.id} p={p} season={SEASON} matchups={matchups} up
+                    pct={(Number(p.net_order_flow) / maxFlow) * 100}
+                    isLast={i === highDemand.length - 1}
+                  />
                 );
               })}
-              </div>
-              )}
             </SectionCard>
-            </>
-          )}
 
-        </main>
-      </div>
+            {/* Sell Pressure */}
+            <SectionCard title="Sell pressure" sub="Most net selling this week" dark>
+              {sellPressure.length === 0 && <DarkEmpty msg="No selling recorded yet." />}
+              {sellPressure.map((p, i) => {
+                const maxFlow = Math.abs(Number(sellPressure[0]?.net_order_flow ?? 1));
+                return (
+                  <FlowListRow
+                    key={p.id} p={p} season={SEASON} matchups={matchups} up={false}
+                    pct={(Math.abs(Number(p.net_order_flow)) / maxFlow) * 100}
+                    isLast={i === sellPressure.length - 1}
+                  />
+                );
+              })}
+            </SectionCard>
+
+            {/* Most Traded */}
+            <SectionCard title="Most traded" sub="Highest combined buy and sell volume">
+              {mostTraded.length === 0 && <EmptyState compact title="No trades recorded yet." />}
+              {mostTraded.map((p, i) => {
+                const total   = Number(p.buy_orders_count) + Number(p.sell_orders_count);
+                const maxTotal = Number(mostTraded[0]?.buy_orders_count ?? 0) + Number(mostTraded[0]?.sell_orders_count ?? 1);
+                const buyPct  = total > 0 ? (Number(p.buy_orders_count) / total) * 100 : 50;
+                const barPct  = (total / maxTotal) * 100;
+                return (
+                  <ClickablePlayerRow key={p.id} playerId={p.id} season={SEASON} className="block">
+                    <div className={[
+                      'px-5 py-2.5 transition-colors duration-150 ease-out-quart hover:bg-surface-sunken',
+                      i < mostTraded.length - 1 ? 'border-b border-line' : '',
+                    ].join(' ')}>
+                      <div className="mb-1.5 flex items-center gap-2">
+                        <PlayerAvatar player={p} size={28} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate text-label text-ink">{formatPlayerName(p.full_name)}</span>
+                            <PosBadge pos={p.position} />
+                            <MatchupBadge matchup={matchups[p.team_code]} />
+                          </div>
+                          <span className="font-mono tabular-nums text-eyebrow text-ink-3">
+                            {p.buy_orders_count} bought / {p.sell_orders_count} sold
+                          </span>
+                        </div>
+                        <div className="shrink-0 font-mono tabular-nums text-body text-ink">
+                          {total}
+                        </div>
+                      </div>
+                      {/* Buy/sell split bar — the split point is data, so it stays computed */}
+                      <div className="h-[3px] overflow-hidden rounded-pill bg-line">
+                        <div
+                          className="h-full rounded-pill"
+                          style={{
+                            width: `${barPct}%`,
+                            background: `linear-gradient(90deg, var(--color-up) ${buyPct}%, var(--color-down) ${buyPct}%)`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </ClickablePlayerRow>
+                );
+              })}
+            </SectionCard>
+          </div>
+
+          {/* Recent Transactions (full width) */}
+          <SectionCard title="Recent transactions" sub="Latest buys and sells across all leagues" badge={`Last ${recentTx.length}`}>
+            {recentTx.length === 0 ? (
+              <EmptyState compact title="No transactions yet this season." />
+            ) : (
+            <div className="overflow-x-auto">
+            {/* Column headers */}
+            <div
+              className="grid min-w-[640px] border-b border-line bg-surface-sunken px-5 py-2 text-eyebrow uppercase text-ink-3"
+              style={{ gridTemplateColumns: '36px 1fr 140px 80px 80px 80px 120px' }}
+            >
+              <span />
+              <span>Player</span>
+              <span>Team</span>
+              <span className="text-right">Price</span>
+              <span className="text-right">Before</span>
+              <span className="text-right">After</span>
+              <span className="text-right">Time</span>
+            </div>
+
+            {recentTx.map((tx, i) => {
+              const isBuy = tx.transaction_type === 'buy';
+              const delta = Number(tx.price_after) - Number(tx.price_before);
+              return (
+                <div
+                  key={tx.id}
+                  className={[
+                    'grid min-w-[640px] items-center px-5 py-2',
+                    i < recentTx.length - 1 ? 'border-b border-line' : '',
+                  ].join(' ')}
+                  style={{ gridTemplateColumns: '36px 1fr 140px 80px 80px 80px 120px' }}
+                >
+                  {/* Avatar + buy/sell indicator */}
+                  <div className="relative h-7 w-7">
+                    <PlayerAvatar player={tx} size={28} />
+                    <div className={[
+                      'absolute -right-0.5 bottom-0 h-2.5 w-2.5 rounded-pill border-2 border-surface',
+                      isBuy ? 'bg-up' : 'bg-down',
+                    ].join(' ')} />
+                  </div>
+
+                  {/* Player */}
+                  <div className="min-w-0 pl-2">
+                    <ClickablePlayerRow playerId={tx.id} season={SEASON}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-label text-ink">
+                          {formatPlayerName(tx.full_name)}
+                        </span>
+                        <PosBadge pos={tx.position} />
+                        <TeamLogo code={tx.team_code} size={11} />
+                        <span className="shrink-0 text-eyebrow text-ink-3">{tx.team_code}</span>
+                      </div>
+                    </ClickablePlayerRow>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-eyebrow text-ink-3">
+                      <MatchupBadge matchup={matchups[tx.team_code]} />
+                    </div>
+                  </div>
+
+                  {/* Fantasy team */}
+                  <div className="min-w-0">
+                    <div className="truncate text-label text-ink-2">{tx.team_name}</div>
+                    <div className="truncate text-eyebrow text-ink-3">{tx.user_name}</div>
+                  </div>
+
+                  <div className="text-right font-mono tabular-nums text-label text-ink">
+                    {formatPrice(tx.price)}
+                  </div>
+
+                  <div className="text-right font-mono tabular-nums text-label text-ink-3">
+                    {formatPrice(tx.price_before)}
+                  </div>
+
+                  <div className={['text-right font-mono tabular-nums', delta >= 0 ? 'text-up' : 'text-down'].join(' ')}>
+                    <div className="text-label">{formatPrice(tx.price_after)}</div>
+                    <div className="text-eyebrow">
+                      {delta >= 0 ? '+' : ''}{formatPrice(delta)}
+                    </div>
+                  </div>
+
+                  <div className="text-right font-mono tabular-nums text-eyebrow text-ink-3">
+                    {formatTime(tx.created_at)}
+                  </div>
+                </div>
+              );
+            })}
+            </div>
+            )}
+          </SectionCard>
+          </>
+        )}
+
+      </main>
     </div>
   );
 }

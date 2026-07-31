@@ -1,7 +1,7 @@
 import { query } from '@/lib/mysql';
 import { isWeekLive } from '@/lib/live-week';
-import { formatPoints, formatWeekLong } from '@/lib/format';
 import LiveWeekScore from './LiveWeekScore';
+import ProjectedPointsPanel from '@/components/ProjectedPointsPanel';
 import type { RosterPlayer } from '@/app/team/_components/RosterList';
 
 interface Props {
@@ -63,27 +63,10 @@ export default async function WeekScoreSection({ teamId, season, currentWeek }: 
   // Dark panel is earned here: this is live/market-state data (see the
   // dark-panel ruling). Flat fill, no gradient.
   return (
-    <div className="overflow-hidden rounded-card bg-ink p-5">
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        <span className="text-eyebrow uppercase text-emerald">
-          {formatWeekLong(currentWeek)}
-        </span>
-        <span className="text-label text-turf-chalk/50">
-          Games haven&apos;t started yet
-        </span>
-      </div>
-
-      {/* The projected total is the point of this panel, so it's the
-          brightest thing on it. It used to render at 25% white — dimmer than
-          its own caption — which made the hero read as disabled. */}
-      <div className="mt-2 flex flex-wrap items-baseline gap-x-2.5">
-        <span className="font-mono tabular-nums text-display text-turf-chalk">
-          {formatPoints(projected)}
-        </span>
-        <span className="text-label text-turf-chalk/60">
-          projected points this week
-        </span>
-      </div>
-    </div>
+    <ProjectedPointsPanel
+      week={currentWeek}
+      projectedPoints={projected}
+      caption="Games haven't started yet"
+    />
   );
 }

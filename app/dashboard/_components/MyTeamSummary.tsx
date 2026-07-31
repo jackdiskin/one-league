@@ -7,11 +7,19 @@ import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 import type { FieldPlayer } from '@/components/field/types';
 
-interface Props { userId: string; seasonYear: number; hidePrices?: boolean; interactive?: boolean }
+interface Props {
+  userId: string;
+  seasonYear: number;
+  hidePrices?: boolean;
+  interactive?: boolean;
+  /** Replaces the default team-name/stats header with a plain title bar —
+   *  for pages that already show the team name and stats elsewhere. */
+  title?: string;
+}
 
 type Player = FieldPlayer;
 
-export default async function MyTeamSummary({ userId, seasonYear, hidePrices = false, interactive = false }: Props) {
+export default async function MyTeamSummary({ userId, seasonYear, hidePrices = false, interactive = false, title }: Props) {
   const [team] = await query<{
     id: number; team_name: string; total_points: number; budget_remaining: number;
     league_name: string; rank: number; league_size: number;
@@ -85,23 +93,29 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
     <div className="overflow-hidden rounded-card border border-line">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-3 border-b border-line bg-surface px-5 py-3.5">
-        {/* Emerald on the team name mirrors the dashboard greeting — the two
-            brand moments, and nowhere else. */}
-        <p className="min-w-0 truncate text-section text-emerald">{team.team_name}</p>
-        <div className="flex shrink-0 gap-2">
-          {[
-            { label: 'Points', value: formatPoints(team.total_points) },
-            ...(hidePrices ? [] : [{ label: 'Cap space', value: formatPrice(team.budget_remaining) }]),
-            { label: 'Rank', value: rankLabel },
-          ].map(stat => (
-            <div key={stat.label} className="rounded-control border border-line bg-surface-sunken px-3 py-1.5 text-center">
-              <p className="text-eyebrow uppercase text-ink-3">{stat.label}</p>
-              <p className="font-mono tabular-nums text-body text-ink">{stat.value}</p>
-            </div>
-          ))}
+      {title ? (
+        <div className="border-b border-line bg-surface px-5 py-3.5">
+          <p className="text-body font-medium text-ink">{title}</p>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3 border-b border-line bg-surface px-5 py-3.5">
+          {/* Emerald on the team name mirrors the dashboard greeting — the two
+              brand moments, and nowhere else. */}
+          <p className="min-w-0 truncate text-section text-emerald">{team.team_name}</p>
+          <div className="flex shrink-0 gap-2">
+            {[
+              { label: 'Points', value: formatPoints(team.total_points) },
+              ...(hidePrices ? [] : [{ label: 'Cap space', value: formatPrice(team.budget_remaining) }]),
+              { label: 'Rank', value: rankLabel },
+            ].map(stat => (
+              <div key={stat.label} className="rounded-control border border-line bg-surface-sunken px-3 py-1.5 text-center">
+                <p className="text-eyebrow uppercase text-ink-3">{stat.label}</p>
+                <p className="font-mono tabular-nums text-body text-ink">{stat.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Field ── */}
       <LineupField

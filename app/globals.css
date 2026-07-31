@@ -74,6 +74,9 @@
   --text-eyebrow--line-height:    14px;
   --text-eyebrow--letter-spacing: 0.08em;
   --text-eyebrow--font-weight:    500;
+
+  /* grid templates */
+  --grid-template-columns-team:   1.1fr 1fr;
 }
 
 @keyframes slot-in {

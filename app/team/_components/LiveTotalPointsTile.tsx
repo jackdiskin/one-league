@@ -9,13 +9,16 @@ import type { RosterPlayer } from './RosterList';
 interface Props {
   roster:           RosterPlayer[];
   seasonBasePoints: number;   // fantasy_teams.total_points (completed prior weeks only)
+  /** Renders as a small inline chip (matching MyTeamSummary's header stats)
+   *  instead of a full StatCard — for pages that show it beside the title. */
+  compact?: boolean;
 }
 
 /**
  * "Total Points" stat tile that includes live/current-week points in the total.
  * Replaces the static server-rendered tile so the season total stays current.
  */
-export default function LiveTotalPointsTile({ roster, seasonBasePoints }: Props) {
+export default function LiveTotalPointsTile({ roster, seasonBasePoints, compact = false }: Props) {
   const playerIds = useMemo(
     () => roster.map(p => p.external_player_id).filter(Boolean) as string[],
     [roster],
@@ -39,6 +42,15 @@ export default function LiveTotalPointsTile({ roster, seasonBasePoints }: Props)
 
   const total   = Number(seasonBasePoints) + weekTotal;
   const anyLive = roster.some(p => p.roster_slot !== 'BENCH' && p.external_player_id && liveStats.has(p.external_player_id));
+
+  if (compact) {
+    return (
+      <div className="rounded-control border border-emerald-line bg-emerald-tint px-3 py-1.5 text-center">
+        <p className="text-eyebrow uppercase text-emerald">Points</p>
+        <p className="font-mono tabular-nums text-body text-ink">{formatPoints(total)}</p>
+      </div>
+    );
+  }
 
   return (
     <StatCard

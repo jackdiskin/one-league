@@ -2,9 +2,17 @@ import Link from 'next/link';
 import SectionHeader from '@/components/ui/SectionHeader';
 import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
-import type { SidebarLeague } from './Sidebar';
 
-interface Props { leagues: SidebarLeague[] }
+export interface LeagueStanding {
+  id: number;
+  name: string;
+  season_year: number;
+  team_name: string | null;
+  rank: number | null;
+  member_count: number;
+}
+
+interface Props { leagues: LeagueStanding[] }
 
 function rankLabel(r: number | null) {
   if (!r) return null;

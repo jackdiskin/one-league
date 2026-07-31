@@ -3,8 +3,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
 import { formatPrice, formatWeekLong } from '@/lib/format';
-import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
-import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
+import TopNav from '@/components/TopNav';
 import TransferBoard, { type CatalogPlayer } from './_components/TransferBoard';
 import { getNextMatchupByTeam } from '@/lib/schedule';
 import StatCard from '@/components/ui/StatCard';
@@ -35,26 +34,6 @@ async function fetchLastScoreWeek(season: number): Promise<number> {
     `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [season]
   );
   return row?.w ?? 1;
-}
-
-async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
-  return query<SidebarLeague>(
-    `SELECT l.id, l.name, l.season_year,
-            ft.team_name,
-            CASE WHEN ft.id IS NOT NULL THEN
-              (SELECT COUNT(*) + 1
-               FROM fantasy_teams ft2
-               JOIN league_members lm2 ON lm2.user_id = ft2.user_id AND lm2.league_id = l.id
-               WHERE ft2.season_year = l.season_year AND ft2.total_points > ft.total_points)
-            ELSE NULL END AS \`rank\`,
-            (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
-     FROM league_members lm
-     JOIN leagues l ON l.id = lm.league_id
-     LEFT JOIN fantasy_teams ft ON ft.user_id = ? AND ft.season_year = l.season_year
-     WHERE lm.user_id = ?
-     ORDER BY l.created_at DESC`,
-    [userId, userId]
-  );
 }
 
 async function fetchTeam(userId: string, season: number) {
@@ -134,10 +113,9 @@ export default async function TransfersPage({
   const { season: seasonParam } = await searchParams;
   const SEASON = seasonParam ? parseInt(seasonParam, 10) : await detectUserSeason(userId);
 
-  const [currentWeek, lastScoreWeek, userLeagues, team, matchups] = await Promise.all([
+  const [currentWeek, lastScoreWeek, team, matchups] = await Promise.all([
     fetchCurrentWeek(SEASON),
     fetchLastScoreWeek(SEASON),
-    fetchUserLeagues(userId),
     fetchTeam(userId, SEASON),
     getNextMatchupByTeam(SCHEDULE_SEASON),
   ]);
@@ -148,65 +126,52 @@ export default async function TransfersPage({
   const budgetRemaining = team?.budget_remaining ?? 0;
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface md:flex-row">
+    <div className="flex min-h-screen flex-col bg-surface">
 
-      <Sidebar
+      <TopNav
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-        leagues={userLeagues} currentWeek={currentWeek} season={SEASON}
+        season={SEASON} currentWeek={currentWeek}
         logoUri={String(process.env.LOGO_URI)}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <main className="flex flex-1 flex-col gap-6 px-6 py-7">
 
-        {/* Header */}
-        <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
-          <div className="flex items-center justify-between px-6 py-2.5">
-            <SeasonModeSwitcher season={SEASON} currentWeek={currentWeek} />
-            <div className="flex h-8 w-8 items-center justify-center rounded-pill bg-ink text-eyebrow text-surface">
-              {session.user.name?.[0]?.toUpperCase() ?? '?'}
-            </div>
+        {/* Page title */}
+        <div>
+          <p className="text-eyebrow uppercase text-emerald">Buy and sell</p>
+          <h1 className="mt-1 text-display text-ink">Transfers</h1>
+          <p className="mt-1 text-label text-ink-3">
+            Pick a player on your squad to find a replacement · {formatWeekLong(currentWeek)} ·{' '}
+            <span className="font-mono tabular-nums">{SEASON}</span> season
+          </p>
+        </div>
+
+        {!team ? (
+          <div className="rounded-card border border-line bg-surface">
+            <EmptyState
+              icon={<Icon name="football" size={20} />}
+              title="Draft a squad before you can make transfers."
+            />
           </div>
-        </header>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between rounded-card border border-line bg-surface p-4">
+              <StatCard bare label="Budget left" value={formatPrice(budgetRemaining)} size="display" tone="accent" />
+              <StatCard bare align="right" label="Roster" value={`${owned.length}/${TOTAL_SLOTS}`} />
+            </div>
 
-        <main className="flex flex-1 flex-col gap-6 px-6 py-7">
-
-          {/* Page title */}
-          <div>
-            <p className="text-eyebrow uppercase text-emerald">Buy and sell</p>
-            <h1 className="mt-1 text-display text-ink">Transfers</h1>
-            <p className="mt-1 text-label text-ink-3">
-              Pick a player on your squad to find a replacement · {formatWeekLong(currentWeek)} ·{' '}
-              <span className="font-mono tabular-nums">{SEASON}</span> season
-            </p>
+            <TransferBoard
+              players={players}
+              season={SEASON}
+              fantasyTeamId={team.id}
+              currentWeek={currentWeek}
+              budgetRemaining={Number(budgetRemaining)}
+              matchups={matchups}
+            />
           </div>
+        )}
 
-          {!team ? (
-            <div className="rounded-card border border-line bg-surface">
-              <EmptyState
-                icon={<Icon name="football" size={20} />}
-                title="Draft a squad before you can make transfers."
-              />
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between rounded-card border border-line bg-surface p-4">
-                <StatCard bare label="Budget left" value={formatPrice(budgetRemaining)} size="display" tone="accent" />
-                <StatCard bare align="right" label="Roster" value={`${owned.length}/${TOTAL_SLOTS}`} />
-              </div>
-
-              <TransferBoard
-                players={players}
-                season={SEASON}
-                fantasyTeamId={team.id}
-                currentWeek={currentWeek}
-                budgetRemaining={Number(budgetRemaining)}
-                matchups={matchups}
-              />
-            </div>
-          )}
-
-        </main>
-      </div>
+      </main>
     </div>
   );
 }

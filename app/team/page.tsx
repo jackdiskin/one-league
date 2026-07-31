@@ -3,15 +3,13 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
-import { formatWeekLong } from '@/lib/format';
-import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
-import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
+import TopNav from '@/components/TopNav';
+import ProjectedPointsPanel from '@/components/ProjectedPointsPanel';
 import MyTeamSummary from '@/app/dashboard/_components/MyTeamSummary';
 import RosterList,   { type RosterPlayer }   from './_components/RosterList';
 import LiveTotalPointsTile from './_components/LiveTotalPointsTile';
 import WeeklyPerformance, { type PerfPlayer } from './_components/WeeklyPerformance';
 import { getNextMatchupByTeam } from '@/lib/schedule';
-import StatCard from '@/components/ui/StatCard';
 import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 
@@ -44,38 +42,19 @@ async function fetchLastScoreWeek(season: number): Promise<number> {
   return row?.w ?? 1;
 }
 
-async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
-  return query<SidebarLeague>(
-    `SELECT l.id, l.name, l.season_year,
-            ft.team_name,
-            CASE WHEN ft.id IS NOT NULL THEN
-              (SELECT COUNT(*) + 1
-               FROM fantasy_teams ft2
-               JOIN league_members lm2 ON lm2.user_id = ft2.user_id AND lm2.league_id = l.id
-               LEFT JOIN (
-                 SELECT ftr2.fantasy_team_id, SUM(pms2.current_price) AS rv
-                 FROM fantasy_team_roster ftr2
-                 JOIN player_market_state pms2 ON pms2.player_id = ftr2.player_id AND pms2.season_year = l.season_year
-                 WHERE ftr2.is_active = TRUE GROUP BY ftr2.fantasy_team_id
-               ) rv2 ON rv2.fantasy_team_id = ft2.id
-               WHERE ft2.season_year = l.season_year
-                 AND (ft2.total_points > ft.total_points
-                      OR (ft2.total_points = ft.total_points
-                          AND COALESCE(rv2.rv, 0) > (
-                            SELECT COALESCE(SUM(pms3.current_price), 0)
-                            FROM fantasy_team_roster ftr3
-                            JOIN player_market_state pms3 ON pms3.player_id = ftr3.player_id AND pms3.season_year = l.season_year
-                            WHERE ftr3.fantasy_team_id = ft.id AND ftr3.is_active = TRUE
-                          ))))
-            ELSE NULL END AS \`rank\`,
-            (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
-     FROM league_members lm
-     JOIN leagues l ON l.id = lm.league_id
-     LEFT JOIN fantasy_teams ft ON ft.user_id = ? AND ft.season_year = l.season_year
-     WHERE lm.user_id = ?
-     ORDER BY l.created_at DESC`,
-    [userId, userId]
+// Bench points never count toward the score — mirrors WeekScoreSection's
+// fetchProjectedTotal (only starters' expected_points sum toward the panel).
+async function fetchProjectedTotal(season: number, teamId: number, week: number): Promise<number> {
+  const [row] = await query<{ total: number }>(
+    `SELECT COALESCE(SUM(pwp.expected_points), 0) AS total
+     FROM fantasy_team_roster ftr
+     LEFT JOIN player_weekly_projections pwp
+       ON pwp.player_id = ftr.player_id AND pwp.season_year = ? AND pwp.week = ?
+          AND pwp.projection_source = 'internal_model'
+     WHERE ftr.fantasy_team_id = ? AND ftr.is_active = TRUE AND ftr.roster_slot != 'BENCH'`,
+    [season, week, teamId]
   );
+  return Number(row?.total ?? 0);
 }
 
 async function fetchTeam(userId: string, season: number) {
@@ -177,20 +156,18 @@ export default async function TeamPage({
   const { season: seasonParam } = await searchParams;
   const SEASON = seasonParam ? parseInt(seasonParam, 10) : await detectUserSeason(userId);
 
-  const [currentWeek, lastScoreWeek, userLeagues, team] = await Promise.all([
+  const [currentWeek, lastScoreWeek, team] = await Promise.all([
     fetchCurrentWeek(SEASON),
     fetchLastScoreWeek(SEASON),
-    fetchUserLeagues(userId),
     fetchTeam(userId, SEASON),
   ]);
 
-
   if (!team) {
     return (
-      <div className="flex min-h-screen flex-col bg-surface md:flex-row">
-        <Sidebar
+      <div className="flex min-h-screen flex-col bg-surface">
+        <TopNav
           user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-          leagues={userLeagues} currentWeek={currentWeek} season={SEASON}
+          season={SEASON} currentWeek={currentWeek}
           logoUri={String(process.env.LOGO_URI)}
         />
         <div className="flex flex-1 items-center justify-center">
@@ -203,77 +180,65 @@ export default async function TeamPage({
     );
   }
 
-  const [roster, weeklyPerf, matchups] = await Promise.all([
+  const [roster, weeklyPerf, matchups, projectedTotal] = await Promise.all([
     fetchRoster(SEASON, team.id, lastScoreWeek),
     fetchWeeklyPerf(SEASON, team.id, lastScoreWeek),
     getNextMatchupByTeam(SCHEDULE_SEASON),
+    fetchProjectedTotal(SEASON, team.id, currentWeek),
   ]);
 
   const rankLabel = team.rank === 1 ? '1st' : team.rank === 2 ? '2nd' : team.rank === 3 ? '3rd' : `${team.rank}th`;
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface md:flex-row">
+    <div className="flex min-h-screen flex-col bg-surface">
 
-      <Sidebar
+      <TopNav
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-        leagues={userLeagues} currentWeek={currentWeek} season={SEASON}
+        season={SEASON} currentWeek={currentWeek}
         logoUri={String(process.env.LOGO_URI)}
       />
 
-      {/* Main column */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <main className="flex flex-1 flex-col gap-6 px-6 py-7">
 
-        {/* Header */}
-        <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
-          <div className="flex items-center justify-between px-6 py-3">
-            <SeasonModeSwitcher season={SEASON} currentWeek={currentWeek} />
-            <div className="flex items-center gap-3 ml-auto">
-              <div className="flex h-8 w-8 items-center justify-center rounded-pill bg-ink text-eyebrow text-surface">
-                {session.user.name?.[0]?.toUpperCase() ?? '?'}
-              </div>
+        {/* Page title */}
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="min-w-0 truncate text-display text-emerald">{team.team_name}</h1>
+          <div className="flex shrink-0 gap-2">
+            <LiveTotalPointsTile roster={roster} seasonBasePoints={team.total_points} compact />
+            <div className="rounded-control border border-line bg-surface-sunken px-3 py-1.5 text-center">
+              <p className="text-eyebrow uppercase text-ink-3">Rank</p>
+              <p className="font-mono tabular-nums text-body text-ink">{rankLabel}</p>
             </div>
           </div>
-        </header>
+        </div>
 
-        <main className="flex flex-1 flex-col gap-6 px-6 py-7">
+        {/* Field + roster, side by side */}
+        <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-team">
 
-          {/* Page title */}
-          <div>
-            <h1 className="text-display text-emerald">{team.team_name}</h1>
-            <p className="mt-1 text-label text-ink-3">
-              {formatWeekLong(currentWeek)} · <span className="font-mono tabular-nums">{SEASON}</span> NFL season
-            </p>
+          {/* Left column: projected points + formation */}
+          <div className="flex flex-col gap-4">
+            <ProjectedPointsPanel week={currentWeek} projectedPoints={projectedTotal} />
+            <Suspense fallback={<Skeleton h={580} />}>
+              <MyTeamSummary
+                userId={userId} seasonYear={SEASON} hidePrices interactive
+                title="Formation — tap to swap"
+              />
+            </Suspense>
           </div>
 
-          {/* Quick stat tiles */}
-          <div className="grid grid-cols-2 gap-4">
-            <LiveTotalPointsTile roster={roster} seasonBasePoints={team.total_points} />
-            <StatCard
-              label="League rank"
-              value={rankLabel}
-              sub={`of ${team.league_size} teams`}
-              tone={team.rank <= 3 ? 'accent' : 'default'}
-            />
-          </div>
-
-          {/* Formation */}
-          <Suspense fallback={<Skeleton h={580} />}>
-            <MyTeamSummary userId={userId} seasonYear={SEASON} hidePrices interactive />
-          </Suspense>
-
-          {/* Roster list — starters/bench lineup management only */}
+          {/* Right column: full roster — starters/bench lineup management */}
           <RosterList
             roster={roster}
             teamId={team.id}
             matchups={matchups}
             season={SEASON}
           />
+        </div>
 
-          {/* Weekly performance */}
-          <WeeklyPerformance players={weeklyPerf} week={lastScoreWeek} season={SEASON} matchups={matchups} />
+        {/* Weekly performance */}
+        <WeeklyPerformance players={weeklyPerf} week={lastScoreWeek} season={SEASON} matchups={matchups} />
 
-        </main>
-      </div>
+      </main>
     </div>
   );
 }

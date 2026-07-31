@@ -5,7 +5,7 @@ import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
 import Icon from '@/components/ui/Icon';
 import EmptyState from '@/components/ui/EmptyState';
-import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
+import TopNav from '@/components/TopNav';
 import LeaguesClient, { type MyLeague } from './_components/LeaguesClient';
 import LeaderboardCard from './_components/LeaderboardCard';
 
@@ -24,27 +24,6 @@ async function fetchCurrentWeek(season: number): Promise<number> {
     `SELECT MAX(week) AS w FROM player_weekly_scores WHERE season_year = ?`, [season]
   );
   return row?.w ?? 1;
-}
-
-// Sidebar's own "My Leagues" quick-list — kept consistent with every other page.
-async function fetchUserLeagues(userId: string): Promise<SidebarLeague[]> {
-  return query<SidebarLeague>(
-    `SELECT l.id, l.name, l.season_year,
-            ft.team_name,
-            CASE WHEN ft.id IS NOT NULL THEN
-              (SELECT COUNT(*) + 1
-               FROM fantasy_teams ft2
-               JOIN league_members lm2 ON lm2.user_id = ft2.user_id AND lm2.league_id = l.id
-               WHERE ft2.season_year = l.season_year AND ft2.total_points > ft.total_points)
-            ELSE NULL END AS \`rank\`,
-            (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
-     FROM league_members lm
-     JOIN leagues l ON l.id = lm.league_id
-     LEFT JOIN fantasy_teams ft ON ft.user_id = ? AND ft.season_year = l.season_year
-     WHERE lm.user_id = ?
-     ORDER BY l.created_at DESC`,
-    [userId, userId]
-  );
 }
 
 async function fetchMyLeagues(userId: string, season: number): Promise<MyLeague[]> {
@@ -78,51 +57,48 @@ export default async function LeaguesPage({
   const { season: seasonParam } = await searchParams;
   const SEASON_YEAR = seasonParam ? parseInt(seasonParam, 10) : await detectUserSeason(userId);
 
-  const [currentWeek, userLeagues, myLeagues, hasTeam] = await Promise.all([
+  const [currentWeek, myLeagues, hasTeam] = await Promise.all([
     fetchCurrentWeek(SEASON_YEAR),
-    fetchUserLeagues(userId),
     fetchMyLeagues(userId, SEASON_YEAR),
     query<{ id: number }>(`SELECT id FROM fantasy_teams WHERE user_id = ? AND season_year = ? LIMIT 1`, [userId, SEASON_YEAR])
       .then(rows => rows.length > 0),
   ]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface md:flex-row">
-      <Sidebar
+    <div className="flex min-h-screen flex-col bg-surface">
+      <TopNav
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-        leagues={userLeagues} currentWeek={currentWeek} season={SEASON_YEAR}
+        season={SEASON_YEAR} currentWeek={currentWeek}
         logoUri={String(process.env.LOGO_URI)}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <main className="flex max-w-3xl flex-1 flex-col gap-6 px-6 py-7">
-          <div>
-            <h1 className="text-display text-ink">Leagues</h1>
-            <p className="mt-1 max-w-xl text-label text-ink-3">
-              Every OneLeague manager competes on the same global leaderboard. Create or join a
-              private league to also compete with friends.
-            </p>
-          </div>
+      <main className="flex max-w-3xl flex-1 flex-col gap-6 px-6 py-7">
+        <div>
+          <h1 className="text-display text-ink">Leagues</h1>
+          <p className="mt-1 max-w-xl text-label text-ink-3">
+            Every OneLeague manager competes on the same global leaderboard. Create or join a
+            private league to also compete with friends.
+          </p>
+        </div>
 
-          {!hasTeam ? (
-            <div className="rounded-card border border-line bg-surface">
-              <EmptyState
-                icon={<Icon name="football" size={20} />}
-                title="Draft your squad first. You join the global leaderboard the moment you do."
-              />
+        {!hasTeam ? (
+          <div className="rounded-card border border-line bg-surface">
+            <EmptyState
+              icon={<Icon name="football" size={20} />}
+              title="Draft your squad first. You join the global leaderboard the moment you do."
+            />
+          </div>
+        ) : (
+          <>
+            <div className="max-w-xs">
+              <Suspense fallback={<div className="h-32 animate-pulse rounded-card bg-surface-sunken" />}>
+                <LeaderboardCard userId={userId} seasonYear={SEASON_YEAR} />
+              </Suspense>
             </div>
-          ) : (
-            <>
-              <div className="max-w-xs">
-                <Suspense fallback={<div className="h-32 animate-pulse rounded-card bg-surface-sunken" />}>
-                  <LeaderboardCard userId={userId} seasonYear={SEASON_YEAR} />
-                </Suspense>
-              </div>
-              <LeaguesClient initialLeagues={myLeagues} />
-            </>
-          )}
-        </main>
-      </div>
+            <LeaguesClient initialLeagues={myLeagues} />
+          </>
+        )}
+      </main>
     </div>
   );
 }
