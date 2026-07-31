@@ -4,12 +4,12 @@ import { Suspense } from 'react';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
 import Icon from '@/components/ui/Icon';
+import EmptyState from '@/components/ui/EmptyState';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import LeaguesClient, { type MyLeague } from './_components/LeaguesClient';
 import LeaderboardCard from './_components/LeaderboardCard';
 
 const PREV_SEASON = 2025;
-const SEASON = 2026;
 
 async function detectUserSeason(userId: string): Promise<number> {
   const [row] = await query<{ season_year: number }>(
@@ -87,40 +87,38 @@ export default async function LeaguesPage({
   ]);
 
   return (
-    <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
+    <div className="flex min-h-screen flex-col bg-surface md:flex-row">
       <Sidebar
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
         leagues={userLeagues} currentWeek={currentWeek} season={SEASON_YEAR}
         logoUri={String(process.env.LOGO_URI)}
       />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <main style={{ flex: 1, padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 760 }}>
-          <div style={{ paddingLeft: 4 }}>
-            <h1 style={{
-              fontSize: 24, fontWeight: 900, letterSpacing: '-0.03em', color: '#0f172a',
-            }}>
-              Leagues
-            </h1>
-            <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 2 }}>
-              Every OneLeague manager competes on the same Global Leaderboard — create or join a private league to also compete with friends.
+      <div className="flex min-w-0 flex-1 flex-col">
+        <main className="flex max-w-3xl flex-1 flex-col gap-6 px-6 py-7">
+          <div>
+            <h1 className="text-display text-ink">Leagues</h1>
+            <p className="mt-1 max-w-xl text-label text-ink-3">
+              Every OneLeague manager competes on the same global leaderboard. Create or join a
+              private league to also compete with friends.
             </p>
           </div>
 
           {!hasTeam ? (
-            <div className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm p-8 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-card bg-emerald-tint text-emerald"><Icon name="football" size={22} /></div>
-              <p className="font-semibold text-slate-900">Draft your team first</p>
-              <p className="text-sm text-slate-500 mt-1">You're auto-enrolled in the Global Leaderboard the moment you draft — private leagues can wait until after.</p>
+            <div className="rounded-card border border-line bg-surface">
+              <EmptyState
+                icon={<Icon name="football" size={20} />}
+                title="Draft your squad first. You join the global leaderboard the moment you do."
+              />
             </div>
           ) : (
             <>
-              <div style={{ maxWidth: 280 }}>
-                <Suspense fallback={<div className="rounded-2xl bg-slate-100 animate-pulse h-32" />}>
+              <div className="max-w-xs">
+                <Suspense fallback={<div className="h-32 animate-pulse rounded-card bg-surface-sunken" />}>
                   <LeaderboardCard userId={userId} seasonYear={SEASON_YEAR} />
                 </Suspense>
               </div>
-              <LeaguesClient initialLeagues={myLeagues} season={SEASON_YEAR} />
+              <LeaguesClient initialLeagues={myLeagues} />
             </>
           )}
         </main>
