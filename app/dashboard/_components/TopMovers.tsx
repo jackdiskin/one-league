@@ -2,6 +2,9 @@ import Image from 'next/image';
 import { query } from '@/lib/mysql';
 import { formatPrice, formatPct, formatWeek, formatPlayerName } from '@/lib/format';
 import ClickablePlayerRow from '@/components/ClickablePlayerRow';
+import SectionHeader from '@/components/ui/SectionHeader';
+import PositionChip from '@/components/ui/PositionChip';
+import Icon from '@/components/ui/Icon';
 import TeamLogo from '@/components/TeamLogo';
 import { getNextMatchupByTeam } from '@/lib/schedule';
 
@@ -66,7 +69,7 @@ function MoverRow({ mover, up, season, matchups }: {
     <ClickablePlayerRow
       playerId={mover.player_id}
       season={season}
-      className="group flex items-center justify-between rounded-2xl bg-white p-4 ring-1 ring-slate-200 hover:ring-slate-200 hover:shadow-sm transition-all"
+      className="group flex items-center justify-between rounded-control border border-line bg-surface p-3 transition-colors duration-150 ease-out-quart hover:border-line-strong hover:bg-surface-sunken"
     >
       <div className="flex items-center gap-3 min-w-0">
         {mover.headshot_url ? (
@@ -76,33 +79,31 @@ function MoverRow({ mover, up, season, matchups }: {
             unoptimized
           />
         ) : (
-          <div className="h-12 w-12 rounded-lg bg-slate-100 ring-1 ring-slate-200 flex items-center justify-center text-sm font-bold text-slate-500 shrink-0">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-pill bg-emerald-tint text-body text-emerald">
             {mover.full_name[0]}
           </div>
         )}
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <p className="text-sm font-semibold text-slate-900 truncate group-hover:text-emerald-700 transition-colors">{displayName}</p>
-            <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold shrink-0 bg-slate-100 text-slate-600">
-              {mover.position}
-            </span>
+            <p className="truncate text-body font-medium text-ink">{displayName}</p>
+            <PositionChip label={mover.position} />
             <TeamLogo code={mover.team_code} size={12} />
-            <span className="text-xs text-slate-500 shrink-0">{mover.team_code}</span>
+            <span className="shrink-0 text-label text-ink-3">{mover.team_code}</span>
           </div>
         </div>
       </div>
       <div className="flex items-center gap-3 shrink-0 ml-2">
         <Sparkline prices={mover.sparkPrices} up={up} />
         <div className="text-right">
-          <p className="text-sm font-semibold text-slate-900">{formatPrice(mover.current_price)}</p>
-          <p className={`text-xs font-semibold ${up ? 'text-emerald-600' : 'text-rose-500'}`}>
+          <p className="font-mono tabular-nums text-body text-ink">{formatPrice(mover.current_price)}</p>
+          <p className={`font-mono tabular-nums text-label ${up ? 'text-up' : 'text-down'}`}>
             {formatPct(mover.pct_change)}
           </p>
         </div>
-        <div className={`h-8 w-8 rounded-xl flex items-center justify-center ring-1 shrink-0 ${
-          up ? 'bg-emerald-50 ring-emerald-200 text-emerald-700' : 'bg-rose-50 ring-rose-200 text-rose-600'
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-control ${
+          up ? 'bg-emerald-tint text-up' : 'bg-surface-sunken text-down'
         }`}>
-          {up ? '↗' : '↘'}
+          <Icon name="arrowRight" size={14} className={up ? '-rotate-45' : 'rotate-45'} />
         </div>
       </div>
     </ClickablePlayerRow>
@@ -150,25 +151,23 @@ export default async function TopMovers({ seasonYear }: Props) {
   return (
     <div className="grid grid-cols-2 gap-4">
       {/* Gainers */}
-      <div className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">↑</span>
-          <h3 className="font-semibold text-slate-900">Top Gainers</h3>
-          <span className="ml-auto text-xs text-slate-400">{formatWeek(maxWeek)}</span>
-        </div>
-        <div className="space-y-2">
+      <div className="rounded-card border border-line bg-surface p-5">
+        <SectionHeader
+          title="Top gainers"
+          right={<span className="font-mono tabular-nums text-label text-ink-3">{formatWeek(maxWeek)}</span>}
+        />
+        <div className="mt-4 flex flex-col gap-2">
           {gainers.map((m) => <MoverRow key={m.player_id} mover={enrich(m)} up={true} season={seasonYear} matchups={matchups} />)}
         </div>
       </div>
 
       {/* Losers */}
-      <div className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-rose-600 text-xs font-bold">↓</span>
-          <h3 className="font-semibold text-slate-900">Top Losers</h3>
-          <span className="ml-auto text-xs text-slate-400">{formatWeek(maxWeek)}</span>
-        </div>
-        <div className="space-y-2">
+      <div className="rounded-card border border-line bg-surface p-5">
+        <SectionHeader
+          title="Top losers"
+          right={<span className="font-mono tabular-nums text-label text-ink-3">{formatWeek(maxWeek)}</span>}
+        />
+        <div className="mt-4 flex flex-col gap-2">
           {losers.map((m) => <MoverRow key={m.player_id} mover={enrich(m)} up={false} season={seasonYear} matchups={matchups} />)}
         </div>
       </div>

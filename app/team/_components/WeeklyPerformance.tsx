@@ -2,6 +2,8 @@
 
 import Image from 'next/image';
 import { formatPoints, formatWeekLong, formatPlayerName } from '@/lib/format';
+import SectionHeader from '@/components/ui/SectionHeader';
+import StatCard from '@/components/ui/StatCard';
 import ClickablePlayerRow from '@/components/ClickablePlayerRow';
 import TeamLogo from '@/components/TeamLogo';
 import MatchupBadge from '@/components/MatchupBadge';
@@ -34,49 +36,33 @@ export default function WeeklyPerformance({ players, week, season, matchups }: {
   const teamUp = teamDiff >= 0;
 
   return (
-    <div className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm overflow-hidden">
+    <div className="overflow-hidden rounded-card border border-line bg-surface">
       {/* Header */}
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>{formatWeekLong(week)} Performance</h3>
-          <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{startersPlayed} of {starters.length} starters scored</p>
-        </div>
-        {/* Team totals */}
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Projected</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#94a3b8' }}>{formatPoints(totalExpected)}</div>
-          </div>
-          <div style={{ width: 1, height: 32, background: '#e2e8f0' }} />
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Actual</div>
-            <div style={{ fontSize: 20, fontWeight: 900, color: '#0f172a' }}>{formatPoints(totalActual)}</div>
-          </div>
-          <div style={{
-            padding: '5px 10px', borderRadius: 20,
-            background: teamUp ? '#f0fdf4' : '#fff1f2',
-            border: `1px solid ${teamUp ? '#bbf7d0' : '#fecdd3'}`,
-          }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: teamUp ? '#059669' : '#f43f5e' }}>
-              {teamUp ? '+' : ''}{formatPoints(teamDiff)}
-            </span>
-          </div>
+      <div className="flex flex-wrap items-end justify-between gap-4 px-5 pb-3 pt-4">
+        <SectionHeader
+          title={`${formatWeekLong(week)} performance`}
+          sub={`${startersPlayed} of ${starters.length} starters scored`}
+        />
+        <div className="flex items-center gap-3">
+          <StatCard bare align="right" label="Projected" value={formatPoints(totalExpected)} tone="muted" />
+          <div className="h-8 w-px bg-line" />
+          <StatCard bare align="right" label="Actual" value={formatPoints(totalActual)} />
+          <span className={[
+            'rounded-pill px-2.5 py-1 font-mono tabular-nums text-label',
+            teamUp ? 'bg-emerald-tint text-up' : 'bg-surface-sunken text-down',
+          ].join(' ')}>
+            {teamUp ? '+' : ''}{formatPoints(teamDiff)}
+          </span>
         </div>
       </div>
 
       {/* Column labels */}
-      <div style={{
-        padding: '6px 20px',
-        background: '#f8fafc',
-        borderBottom: '1px solid #f1f5f9',
-        display: 'flex', alignItems: 'center',
-        fontSize: 9, fontWeight: 700, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.08em',
-      }}>
-        <div style={{ flex: 1 }}>Player</div>
-        <div style={{ width: 120, textAlign: 'right' }}>Projected</div>
-        <div style={{ width: 80, textAlign: 'right' }}>Actual</div>
-        <div style={{ width: 80, textAlign: 'right' }}>Diff</div>
-        <div style={{ width: 160, textAlign: 'right', paddingRight: 4 }}>vs Projection</div>
+      <div className="sticky top-0 z-10 flex items-center border-y border-line bg-surface-sunken px-5 py-2 text-eyebrow uppercase text-ink-3">
+        <div className="flex-1">Player</div>
+        <div className="w-[120px] text-right">Projected</div>
+        <div className="w-20 text-right">Actual</div>
+        <div className="w-20 text-right">Diff</div>
+        <div className="w-40 pr-1 text-right">vs projection</div>
       </div>
 
       {/* Player rows */}
@@ -84,7 +70,7 @@ export default function WeeklyPerformance({ players, week, season, matchups }: {
         {players
           .slice()
           .sort((a, b) => (b.last_week_points ?? -1) - (a.last_week_points ?? -1))
-          .map((p, i) => {
+          .map(p => {
             const actual = p.last_week_points != null ? Number(p.last_week_points) : null;
             const proj   = p.projected_points  != null ? Number(p.projected_points)  : null;
             const diff   = actual != null && proj != null ? actual - proj : null;
@@ -98,83 +84,78 @@ export default function WeeklyPerformance({ players, week, season, matchups }: {
                 key={p.id}
                 playerId={p.id}
                 season={season}
-                style={{
-                  display: 'flex', alignItems: 'center',
-                  padding: '10px 20px',
-                  borderBottom: '1px solid #f8fafc',
-                }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#fafafa'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                className="flex items-center border-b border-line px-5 py-2.5 transition-colors duration-150 ease-out-quart hover:bg-surface-sunken"
               >
                 {/* Avatar */}
-                <div style={{ position: 'relative', flexShrink: 0, marginRight: 12 }}>
+                <div className="relative mr-3 shrink-0">
                   {p.headshot_url ? (
                     <Image src={p.headshot_url} alt={p.full_name} width={38} height={38} unoptimized
-                      style={{ width: 38, height: 38, objectFit: 'contain', display: 'block' }}
+                      className="block h-[38px] w-[38px] object-contain"
                     />
                   ) : (
-                    <div style={{ width: 38, height: 38, borderRadius: 8, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#64748b' }}>
+                    <div className="flex h-[38px] w-[38px] items-center justify-center rounded-pill bg-emerald-tint text-label text-emerald">
                       {p.full_name[0]}
                     </div>
                   )}
                 </div>
 
                 {/* Name */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-body font-medium text-ink">
                       {formatPlayerName(p.full_name)}
                     </span>
                     <TeamLogo code={p.team_code} size={11} />
-                    <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
+                    <span className="shrink-0 text-label text-ink-3">{p.team_code}</span>
                   </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-label text-ink-3">
                     <MatchupBadge matchup={matchups[p.team_code]} />
                   </div>
                 </div>
 
                 {/* Projected */}
-                <div style={{ width: 120, textAlign: 'right', fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>
-                  {proj != null ? formatPoints(proj) : '—'}
+                <div className="w-[120px] text-right font-mono tabular-nums text-label text-ink-2">
+                  {proj != null ? formatPoints(proj) : '0.0'}
                 </div>
 
                 {/* Actual */}
-                <div style={{ width: 80, textAlign: 'right', fontSize: 14, fontWeight: 800, color: actual != null ? '#0f172a' : '#cbd5e1' }}>
-                  {actual != null ? formatPoints(actual) : '—'}
+                <div className={[
+                  'w-20 text-right font-mono tabular-nums text-body',
+                  actual != null ? 'text-ink' : 'text-ink-3',
+                ].join(' ')}>
+                  {actual != null ? formatPoints(actual) : 'DNP'}
                 </div>
 
                 {/* Diff */}
-                <div style={{ width: 80, textAlign: 'right' }}>
+                <div className="w-20 text-right font-mono tabular-nums text-label">
                   {diff != null ? (
-                    <span style={{ fontSize: 12, fontWeight: 700, color: up ? '#10b981' : '#f43f5e' }}>
+                    <span className={up ? 'text-up' : 'text-down'}>
                       {up ? '+' : ''}{formatPoints(diff)}
                     </span>
-                  ) : <span style={{ color: '#e2e8f0' }}>—</span>}
+                  ) : <span className="text-ink-3">--</span>}
                 </div>
 
                 {/* Visual bar */}
-                <div style={{ width: 160, paddingLeft: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div className="flex w-40 items-center gap-1.5 pl-3">
                   {barPct != null ? (
                     <>
-                      <div style={{ flex: 1, height: 6, borderRadius: 4, background: '#f1f5f9', overflow: 'hidden', position: 'relative' }}>
+                      <div className="relative h-1.5 flex-1 overflow-hidden rounded-pill bg-line">
                         {/* Projection baseline at 100% */}
-                        <div style={{
-                          position: 'absolute', left: `${Math.min(100, (100 / 160) * 100)}%`,
-                          top: 0, bottom: 0, width: 1, background: '#cbd5e1', zIndex: 1,
-                        }} />
-                        <div style={{
-                          height: '100%', borderRadius: 4,
-                          background: up ? '#10b981' : '#f43f5e',
-                          width: `${(barPct / 160) * 100}%`,
-                          opacity: 0.75,
-                        }} />
+                        <div aria-hidden="true" className="absolute inset-y-0 z-10 w-px bg-line-strong" style={{ left: `${(100 / 160) * 100}%` }} />
+                        <div
+                          className={`h-full rounded-pill ${up ? 'bg-up' : 'bg-down'}`}
+                          style={{ width: `${(barPct / 160) * 100}%` }}
+                        />
                       </div>
-                      <span style={{ fontSize: 9, fontWeight: 700, color: up ? '#10b981' : '#f43f5e', width: 32, textAlign: 'right', flexShrink: 0 }}>
+                      <span className={[
+                        'w-8 shrink-0 text-right font-mono tabular-nums text-eyebrow',
+                        up ? 'text-up' : 'text-down',
+                      ].join(' ')}>
                         {barPct.toFixed(0)}%
                       </span>
                     </>
                   ) : (
-                    <span style={{ fontSize: 10, color: '#e2e8f0' }}>No data</span>
+                    <span className="text-eyebrow text-ink-3">No data</span>
                   )}
                 </div>
               </ClickablePlayerRow>

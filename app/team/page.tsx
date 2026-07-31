@@ -11,12 +11,15 @@ import RosterList,   { type RosterPlayer }   from './_components/RosterList';
 import LiveTotalPointsTile from './_components/LiveTotalPointsTile';
 import WeeklyPerformance, { type PerfPlayer } from './_components/WeeklyPerformance';
 import { getNextMatchupByTeam } from '@/lib/schedule';
+import StatCard from '@/components/ui/StatCard';
+import EmptyState from '@/components/ui/EmptyState';
+import Icon from '@/components/ui/Icon';
 
 const PREV_SEASON = 2025;
 const SCHEDULE_SEASON = 2026;
 
 function Skeleton({ h = 200 }: { h?: number }) {
-  return <div className="rounded-2xl bg-slate-100 animate-pulse" style={{ height: h }} />;
+  return <div className="animate-pulse rounded-card bg-line" style={{ height: h }} />;
 }
 
 async function detectUserSeason(userId: string): Promise<number> {
@@ -184,18 +187,17 @@ export default async function TeamPage({
 
   if (!team) {
     return (
-      <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
+      <div className="flex min-h-screen flex-col bg-surface md:flex-row">
         <Sidebar
           user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
           leagues={userLeagues} currentWeek={currentWeek} season={SEASON}
           logoUri={String(process.env.LOGO_URI)}
         />
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🏈</div>
-            <p style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>No team found</p>
-            <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>Join a league and create a team first.</p>
-          </div>
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState
+            icon={<Icon name="football" size={20} />}
+            title="Draft a squad to start managing your lineup."
+          />
         </div>
       </div>
     );
@@ -210,13 +212,7 @@ export default async function TeamPage({
   const rankLabel = team.rank === 1 ? '1st' : team.rank === 2 ? '2nd' : team.rank === 3 ? '3rd' : `${team.rank}th`;
 
   return (
-    <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
-
-      {/* Background blobs */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
-        <div className="absolute -top-32 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-br from-emerald-200/40 via-sky-200/30 to-indigo-200/20 blur-3xl" />
-        <div className="absolute bottom-0 right-[-80px] h-[420px] w-[420px] rounded-full bg-gradient-to-br from-sky-200/40 via-indigo-200/25 to-emerald-200/20 blur-3xl" />
-      </div>
+    <div className="flex min-h-screen flex-col bg-surface md:flex-row">
 
       <Sidebar
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
@@ -225,54 +221,39 @@ export default async function TeamPage({
       />
 
       {/* Main column */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div className="flex min-w-0 flex-1 flex-col">
 
         {/* Header */}
-        <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+        <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
           <div className="flex items-center justify-between px-6 py-3">
             <SeasonModeSwitcher season={SEASON} currentWeek={currentWeek} />
             <div className="flex items-center gap-3 ml-auto">
-              <div className="h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold cursor-pointer hover:bg-slate-700 transition-colors">
+              <div className="flex h-8 w-8 items-center justify-center rounded-pill bg-ink text-eyebrow text-surface">
                 {session.user.name?.[0]?.toUpperCase() ?? '?'}
               </div>
             </div>
           </div>
         </header>
 
-        <main style={{ flex: 1, padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <main className="flex flex-1 flex-col gap-6 px-6 py-7">
 
           {/* Page title */}
-          <div style={{ paddingLeft: 10 }}>
-            <h1 style={{
-              fontSize: 26, fontWeight: 900, letterSpacing: '-0.03em',
-              backgroundImage: 'linear-gradient(135deg, #0f172a 0%, #334155 55%, #059669 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-              display: 'inline-block',
-            }}>
-              {team.team_name}
-            </h1>
-            <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
-              {formatWeekLong(currentWeek)} · {SEASON} NFL season
+          <div>
+            <h1 className="text-display text-emerald">{team.team_name}</h1>
+            <p className="mt-1 text-label text-ink-3">
+              {formatWeekLong(currentWeek)} · <span className="font-mono tabular-nums">{SEASON}</span> NFL season
             </p>
           </div>
 
           {/* Quick stat tiles */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+          <div className="grid grid-cols-2 gap-4">
             <LiveTotalPointsTile roster={roster} seasonBasePoints={team.total_points} />
-            {[
-              { label: 'League Rank',  value: rankLabel, sub: `of ${team.league_size} teams`, accent: team.rank <= 3 },
-            ].map(tile => (
-              <div key={tile.label} className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm" style={{ padding: '14px 16px' }}>
-                <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{tile.label}</p>
-                <p style={{
-                  fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1,
-                  color: tile.accent ? '#059669' : '#0f172a',
-                }}>
-                  {tile.value}
-                </p>
-                <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>{tile.sub}</p>
-              </div>
-            ))}
+            <StatCard
+              label="League rank"
+              value={rankLabel}
+              sub={`of ${team.league_size} teams`}
+              tone={team.rank <= 3 ? 'accent' : 'default'}
+            />
           </div>
 
           {/* Formation */}

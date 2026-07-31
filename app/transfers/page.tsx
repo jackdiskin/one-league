@@ -7,6 +7,10 @@ import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import TransferBoard, { type CatalogPlayer } from './_components/TransferBoard';
 import { getNextMatchupByTeam } from '@/lib/schedule';
+import StatCard from '@/components/ui/StatCard';
+import EmptyState from '@/components/ui/EmptyState';
+import Icon from '@/components/ui/Icon';
+import { TOTAL_SLOTS } from '@/components/rosterRules';
 
 const PREV_SEASON = 2025;
 const SCHEDULE_SEASON = 2026;
@@ -144,13 +148,7 @@ export default async function TransfersPage({
   const budgetRemaining = team?.budget_remaining ?? 0;
 
   return (
-    <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
-
-      {/* Background blobs */}
-      <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', zIndex: -1, pointerEvents: 'none' }}>
-        <div style={{ position: 'absolute', top: -128, left: '50%', transform: 'translateX(-50%)', width: 520, height: 520, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.15) 0%, rgba(14,165,233,0.08) 50%, transparent 70%)', filter: 'blur(40px)' }} />
-        <div style={{ position: 'absolute', bottom: 0, right: -80, width: 420, height: 420, borderRadius: '50%', background: 'radial-gradient(circle, rgba(14,165,233,0.15) 0%, rgba(99,102,241,0.08) 50%, transparent 70%)', filter: 'blur(40px)' }} />
-      </div>
+    <div className="flex min-h-screen flex-col bg-surface md:flex-row">
 
       <Sidebar
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
@@ -158,68 +156,42 @@ export default async function TransfersPage({
         logoUri={String(process.env.LOGO_URI)}
       />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div className="flex min-w-0 flex-1 flex-col">
 
         {/* Header */}
-        <header style={{
-          position: 'sticky', top: 0, zIndex: 20,
-          background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)',
-          borderBottom: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 24px' }}>
+        <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
+          <div className="flex items-center justify-between px-6 py-2.5">
             <SeasonModeSwitcher season={SEASON} currentWeek={currentWeek} />
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%', background: '#0f172a', color: '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800,
-            }}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-pill bg-ink text-eyebrow text-surface">
               {session.user.name?.[0]?.toUpperCase() ?? '?'}
             </div>
           </div>
         </header>
 
-        <main style={{ flex: 1, padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <main className="flex flex-1 flex-col gap-6 px-6 py-7">
 
           {/* Page title */}
-          <div style={{ paddingLeft: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-              Buy &amp; Sell
-            </div>
-            <h1 style={{
-              fontSize: 26, fontWeight: 900, letterSpacing: '-0.03em',
-              backgroundImage: 'linear-gradient(135deg, #0f172a 0%, #334155 55%, #059669 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', display: 'inline-block',
-            }}>
-              Transfers
-            </h1>
-            <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
-              Tap a player on your squad to find a replacement · {formatWeekLong(currentWeek)} · {SEASON} season
+          <div>
+            <p className="text-eyebrow uppercase text-emerald">Buy and sell</p>
+            <h1 className="mt-1 text-display text-ink">Transfers</h1>
+            <p className="mt-1 text-label text-ink-3">
+              Pick a player on your squad to find a replacement · {formatWeekLong(currentWeek)} ·{' '}
+              <span className="font-mono tabular-nums">{SEASON}</span> season
             </p>
           </div>
 
           {!team ? (
-            <div style={{
-              borderRadius: 16, background: '#fff', border: '1px solid #e2e8f0',
-              padding: '32px', textAlign: 'center',
-            }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>🏈</div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>No team found</p>
-              <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>Join a league and create a team to start making transfers.</p>
+            <div className="rounded-card border border-line bg-surface">
+              <EmptyState
+                icon={<Icon name="football" size={20} />}
+                title="Draft a squad before you can make transfers."
+              />
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{
-                borderRadius: 16, background: '#fff', border: '1px solid #e2e8f0',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: '14px 16px',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              }}>
-                <div>
-                  <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Budget Left</p>
-                  <p style={{ fontSize: 22, fontWeight: 900, color: '#059669', letterSpacing: '-0.02em' }}>{formatPrice(budgetRemaining)}</p>
-                </div>
-                <div>
-                  <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4, textAlign: 'right' }}>Roster</p>
-                  <p style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', textAlign: 'right' }}>{owned.length}/11</p>
-                </div>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between rounded-card border border-line bg-surface p-4">
+                <StatCard bare label="Budget left" value={formatPrice(budgetRemaining)} size="display" tone="accent" />
+                <StatCard bare align="right" label="Roster" value={`${owned.length}/${TOTAL_SLOTS}`} />
               </div>
 
               <TransferBoard

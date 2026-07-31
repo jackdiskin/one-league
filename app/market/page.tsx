@@ -7,6 +7,9 @@ import { formatPrice, formatPoints, formatWeekLong, formatPlayerName } from '@/l
 import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import ClickablePlayerRow from '@/components/ClickablePlayerRow';
+import PositionChip from '@/components/ui/PositionChip';
+import EmptyState from '@/components/ui/EmptyState';
+import Icon from '@/components/ui/Icon';
 import TeamLogo from '@/components/TeamLogo';
 import MatchupBadge from '@/components/MatchupBadge';
 import { getNextMatchupByTeam } from '@/lib/schedule';
@@ -158,24 +161,21 @@ function formatTime(val: string) {
 }
 
 function PosBadge({ pos }: { pos: string }) {
-  return (
-    <span style={{
-      fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9',
-      borderRadius: 20, padding: '1px 5px', flexShrink: 0,
-    }}>{pos}</span>
-  );
+  return <PositionChip label={pos} />;
 }
 
 function PlayerAvatar({ player, size = 32 }: { player: { headshot_url: string | null; full_name: string }; size?: number }) {
   return player.headshot_url ? (
-    <Image src={player.headshot_url} alt={player.full_name} width={size} height={size} unoptimized
-      style={{ width: size, height: size, objectFit: 'contain', display: 'block', flexShrink: 0 }}
+    <Image
+      src={player.headshot_url} alt="" width={size} height={size} unoptimized
+      className="block shrink-0 object-contain"
+      style={{ width: size, height: size }}
     />
   ) : (
-    <div style={{
-      width: size, height: size, borderRadius: 8, background: '#e2e8f0', flexShrink: 0,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.38, fontWeight: 700, color: '#64748b',
-    }}>
+    <div
+      className="flex shrink-0 items-center justify-center rounded-pill bg-emerald-tint text-emerald"
+      style={{ width: size, height: size }}
+    >
       {player.full_name[0]}
     </div>
   );
@@ -185,29 +185,28 @@ function SectionCard({ title, sub, badge, dark, children }: {
   title: string; sub?: string; badge?: string; dark?: boolean; children: React.ReactNode;
 }) {
   return (
-    <div style={{
-      borderRadius: 16, overflow: 'hidden',
-      background: dark ? 'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)' : '#fff',
-      border: dark ? '1px solid #1e293b' : '1px solid #e2e8f0',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-    }}>
-      <div style={{
-        padding: '13px 18px',
-        borderBottom: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #f1f5f9',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
+    // Dark is reserved for live/market-state data — see the dark-panel ruling.
+    <div className={[
+      'overflow-hidden rounded-card border',
+      dark ? 'border-ink bg-ink' : 'border-line bg-surface',
+    ].join(' ')}>
+      <div className={[
+        'flex items-center justify-between gap-3 border-b px-5 py-3',
+        dark ? 'border-turf-chalk/10' : 'border-line',
+      ].join(' ')}>
         <div>
-          <h3 style={{ fontSize: 14, fontWeight: 800, color: dark ? '#fff' : '#0f172a', letterSpacing: '-0.01em' }}>{title}</h3>
-          {sub && <p style={{ fontSize: 11, color: dark ? 'rgba(255,255,255,0.4)' : '#94a3b8', marginTop: 1 }}>{sub}</p>}
+          <h3 className={['text-section', dark ? 'text-turf-chalk' : 'text-ink'].join(' ')}>{title}</h3>
+          {sub && (
+            <p className={['mt-0.5 text-label', dark ? 'text-turf-chalk/50' : 'text-ink-3'].join(' ')}>{sub}</p>
+          )}
         </div>
         {badge && (
-          <span style={{
-            fontSize: 10, fontWeight: 700,
-            color: dark ? 'rgba(255,255,255,0.5)' : '#64748b',
-            background: dark ? 'rgba(255,255,255,0.08)' : '#f8fafc',
-            border: dark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
-            borderRadius: 20, padding: '3px 10px',
-          }}>{badge}</span>
+          <span className={[
+            'shrink-0 rounded-pill border px-2.5 py-1 font-mono tabular-nums text-eyebrow',
+            dark
+              ? 'border-turf-chalk/15 bg-turf-chalk/10 text-turf-chalk/60'
+              : 'border-line bg-surface-sunken text-ink-2',
+          ].join(' ')}>{badge}</span>
         )}
       </div>
       {children}
@@ -217,9 +216,99 @@ function SectionCard({ title, sub, badge, dark, children }: {
 
 function Empty({ msg, dark }: { msg: string; dark?: boolean }) {
   return (
-    <div style={{ padding: '18px', fontSize: 12, color: dark ? 'rgba(255,255,255,0.3)' : '#94a3b8', textAlign: 'center' }}>
+    <p className={[
+      'px-5 py-6 text-center text-label',
+      dark ? 'text-turf-chalk/50' : 'text-ink-3',
+    ].join(' ')}>
       {msg}
-    </div>
+    </p>
+  );
+}
+
+/** One gainers/drops row. Gainers and drops differ only in sign and tone. */
+function MoverListRow({ p, season, matchups, up, isLast }: {
+  p: MoverRow; season: number;
+  matchups: Record<string, import('@/lib/schedule').Matchup>;
+  up: boolean; isLast: boolean;
+}) {
+  const delta = Number(p.price_delta);
+  const base  = Number(p.base_weekly_price);
+  const pct   = base > 0 ? (Math.abs(delta) / base) * 100 : 0;
+  const orders = up ? p.buy_orders_count : p.sell_orders_count;
+
+  return (
+    <ClickablePlayerRow playerId={p.id} season={season} className="block">
+      <div className={[
+        'flex items-center gap-2.5 px-5 py-2.5',
+        'transition-colors duration-150 ease-out-quart hover:bg-surface-sunken',
+        isLast ? '' : 'border-b border-line',
+      ].join(' ')}>
+        <PlayerAvatar player={p} size={32} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-body font-medium text-ink">{formatPlayerName(p.full_name)}</span>
+            <PosBadge pos={p.position} />
+            <TeamLogo code={p.team_code} size={11} />
+            <span className="shrink-0 text-label text-ink-3">{p.team_code}</span>
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-label text-ink-3">
+            <MatchupBadge matchup={matchups[p.team_code]} />
+            <span>
+              · <span className="font-mono tabular-nums">{formatPrice(p.current_price)}</span>
+              {' · '}
+              <span className="font-mono tabular-nums">{orders}</span> {up ? 'buys' : 'sells'}
+            </span>
+          </div>
+        </div>
+        <div className={['shrink-0 text-right', up ? 'text-up' : 'text-down'].join(' ')}>
+          <div className="font-mono tabular-nums text-body">
+            {up ? '+' : ''}{formatPrice(delta)}
+          </div>
+          <div className="flex items-center justify-end gap-0.5 font-mono tabular-nums text-eyebrow">
+            <Icon name="arrowRight" size={9} className={up ? '-rotate-90' : 'rotate-90'} />
+            {pct.toFixed(1)}%
+          </div>
+        </div>
+      </div>
+    </ClickablePlayerRow>
+  );
+}
+
+/** One flow row on a dark panel. Demand and sell pressure differ only in sign. */
+function FlowListRow({ p, season, matchups, pct, up, isLast }: {
+  p: TradedRow; season: number;
+  matchups: Record<string, import('@/lib/schedule').Matchup>;
+  pct: number; up: boolean; isLast: boolean;
+}) {
+  return (
+    <ClickablePlayerRow playerId={p.id} season={season} className="block">
+      <div className={['cursor-pointer px-4 py-2.5', isLast ? '' : 'border-b border-turf-chalk/8'].join(' ')}>
+        <div className="mb-1.5 flex items-center gap-2">
+          <PlayerAvatar player={p} size={28} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-label text-turf-chalk">{formatPlayerName(p.full_name)}</span>
+              <PosBadge pos={p.position} />
+              <TeamLogo code={p.team_code} size={11} />
+              <span className="shrink-0 text-eyebrow text-turf-chalk/40">{p.team_code}</span>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-eyebrow text-turf-chalk/40">
+              <MatchupBadge matchup={matchups[p.team_code]} />
+              <span>· <span className="font-mono tabular-nums">{formatPrice(p.current_price)}</span></span>
+            </span>
+          </div>
+          <div className={['shrink-0 font-mono tabular-nums text-label', up ? 'text-emerald' : 'text-down'].join(' ')}>
+            {up ? '+' : ''}{p.net_order_flow}
+          </div>
+        </div>
+        <div className="h-0.5 rounded-pill bg-turf-chalk/10">
+          <div
+            className={['h-full rounded-pill', up ? 'bg-emerald' : 'bg-down'].join(' ')}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+    </ClickablePlayerRow>
   );
 }
 
@@ -260,13 +349,7 @@ export default async function MarketPage({
   const topDemand     = highDemand[0] ?? null;
 
   return (
-    <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
-
-      {/* Background blobs */}
-      <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', zIndex: -1, pointerEvents: 'none' }}>
-        <div style={{ position: 'absolute', top: -128, left: '50%', transform: 'translateX(-50%)', width: 520, height: 520, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.15) 0%, rgba(14,165,233,0.08) 50%, transparent 70%)', filter: 'blur(40px)' }} />
-        <div style={{ position: 'absolute', bottom: 0, right: -80, width: 420, height: 420, borderRadius: '50%', background: 'radial-gradient(circle, rgba(14,165,233,0.15) 0%, rgba(99,102,241,0.08) 50%, transparent 70%)', filter: 'blur(40px)' }} />
-      </div>
+    <div className="flex min-h-screen flex-col bg-surface md:flex-row">
 
       <Sidebar
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
@@ -274,279 +357,168 @@ export default async function MarketPage({
         logoUri={String(process.env.LOGO_URI)}
       />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div className="flex min-w-0 flex-1 flex-col">
 
         {/* Header */}
-        <header style={{
-          position: 'sticky', top: 0, zIndex: 20,
-          background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)',
-          borderBottom: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 24px' }}>
+        <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
+          <div className="flex items-center justify-between px-6 py-2.5">
             <SeasonModeSwitcher season={SEASON} currentWeek={currentWeek} />
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%', background: '#0f172a', color: '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800,
-            }}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-pill bg-ink text-eyebrow text-surface">
               {session.user.name?.[0]?.toUpperCase() ?? '?'}
             </div>
           </div>
         </header>
 
-        <main style={{ flex: 1, padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <main className="flex flex-1 flex-col gap-6 px-6 py-7">
 
           {/* Page title */}
-          <div style={{ paddingLeft: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-              Live Pricing
-            </div>
-            <h1 style={{
-              fontSize: 26, fontWeight: 900, letterSpacing: '-0.03em',
-              backgroundImage: 'linear-gradient(135deg, #0f172a 0%, #334155 55%, #059669 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', display: 'inline-block',
-            }}>
-              Market
-            </h1>
-            <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
-              Supply &amp; demand pricing · {formatWeekLong(currentWeek)} · {SEASON} season
+          <div>
+            <p className="text-eyebrow uppercase text-emerald">Live pricing</p>
+            <h1 className="mt-1 text-display text-ink">Market</h1>
+            <p className="mt-1 text-label text-ink-3">
+              Supply and demand pricing · {formatWeekLong(currentWeek)} ·{' '}
+              <span className="font-mono tabular-nums">{SEASON}</span> season
             </p>
           </div>
 
           {/* Stat tiles */}
-          <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: 12 }}>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {[
               {
-                label: 'Biggest Gainer',
-                value: biggestGainer ? `+${formatPrice(Math.abs(Number(biggestGainer.price_delta)))}` : '—',
-                sub:   biggestGainer ? formatPlayerName(biggestGainer.full_name) : 'No movers yet',
-                color: '#10b981',
+                label: 'Biggest gainer',
+                value: biggestGainer ? `+${formatPrice(Math.abs(Number(biggestGainer.price_delta)))}` : 'None yet',
+                sub:   biggestGainer ? formatPlayerName(biggestGainer.full_name) : 'Prices move once games start',
+                tone:  biggestGainer ? 'text-up' : 'text-ink-3',
+                numeric: !!biggestGainer,
               },
               {
-                label: 'Biggest Drop',
-                value: biggestLoser ? `-${formatPrice(Math.abs(Number(biggestLoser.price_delta)))}` : '—',
-                sub:   biggestLoser ? formatPlayerName(biggestLoser.full_name) : 'No drops yet',
-                color: '#f43f5e',
+                label: 'Biggest drop',
+                value: biggestLoser ? `-${formatPrice(Math.abs(Number(biggestLoser.price_delta)))}` : 'None yet',
+                sub:   biggestLoser ? formatPlayerName(biggestLoser.full_name) : 'Prices move once games start',
+                tone:  biggestLoser ? 'text-down' : 'text-ink-3',
+                numeric: !!biggestLoser,
               },
               {
-                label: 'Top Demand',
-                value: topDemand ? formatPlayerName(topDemand.full_name) : '—',
-                sub:   topDemand ? `+${topDemand.net_order_flow} net flow` : 'No demand data',
-                color: '#0ea5e9',
+                label: 'Top demand',
+                value: topDemand ? formatPlayerName(topDemand.full_name) : 'None yet',
+                sub:   topDemand ? `+${topDemand.net_order_flow} net flow` : 'No transfers recorded yet',
+                tone:  topDemand ? 'text-ink' : 'text-ink-3',
+                numeric: false,
               },
               {
-                label: 'Recent Transactions',
+                label: 'Recent transactions',
                 value: String(totalTxCount),
-                sub:   'across all leagues',
-                color: '#059669',
+                sub:   'Across all leagues',
+                tone:  totalTxCount > 0 ? 'text-ink' : 'text-ink-3',
+                numeric: true,
               },
             ].map(tile => (
-              <div key={tile.label} style={{
-                borderRadius: 16, background: '#fff', border: '1px solid #e2e8f0',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: '14px 16px',
-              }}>
-                <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{tile.label}</p>
-                <p style={{
-                  fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1,
-                  color: tile.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
+              <div key={tile.label} className="rounded-card border border-line bg-surface p-4">
+                <p className="text-eyebrow uppercase text-ink-3">{tile.label}</p>
+                <p className={[
+                  'mt-1.5 truncate text-section',
+                  tile.numeric ? 'font-mono tabular-nums' : '',
+                  tile.tone,
+                ].join(' ')}>
                   {tile.value}
                 </p>
-                <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>{tile.sub}</p>
+                <p className="mt-1 truncate text-label text-ink-3">{tile.sub}</p>
               </div>
             ))}
           </div>
 
           {/* Movers: Gainers | Losers */}
-          <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 16 }}>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
 
             {/* Top Gainers */}
-            <SectionCard title="Top Gainers" sub="Biggest price increases this week" badge={`${gainers.length} players`}>
-              {gainers.length === 0 && <Empty msg="No price increases this week." />}
-              {gainers.map((p, i) => {
-                const delta = Number(p.price_delta);
-                const pct  = Number(p.base_weekly_price) > 0 ? (delta / Number(p.base_weekly_price)) * 100 : 0;
-                return (
-                  <ClickablePlayerRow key={p.id} playerId={p.id} season={SEASON} style={{ display: 'block' }}>
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '9px 18px',
-                      borderBottom: i < gainers.length - 1 ? '1px solid #f8fafc' : 'none',
-                    }}>
-                      <PlayerAvatar player={p} size={32} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(p.full_name)}</span>
-                          <PosBadge pos={p.position} />
-                          <TeamLogo code={p.team_code} size={11} />
-                          <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
-                        </div>
-                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <MatchupBadge matchup={matchups[p.team_code]} />
-                          <span>· {formatPrice(p.current_price)} · {p.buy_orders_count} buys</span>
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: '#10b981' }}>+{formatPrice(delta)}</div>
-                        <div style={{ fontSize: 9, color: '#10b981' }}>▲ {pct.toFixed(1)}%</div>
-                      </div>
-                    </div>
-                  </ClickablePlayerRow>
-                );
-              })}
+            <SectionCard title="Top gainers" sub="Biggest price rises this week" badge={`${gainers.length} players`}>
+              {gainers.length === 0 && <Empty msg="No price rises this week." />}
+              {gainers.map((p, i) => (
+                <MoverListRow key={p.id} p={p} season={SEASON} matchups={matchups} up isLast={i === gainers.length - 1} />
+              ))}
             </SectionCard>
 
             {/* Top Losers */}
-            <SectionCard title="Biggest Drops" sub="Biggest price decreases this week" badge={`${losers.length} players`}>
-              {losers.length === 0 && <Empty msg="No price drops this week." />}
-              {losers.map((p, i) => {
-                const delta = Number(p.price_delta);
-                const pct  = Number(p.base_weekly_price) > 0 ? (Math.abs(delta) / Number(p.base_weekly_price)) * 100 : 0;
-                return (
-                  <ClickablePlayerRow key={p.id} playerId={p.id} season={SEASON} style={{ display: 'block' }}>
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '9px 18px',
-                      borderBottom: i < losers.length - 1 ? '1px solid #f8fafc' : 'none',
-                    }}>
-                      <PlayerAvatar player={p} size={32} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(p.full_name)}</span>
-                          <PosBadge pos={p.position} />
-                          <TeamLogo code={p.team_code} size={11} />
-                          <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
-                        </div>
-                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <MatchupBadge matchup={matchups[p.team_code]} />
-                          <span>· {formatPrice(p.current_price)} · {p.sell_orders_count} sells</span>
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: '#f43f5e' }}>{formatPrice(delta)}</div>
-                        <div style={{ fontSize: 9, color: '#f43f5e' }}>▼ {pct.toFixed(1)}%</div>
-                      </div>
-                    </div>
-                  </ClickablePlayerRow>
-                );
-              })}
+            <SectionCard title="Biggest drops" sub="Biggest price falls this week" badge={`${losers.length} players`}>
+              {losers.length === 0 && <Empty msg="No price falls this week." />}
+              {losers.map((p, i) => (
+                <MoverListRow key={p.id} p={p} season={SEASON} matchups={matchups} up={false} isLast={i === losers.length - 1} />
+              ))}
             </SectionCard>
           </div>
 
           {/* Demand Watch + Sell Pressure + Most Traded */}
-          <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: 16 }}>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
 
             {/* High Demand */}
-            <SectionCard title="High Demand" sub="Players with the most net buy flow" dark>
-              {highDemand.length === 0 && <Empty msg="No demand data yet." dark />}
+            <SectionCard title="High demand" sub="Most net buying this week" dark>
+              {highDemand.length === 0 && <Empty msg="No buying recorded yet." dark />}
               {highDemand.map((p, i) => {
                 const maxFlow = Number(highDemand[0]?.net_order_flow ?? 1);
-                const pct = (Number(p.net_order_flow) / maxFlow) * 100;
                 return (
-                  <ClickablePlayerRow key={p.id} playerId={p.id} season={SEASON} style={{ display: 'block' }}>
-                    <div style={{
-                      padding: '9px 16px',
-                      borderBottom: i < highDemand.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-                      cursor: 'pointer',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                        <PlayerAvatar player={p} size={28} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(p.full_name)}</span>
-                            <PosBadge pos={p.position} />
-                            <TeamLogo code={p.team_code} size={11} />
-                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>{p.team_code}</span>
-                          </div>
-                          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            <MatchupBadge matchup={matchups[p.team_code]} />
-                            <span>· {formatPrice(p.current_price)}</span>
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 12, fontWeight: 800, color: '#34d399', flexShrink: 0 }}>
-                          +{p.net_order_flow}
-                        </div>
-                      </div>
-                      <div style={{ height: 2, borderRadius: 99, background: 'rgba(255,255,255,0.08)' }}>
-                        <div style={{ height: '100%', borderRadius: 99, width: `${pct}%`, background: 'linear-gradient(90deg,#10b981,#34d399)' }} />
-                      </div>
-                    </div>
-                  </ClickablePlayerRow>
+                  <FlowListRow
+                    key={p.id} p={p} season={SEASON} matchups={matchups} up
+                    pct={(Number(p.net_order_flow) / maxFlow) * 100}
+                    isLast={i === highDemand.length - 1}
+                  />
                 );
               })}
             </SectionCard>
 
             {/* Sell Pressure */}
-            <SectionCard title="Sell Pressure" sub="Players being offloaded most" dark>
-              {sellPressure.length === 0 && <Empty msg="No sell pressure data." dark />}
+            <SectionCard title="Sell pressure" sub="Most net selling this week" dark>
+              {sellPressure.length === 0 && <Empty msg="No selling recorded yet." dark />}
               {sellPressure.map((p, i) => {
                 const maxFlow = Math.abs(Number(sellPressure[0]?.net_order_flow ?? 1));
-                const pct = (Math.abs(Number(p.net_order_flow)) / maxFlow) * 100;
                 return (
-                  <ClickablePlayerRow key={p.id} playerId={p.id} season={SEASON} style={{ display: 'block' }}>
-                    <div style={{
-                      padding: '9px 16px',
-                      borderBottom: i < sellPressure.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-                      cursor: 'pointer',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                        <PlayerAvatar player={p} size={28} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(p.full_name)}</span>
-                            <PosBadge pos={p.position} />
-                            <TeamLogo code={p.team_code} size={11} />
-                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>{p.team_code}</span>
-                          </div>
-                          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            <MatchupBadge matchup={matchups[p.team_code]} />
-                            <span>· {formatPrice(p.current_price)}</span>
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 12, fontWeight: 800, color: '#fb7185', flexShrink: 0 }}>
-                          {p.net_order_flow}
-                        </div>
-                      </div>
-                      <div style={{ height: 2, borderRadius: 99, background: 'rgba(255,255,255,0.08)' }}>
-                        <div style={{ height: '100%', borderRadius: 99, width: `${pct}%`, background: 'linear-gradient(90deg,#f43f5e,#fb7185)' }} />
-                      </div>
-                    </div>
-                  </ClickablePlayerRow>
+                  <FlowListRow
+                    key={p.id} p={p} season={SEASON} matchups={matchups} up={false}
+                    pct={(Math.abs(Number(p.net_order_flow)) / maxFlow) * 100}
+                    isLast={i === sellPressure.length - 1}
+                  />
                 );
               })}
             </SectionCard>
 
             {/* Most Traded */}
-            <SectionCard title="Most Traded" sub="Highest combined buy + sell volume">
-              {mostTraded.length === 0 && <Empty msg="No trade data yet." />}
+            <SectionCard title="Most traded" sub="Highest combined buy and sell volume">
+              {mostTraded.length === 0 && <Empty msg="No trades recorded yet." />}
               {mostTraded.map((p, i) => {
                 const total   = Number(p.buy_orders_count) + Number(p.sell_orders_count);
                 const maxTotal = Number(mostTraded[0]?.buy_orders_count ?? 0) + Number(mostTraded[0]?.sell_orders_count ?? 1);
                 const buyPct  = total > 0 ? (Number(p.buy_orders_count) / total) * 100 : 50;
                 const barPct  = (total / maxTotal) * 100;
                 return (
-                  <ClickablePlayerRow key={p.id} playerId={p.id} season={SEASON} style={{ display: 'block' }}>
-                    <div style={{
-                      padding: '9px 18px',
-                      borderBottom: i < mostTraded.length - 1 ? '1px solid #f8fafc' : 'none',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                  <ClickablePlayerRow key={p.id} playerId={p.id} season={SEASON} className="block">
+                    <div className={[
+                      'px-5 py-2.5 transition-colors duration-150 ease-out-quart hover:bg-surface-sunken',
+                      i < mostTraded.length - 1 ? 'border-b border-line' : '',
+                    ].join(' ')}>
+                      <div className="mb-1.5 flex items-center gap-2">
                         <PlayerAvatar player={p} size={28} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(p.full_name)}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate text-label text-ink">{formatPlayerName(p.full_name)}</span>
                             <PosBadge pos={p.position} />
                             <MatchupBadge matchup={matchups[p.team_code]} />
                           </div>
-                          <span style={{ fontSize: 10, color: '#94a3b8' }}>{p.buy_orders_count}B / {p.sell_orders_count}S</span>
+                          <span className="font-mono tabular-nums text-eyebrow text-ink-3">
+                            {p.buy_orders_count} bought / {p.sell_orders_count} sold
+                          </span>
                         </div>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: '#475569', flexShrink: 0 }}>
+                        <div className="shrink-0 font-mono tabular-nums text-body text-ink">
                           {total}
                         </div>
                       </div>
-                      {/* Buy/sell split bar */}
-                      <div style={{ height: 3, borderRadius: 99, background: '#f1f5f9', overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%', borderRadius: 99, width: `${barPct}%`,
-                          background: `linear-gradient(90deg, #10b981 ${buyPct}%, #f43f5e ${buyPct}%)`,
-                        }} />
+                      {/* Buy/sell split bar — the split point is data, so it stays computed */}
+                      <div className="h-[3px] overflow-hidden rounded-pill bg-line">
+                        <div
+                          className="h-full rounded-pill"
+                          style={{
+                            width: `${barPct}%`,
+                            background: `linear-gradient(90deg, var(--color-up) ${buyPct}%, var(--color-down) ${buyPct}%)`,
+                          }}
+                        />
                       </div>
                     </div>
                   </ClickablePlayerRow>
@@ -556,91 +528,84 @@ export default async function MarketPage({
           </div>
 
           {/* Recent Transactions (full width) */}
-          <SectionCard title="Recent Transactions" sub="Latest buys &amp; sells across all leagues" badge={`Last ${recentTx.length}`}>
+          <SectionCard title="Recent transactions" sub="Latest buys and sells across all leagues" badge={`Last ${recentTx.length}`}>
             {recentTx.length === 0 && <Empty msg="No transactions yet this season." />}
 
-            <div style={{ overflowX: 'auto' }}>
+            <div className="overflow-x-auto">
             {/* Column headers */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: '36px 1fr 140px 80px 80px 80px 120px',
-              padding: '7px 18px', background: '#fafafa', borderBottom: '1px solid #f1f5f9',
-              fontSize: 9, fontWeight: 700, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.1em',
-              minWidth: 640,
-            }}>
+            <div
+              className="grid min-w-[640px] border-b border-line bg-surface-sunken px-5 py-2 text-eyebrow uppercase text-ink-3"
+              style={{ gridTemplateColumns: '36px 1fr 140px 80px 80px 80px 120px' }}
+            >
               <span />
               <span>Player</span>
               <span>Team</span>
-              <span style={{ textAlign: 'right' }}>Price</span>
-              <span style={{ textAlign: 'right' }}>Before</span>
-              <span style={{ textAlign: 'right' }}>After</span>
-              <span style={{ textAlign: 'right' }}>Time</span>
+              <span className="text-right">Price</span>
+              <span className="text-right">Before</span>
+              <span className="text-right">After</span>
+              <span className="text-right">Time</span>
             </div>
 
             {recentTx.map((tx, i) => {
               const isBuy = tx.transaction_type === 'buy';
               const delta = Number(tx.price_after) - Number(tx.price_before);
               return (
-                <div key={tx.id} style={{
-                  display: 'grid', gridTemplateColumns: '36px 1fr 140px 80px 80px 80px 120px',
-                  alignItems: 'center', padding: '8px 18px',
-                  borderBottom: i < recentTx.length - 1 ? '1px solid #f8fafc' : 'none',
-                  minWidth: 640,
-                }}>
-                  {/* Avatar + indicator */}
-                  <div style={{ position: 'relative', width: 28, height: 28 }}>
+                <div
+                  key={tx.id}
+                  className={[
+                    'grid min-w-[640px] items-center px-5 py-2',
+                    i < recentTx.length - 1 ? 'border-b border-line' : '',
+                  ].join(' ')}
+                  style={{ gridTemplateColumns: '36px 1fr 140px 80px 80px 80px 120px' }}
+                >
+                  {/* Avatar + buy/sell indicator */}
+                  <div className="relative h-7 w-7">
                     <PlayerAvatar player={tx} size={28} />
-                    <div style={{
-                      position: 'absolute', bottom: 0, right: -2,
-                      width: 10, height: 10, borderRadius: '50%',
-                      background: isBuy ? '#10b981' : '#f43f5e', border: '1.5px solid #fff',
-                    }} />
+                    <div className={[
+                      'absolute -right-0.5 bottom-0 h-2.5 w-2.5 rounded-pill border-2 border-surface',
+                      isBuy ? 'bg-up' : 'bg-down',
+                    ].join(' ')} />
                   </div>
 
                   {/* Player */}
-                  <div style={{ paddingLeft: 8, minWidth: 0 }}>
+                  <div className="min-w-0 pl-2">
                     <ClickablePlayerRow playerId={tx.id} season={SEASON}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-label text-ink">
                           {formatPlayerName(tx.full_name)}
                         </span>
                         <PosBadge pos={tx.position} />
                         <TeamLogo code={tx.team_code} size={11} />
-                        <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{tx.team_code}</span>
+                        <span className="shrink-0 text-eyebrow text-ink-3">{tx.team_code}</span>
                       </div>
                     </ClickablePlayerRow>
-                    <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-eyebrow text-ink-3">
                       <MatchupBadge matchup={matchups[tx.team_code]} />
                     </div>
                   </div>
 
                   {/* Fantasy team */}
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.team_name}</div>
-                    <div style={{ fontSize: 10, color: '#94a3b8' }}>{tx.user_name}</div>
+                  <div className="min-w-0">
+                    <div className="truncate text-label text-ink-2">{tx.team_name}</div>
+                    <div className="truncate text-eyebrow text-ink-3">{tx.user_name}</div>
                   </div>
 
-                  {/* Execution price */}
-                  <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 700, color: '#0f172a' }}>
+                  <div className="text-right font-mono tabular-nums text-label text-ink">
                     {formatPrice(tx.price)}
                   </div>
 
-                  {/* Before */}
-                  <div style={{ textAlign: 'right', fontSize: 11, color: '#94a3b8' }}>
+                  <div className="text-right font-mono tabular-nums text-label text-ink-3">
                     {formatPrice(tx.price_before)}
                   </div>
 
-                  {/* After + delta */}
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: delta >= 0 ? '#10b981' : '#f43f5e' }}>
-                      {formatPrice(tx.price_after)}
-                    </div>
-                    <div style={{ fontSize: 9, color: delta >= 0 ? '#10b981' : '#f43f5e' }}>
+                  <div className={['text-right font-mono tabular-nums', delta >= 0 ? 'text-up' : 'text-down'].join(' ')}>
+                    <div className="text-label">{formatPrice(tx.price_after)}</div>
+                    <div className="text-eyebrow">
                       {delta >= 0 ? '+' : ''}{formatPrice(delta)}
                     </div>
                   </div>
 
-                  {/* Time */}
-                  <div style={{ textAlign: 'right', fontSize: 10, color: '#94a3b8' }}>
+                  <div className="text-right font-mono tabular-nums text-eyebrow text-ink-3">
                     {formatTime(tx.created_at)}
                   </div>
                 </div>

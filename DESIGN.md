@@ -413,15 +413,87 @@ where behaviour quietly changes.
 4. Delete orphaned style objects, keyframes and now-unused state as you go.
 5. Verify per step: `npx tsc --noEmit`, `npx eslint <path>`, and load the page.
 
-### Known carve-outs
+### Shared primitives
 
-`components/PlayerProfileModal.tsx` (5 consumers) and `components/TeamLogo.tsx` (10 consumers)
-are **deliberately unconverted** — restyling them changes Dashboard, Team, Transfers, Market and
-League at the same time. Convert them only as a deliberate cross-page pass.
+Build with these rather than reimplementing per page.
 
-`app/dashboard/_components/LiveTeamField.tsx` contains a **copy of the old CSS-transform field**.
-If you convert that page, port `fieldGeometry.ts` + `FieldSurface.tsx` rather than restyling the
-copy.
+| Component | Use for |
+|---|---|
+| `components/ui/StatCard` | Eyebrow + number + sub. `size="display"` for a page's one hero number, `section` otherwise. `numeric` is on by default — turn it off for word values. `bare` drops card chrome inside an existing panel |
+| `components/ui/SectionHeader` | Panel heading with optional sub and right-hand chip. **Section identity comes from the label, not a slab of colour** |
+| `components/ui/ProgressBar` | Filled track. `tone="auto"` goes amber past 90% and red at 100% — that's the cap rule; anything that isn't a budget stays `emerald` |
+| `components/ui/EmptyState` | One line of direction plus an optional action |
+| `components/ui/PositionChip` | Position/slot badge. **Neutral by default — see below** |
+| `components/ui/RosterRow` | The player row, on all four surfaces |
+| `components/ui/Icon` | The icon set. **Never use emoji as UI** — it renders differently per platform and can't inherit colour |
+| `components/positions.ts` | `POS_COLORS`, `positionColor()`, `positionLabel()` |
+| `components/teamColors.ts` | `teamColor()` for team identity dots |
+
+⚠️ **`POS_COLORS` may only be defined in `components/positions.ts`.** It previously existed in
+three files with three different shapes *and three different palettes* — WR was `#f59e0b` on
+Transfers and `#ea580c` on the draft board, so the same position was a different colour depending
+on the page.
+
+⚠️ **Position badges are neutral gray; position colour is for bars and dots.** This is an existing
+app-wide convention (the identical gray pill was duplicated in `market/page.tsx` and
+`RosterList.tsx`). `PositionChip` defaults to neutral; pass `tone="position"` only when the chip
+is itself the colour key for something adjacent.
+
+#### RosterRow is composition, not variants
+
+The row appears on the draft list, the roster table, the transfers squad list and the market
+movers. Those differ in what they let you *do* — add/remove, swap, select, nothing — so the row
+owns identity, alignment and state, and each page passes its own `trailing` value and `action`:
+
+```tsx
+<RosterRow
+  player={player}
+  badge="FLEX"                      // optional slot label
+  secondary={<MatchupBadge … />}    // optional second line
+  trailing={<Price … />}            // right-aligned value
+  action={<AddButton … />}          // trailing control
+  state={{ selected, eligible, dimmed, live, busy, active }}
+  disabledReason="All 4 RB spots are filled"
+  onClick={…}
+/>
+```
+
+**Don't add a `variant` prop.** That would make the row know every page's semantics and grow a
+branch per page — the same trap called out for the field slot cards.
+
+### Shared components (converted)
+
+`components/PlayerProfileModal.tsx` and `components/TeamLogo.tsx` are on the system as of the
+cross-page pass. They render on Dashboard, My Team, Transfers, Market, League, the draft board
+and the lineup field — **check all of them when changing either.**
+
+### The field is shared — don't fork it
+
+`components/field/` is the one field implementation. `LiveTeamField.tsx` (the old
+CSS-transform copy) has been deleted.
+
+```
+components/field/
+├── fieldGeometry.ts     perspective math (see The field SVG above)
+├── FieldSurface.tsx     the turf SVG
+├── FieldPanel.tsx       generic shell: takes `slots` + `renderSlot`
+├── cardStyles.ts        shared card box + focus ring
+├── types.ts             FieldPlayer, PlacedSlot
+├── slots.ts             ⚠️ canonical lineup slot rules — see below
+├── formations.ts        where each starter stands
+├── LineupSlotCard.tsx   lineup card (live / selected / eligible / dimmed)
+├── LineupField.tsx      live lineup: swap, live scoring, bench
+└── LiveStatsModal.tsx   live stat breakdown
+```
+
+`FieldPanel` is generic over slot content. The draft board supplies add/remove cards
+(`DraftField.tsx`); the lineup supplies live-scoring cards. **Add a sibling component rather than
+growing either with mode flags.**
+
+⚠️ **`components/field/slots.ts` is the only place lineup eligibility may be defined.** It used to
+exist twice — in the dashboard field and the roster list, with different shapes, both feeding
+`/api/roster/swap`. Keeping them in sync was luck, and that is how the "WR3 isn't a real FLEX" bug
+shipped. `roster_slot` values are persisted in MySQL; never rename them.
 
 ⚠️ `app/dashboard/_components/Sidebar.tsx`: keep `display` in `className`, never inline. An
 inline `display` overrides the `md:hidden` breakpoint class and shows the mobile bar at every

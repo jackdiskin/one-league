@@ -1,5 +1,3 @@
-import Image from 'next/image';
-import Link from 'next/link';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
@@ -15,7 +13,7 @@ import { formatWeekLong } from '@/lib/format';
 import SeasonModeSwitcher from './_components/SeasonModeSwitcher';
 
 function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`rounded-2xl bg-slate-100 animate-pulse ${className}`} />;
+  return <div className={`animate-pulse rounded-card bg-line ${className}`} />;
 }
 
 async function fetchCurrentWeek(season: number): Promise<number> {
@@ -113,13 +111,7 @@ export default async function DashboardPage({
   ]);
 
   return (
-    <div className="flex flex-col md:flex-row" style={{ minHeight: '100vh', background: '#f8fafc' }}>
-
-      {/* Background blobs */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
-        <div className="absolute -top-32 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-br from-emerald-200/40 via-sky-200/30 to-indigo-200/20 blur-3xl" />
-        <div className="absolute bottom-0 right-[-80px] h-[420px] w-[420px] rounded-full bg-gradient-to-br from-sky-200/40 via-indigo-200/25 to-emerald-200/20 blur-3xl" />
-      </div>
+    <div className="flex min-h-screen flex-col bg-surface md:flex-row">
 
       {/* Sidebar */}
       <Sidebar
@@ -131,38 +123,29 @@ export default async function DashboardPage({
       />
 
       {/* Main column */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div className="flex min-w-0 flex-1 flex-col">
 
         {/* Header */}
-        <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+        <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
           <div className="flex items-center justify-between px-6 py-3">
             <SeasonModeSwitcher season={SEASON} currentWeek={currentWeek} />
             <div className="flex items-center gap-3 ml-auto">
-              <div className="h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold cursor-pointer hover:bg-slate-700 transition-colors">
+              <div className="flex h-8 w-8 items-center justify-center rounded-pill bg-ink text-eyebrow text-surface">
                 {session.user.name?.[0]?.toUpperCase() ?? '?'}
               </div>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 px-6 py-8 space-y-6">
+        <main className="flex flex-1 flex-col gap-6 px-6 py-8">
 
           {/* Greeting */}
-          <div style={{ paddingLeft: 10 }}>
-            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-              Welcome back,{' '}
-              <span
-                style={{
-                  backgroundImage: 'linear-gradient(135deg, #0f172a 0%, #334155 50%, #059669 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}
-              >
-                {firstName}
-              </span>
+          <div>
+            <h1 className="text-display text-ink">
+              Welcome back, <span className="text-emerald">{firstName}</span>
             </h1>
-            <p className="text-slate-500 text-sm mt-1">
-              {formatWeekLong(currentWeek)} · {SEASON} NFL season
+            <p className="mt-1 text-label text-ink-3">
+              {formatWeekLong(currentWeek)} · <span className="font-mono tabular-nums">{SEASON}</span> NFL season
             </p>
           </div>
 
@@ -187,7 +170,7 @@ export default async function DashboardPage({
           </Suspense>
 
           {/* Bottom row */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <StandingsCard leagues={userLeagues} />
 
             <DiscoverLeagues leagues={discoverLeagues} />

@@ -7,6 +7,9 @@ import { formatPoints, formatPlayerName } from '@/lib/format';
 import { useLiveStats, getLivePoints, type LiveStatDelta } from '@/hooks/useLiveStats';
 import TeamLogo from '@/components/TeamLogo';
 import PlayerProfileModal from '@/components/PlayerProfileModal';
+import { STARTER_SLOTS, eligiblePositionsForSlot, slotBadgeLabel } from '@/components/field/slots';
+import PositionChip from '@/components/ui/PositionChip';
+import SectionHeader from '@/components/ui/SectionHeader';
 import MatchupBadge from '@/components/MatchupBadge';
 import type { Matchup } from '@/lib/schedule';
 
@@ -99,19 +102,15 @@ function LiveStatChips({ totals }: { totals: LiveStatDelta }) {
   if (!chips.length) return null;
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 5 }}>
+    <div className="mt-1.5 flex flex-wrap gap-1">
       {chips.map((chip, i) => {
         const flash = flashes[chip.flashKey];
         return (
           <span
             key={i}
-            style={{
-              position: 'relative',
-              display: 'inline-flex', alignItems: 'baseline', gap: 3,
-              padding: '2px 6px', borderRadius: 4,
-              border: `1px solid ${chip.border}`,
-              background: chip.bg, color: chip.color,
-            }}
+            className="relative inline-flex items-baseline gap-1 rounded-control border px-1.5 py-0.5"
+            // Per-stat colour is a data key, like position colour — not decoration.
+            style={{ borderColor: chip.border, background: chip.bg, color: chip.color }}
           >
             {/* Glow overlay — key forces remount to restart animation on each new flash */}
             {flash && (
@@ -157,10 +156,10 @@ function LiveStatChips({ totals }: { totals: LiveStatDelta }) {
                 {chip.deltaText(flash.delta)}
               </span>
             )}
-            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', position: 'relative' }}>
+            <span className="relative font-mono tabular-nums text-label">
               {chip.value}
             </span>
-            <span style={{ fontSize: 8.5, fontWeight: 700, opacity: 0.65, letterSpacing: '0.04em', textTransform: 'uppercase', position: 'relative' }}>
+            <span className="relative text-eyebrow uppercase opacity-65">
               {chip.label}
             </span>
           </span>
@@ -173,10 +172,6 @@ function LiveStatChips({ totals }: { totals: LiveStatDelta }) {
 // Single neutral accent used for all selection/eligibility highlighting on
 // this screen — never varies by position, per the standing no-color-coded-
 // positions rule.
-const ACCENT_RING  = '#059669';
-const ACCENT_LIGHT = '#f0fdf4';
-const ACCENT_BAR   = '#059669';
-
 const POS_ORDER = ['QB', 'RB', 'WR', 'TE'];
 
 // Named starter slots, in display order. WR1/WR2/WR3 are fixed WR/TE slots;
@@ -185,34 +180,17 @@ const POS_ORDER = ['QB', 'RB', 'WR', 'TE'];
 // player's own row (no group headers on this screen). Rendered by exact
 // slot name (not position category) so a RB sitting in FLEX1 shows up in
 // the right place instead of overflowing the Running Backs group.
-const STARTER_SLOTS = [
-  { slot: 'QB1',   eligiblePositions: ['QB'],            badgeLabel: 'QB'    },
-  { slot: 'RB1',   eligiblePositions: ['RB'],            badgeLabel: 'RB'    },
-  { slot: 'RB2',   eligiblePositions: ['RB'],            badgeLabel: 'RB'    },
-  { slot: 'WR1',   eligiblePositions: ['WR', 'TE'],       badgeLabel: 'WR/TE' },
-  { slot: 'WR2',   eligiblePositions: ['WR', 'TE'],       badgeLabel: 'WR/TE' },
-  { slot: 'WR3',   eligiblePositions: ['WR', 'TE'],       badgeLabel: 'WR/TE' },
-  { slot: 'FLEX1', eligiblePositions: ['RB', 'WR', 'TE'], badgeLabel: 'FLEX'  },
-] as const;
+// Canonical definitions now live in components/field/slots.ts — imported above.
 
 // Gray pill badge — matches PosBadge in app/market/page.tsx. Never
 // color-coded by position; shows the slot's badge label for starters
 // (QB / RB / WR/TE / FLEX) or the raw position for bench players.
 function rowBadgeLabel(p: RosterPlayer): string {
-  return STARTER_SLOTS.find(s => s.slot === p.roster_slot)?.badgeLabel ?? p.position;
+  return slotBadgeLabel(p.roster_slot, p.position);
 }
 
 function PosBadge({ label }: { label: string }) {
-  return (
-    <span style={{
-      fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9',
-      borderRadius: 20, padding: '1px 5px', flexShrink: 0,
-    }}>{label}</span>
-  );
-}
-
-function eligiblePositionsForSlot(slot: string): readonly string[] {
-  return STARTER_SLOTS.find(s => s.slot === slot)?.eligiblePositions ?? [];
+  return <PositionChip label={label} />;
 }
 
 // Extracted so PlayerRow (defined outside RosterList) can call it without closures.
@@ -242,19 +220,18 @@ interface PlayerRowProps {
 
 function Avatar({ player, size = 40 }: { player: RosterPlayer; size?: number }) {
   return (
-    <div style={{ position: 'relative', flexShrink: 0, marginRight: 12 }}>
+    <div className="relative mr-3 shrink-0">
       {player.headshot_url ? (
         <Image
-          src={player.headshot_url} alt={player.full_name}
-          width={size} height={size} unoptimized
-          style={{ width: size, height: size, objectFit: 'contain', display: 'block' }}
+          src={player.headshot_url} alt="" width={size} height={size} unoptimized
+          className="block object-contain"
+          style={{ width: size, height: size }}
         />
       ) : (
-        <div style={{
-          width: size, height: size, borderRadius: 8, background: '#e2e8f0',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: size * 0.35, fontWeight: 700, color: '#64748b',
-        }}>
+        <div
+          className="flex items-center justify-center rounded-pill bg-emerald-tint text-emerald"
+          style={{ width: size, height: size }}
+        >
           {player.full_name[0]}
         </div>
       )}
@@ -277,6 +254,8 @@ const PlayerRow = memo(function PlayerRow({
 
   return (
     <div
+      role="button"
+      tabIndex={isSwapping ? -1 : 0}
       onClick={() => {
         if (isSwapping) return;
         // While a swap is pending, clicking any row (selected, eligible, or
@@ -285,114 +264,101 @@ const PlayerRow = memo(function PlayerRow({
         if (selected) { onPlayerClick(p); return; }
         onProfileClick(p);
       }}
-      style={{
-        display: 'flex', alignItems: 'center',
-        padding: '9px 20px',
-        cursor: isSwapping ? 'default' : 'pointer',
-        position: 'relative',
-        background: isSelected
-          ? ACCENT_LIGHT
-          : isLive
-            ? 'linear-gradient(135deg, rgba(5,150,105,0.04) 0%, rgba(255,255,255,0) 60%)'
-            : 'transparent',
-        outline: isSelected
-          ? `1.5px solid ${ACCENT_RING}`
-          : eligible
-            ? `1.5px dashed ${ACCENT_RING}`
-            : 'none',
-        outlineOffset: '-2px',
-        borderRadius: (isSelected || eligible) ? 10 : 0,
-        transition: 'background 0.15s, opacity 0.15s, filter 0.15s',
-        opacity: isSwapping ? 0.6 : dimmed ? 0.4 : 1,
-        filter: dimmed ? 'grayscale(1)' : 'none',
+      onKeyDown={e => {
+        if (isSwapping) return;
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        if (selected) onPlayerClick(p); else onProfileClick(p);
       }}
+      className={[
+        'relative flex items-center px-5 py-2.5',
+        'transition-colors duration-150 ease-out-quart',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald',
+        isSwapping ? 'cursor-default' : 'cursor-pointer',
+        isSelected
+          ? 'bg-emerald-tint ring-2 ring-inset ring-emerald'
+          : eligible
+            ? 'bg-emerald-tint/50 ring-1 ring-inset ring-emerald-line'
+            : isLive
+              ? 'bg-emerald-tint/40'
+              : 'hover:bg-surface-sunken',
+        isSwapping ? 'opacity-60' : dimmed ? 'opacity-40' : '',
+      ].join(' ')}
     >
       {/* Live left-rail accent */}
       {isLive && !isSelected && (
-        <div style={{
-          position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
-          width: 3, height: '70%', minHeight: 24, borderRadius: 4,
-          background: 'linear-gradient(180deg, #10b981, #059669)',
-        }} />
+        <div aria-hidden="true" className="absolute left-1 top-1/2 h-[70%] min-h-6 w-[3px] -translate-y-1/2 rounded-pill bg-emerald" />
       )}
       {/* Selected left-rail accent */}
       {isSelected && (
-        <div style={{
-          position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
-          width: 4, height: '60%', minHeight: 18, borderRadius: 4, background: ACCENT_BAR, opacity: 0.8,
-        }} />
+        <div aria-hidden="true" className="absolute left-1 top-1/2 h-[60%] min-h-[18px] w-1 -translate-y-1/2 rounded-pill bg-emerald" />
       )}
 
       <Avatar player={p} />
 
       {/* Name / position / live chips */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-nowrap items-center gap-1.5">
+          <span className="truncate text-body font-medium text-ink">
             {formatPlayerName(p.full_name)}
           </span>
           <PosBadge label={rowBadgeLabel(p)} />
           <TeamLogo code={p.team_code} size={12} />
-          <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
+          <span className="shrink-0 text-label text-ink-3">{p.team_code}</span>
           {isLive && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0,
-              padding: '1px 6px', borderRadius: 20,
-              background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)',
-              fontSize: 8.5, fontWeight: 800, color: '#059669',
-              letterSpacing: '0.06em', textTransform: 'uppercase',
-            }}>
-              <span style={{
-                width: 5, height: 5, borderRadius: '50%', background: '#10b981', flexShrink: 0,
-                animation: 'live-pulse 1.4s ease-in-out infinite',
-              }} />
-              LIVE
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-pill border border-emerald-line bg-emerald-tint px-1.5 py-0.5 text-eyebrow uppercase text-emerald">
+              <span aria-hidden="true" className="motion-safe:animate-live-dot h-1 w-1 shrink-0 rounded-pill bg-emerald" />
+              Live
             </span>
           )}
         </div>
-        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div className="mt-0.5 flex items-center gap-1.5 text-label text-ink-3">
           <MatchupBadge matchup={matchups[p.team_code]} />
-          {isBench && <span style={{ fontSize: 9, color: '#cbd5e1', fontWeight: 600 }}>· BENCH</span>}
+          {isBench && <span className="text-eyebrow uppercase text-ink-3">· Bench</span>}
         </div>
         {isLive && liveData && <LiveStatChips totals={liveData.totals} />}
       </div>
 
       {/* Data columns */}
-      <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-        <div style={{ width: 68, textAlign: 'right' }}>
+      <div className="flex shrink-0 items-center font-mono tabular-nums">
+        <div className="w-[68px] text-right">
           {isLive && livePoints != null ? (
-            <span style={{ fontSize: 13, fontWeight: 800, color: '#059669' }}>{formatPoints(livePoints)}</span>
+            <span className="text-body text-emerald">{formatPoints(livePoints)}</span>
           ) : p.last_week_points != null ? (
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>{formatPoints(p.last_week_points)}</span>
+            <span className="text-label text-ink">{formatPoints(p.last_week_points)}</span>
           ) : (
-            <span style={{ fontSize: 12, color: '#e2e8f0' }}>—</span>
+            <span className="text-label text-ink-3">0.0</span>
           )}
         </div>
-        <div style={{ width: 56, textAlign: 'right', fontSize: 12, color: '#64748b' }}>
-          {p.projected_points != null ? formatPoints(p.projected_points) : '—'}
+        <div className="w-14 text-right text-label text-ink-2">
+          {p.projected_points != null ? formatPoints(p.projected_points) : '0.0'}
         </div>
-        <div style={{ width: 56, textAlign: 'right', fontSize: 12, fontWeight: 700, color: '#64748b' }}>
-          {p.position_rank != null ? `${p.position_rank}` : '—'}
+        <div className="w-14 text-right text-label text-ink-2">
+          {p.position_rank != null ? `${p.position_rank}` : '--'}
         </div>
-        <div style={{ width: 72, textAlign: 'right', fontSize: 12, color: '#64748b' }}>
-          {p.season_points != null ? formatPoints(p.season_points) : '—'}
+        <div className="w-[72px] text-right text-label text-ink-2">
+          {p.season_points != null ? formatPoints(p.season_points) : '0.0'}
         </div>
       </div>
 
       {/* Move (select for starter/bench swap) — 64px */}
-      <div style={{ width: 64, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+      <div className="flex w-16 shrink-0 items-center justify-end">
         <button
+          type="button"
           onClick={e => { e.stopPropagation(); if (!isSwapping) onPlayerClick(p); }}
           disabled={isSwapping}
-          style={{
-            padding: '5px 10px', borderRadius: 8,
-            border: isSelected ? `1px solid ${ACCENT_RING}` : '1px solid #e2e8f0',
-            background: isSelected ? ACCENT_LIGHT : '#fff',
-            color: isSelected ? ACCENT_RING : '#475569',
-            fontSize: 11, fontWeight: 700,
-            cursor: isSwapping ? 'default' : 'pointer',
-            display: 'flex', alignItems: 'center', gap: 4,
-          }}
+          aria-pressed={isSelected}
+          title={isSelected ? `Cancel moving ${p.full_name}` : `Move ${p.full_name}`}
+          className={[
+            'flex h-8 items-center gap-1 rounded-control border px-2.5 text-label',
+            'transition-colors duration-150 ease-out-quart',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2',
+            isSwapping
+              ? 'cursor-not-allowed border-line bg-surface-sunken text-ink-3'
+              : isSelected
+                ? 'cursor-pointer border-emerald bg-emerald-tint text-emerald'
+                : 'cursor-pointer border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink',
+          ].join(' ')}
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
@@ -404,13 +370,8 @@ const PlayerRow = memo(function PlayerRow({
 
       {/* Swap overlay */}
       {isSwapping && (
-        <div style={{
-          position: 'absolute', inset: 0, borderRadius: 10,
-          background: 'rgba(255,255,255,0.6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 11, fontWeight: 700, color: '#64748b',
-        }}>
-          Swapping...
+        <div className="absolute inset-0 flex items-center justify-center rounded-slot bg-surface/70 text-label text-ink-2">
+          Swapping
         </div>
       )}
     </div>
@@ -458,6 +419,10 @@ export default function RosterList({ roster, teamId, matchups, season }: {
   const starterSlotNames = new Set<string>(STARTER_SLOTS.map(s => s.slot));
   const starters = roster.filter(p => starterSlotNames.has(p.roster_slot));
   const bench    = roster.filter(p => !starterSlotNames.has(p.roster_slot));
+
+  // Column header says what state the column is actually in, rather than
+  // always claiming "Live / Wk".
+  const anyLive = roster.some(p => p.external_player_id && liveStats.has(p.external_player_id));
 
   // Total bench capacity = roster size minus the fixed number of named starter
   // slots, so the "empty bench slot" placeholder only shows up when the bench
@@ -548,8 +513,6 @@ export default function RosterList({ roster, teamId, matchups, season }: {
   }) {
     const canPick = !isSelectionActive && pickable.length > 0;
     const active  = eligible || canPick;
-    const ringColor  = ACCENT_RING;
-    const lightColor = ACCENT_LIGHT;
 
     function handleClick() {
       if (eligible) { onMove(); return; }
@@ -559,82 +522,68 @@ export default function RosterList({ roster, teamId, matchups, season }: {
     return (
       <div>
         <div
+          role={active ? 'button' : undefined}
+          tabIndex={active ? 0 : -1}
           onClick={handleClick}
-          style={{
-            display: 'flex', alignItems: 'center',
-            padding: '9px 20px',
-            cursor: active ? 'pointer' : 'default',
-            background: eligible ? lightColor : pickerOpen ? '#f8fafc' : 'transparent',
-            outline: eligible ? `1.5px dashed ${ringColor}` : pickerOpen ? `1.5px solid ${ringColor}` : 'none',
-            outlineOffset: '-2px',
-            borderRadius: (eligible || pickerOpen) ? 10 : 0,
-            transition: 'all 0.2s',
-            position: 'relative',
+          onKeyDown={e => {
+            if (!active) return;
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            handleClick();
           }}
-          onMouseEnter={e => { if (active) (e.currentTarget as HTMLElement).style.opacity = '0.85'; }}
-          onMouseLeave={e => { if (active) (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+          className={[
+            'relative flex items-center px-5 py-2.5 transition-colors duration-150 ease-out-quart',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald',
+            active ? 'cursor-pointer' : 'cursor-default',
+            eligible
+              ? 'bg-emerald-tint/50 ring-1 ring-inset ring-emerald-line'
+              : pickerOpen
+                ? 'bg-surface-sunken ring-2 ring-inset ring-emerald'
+                : active ? 'hover:bg-surface-sunken' : '',
+          ].join(' ')}
         >
           {eligible && (
-            <div style={{
-              position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
-              width: 4, height: '60%', minHeight: 18, borderRadius: 4, background: ringColor, opacity: 0.8,
-            }} />
+            <div aria-hidden="true" className="absolute left-1 top-1/2 h-[60%] min-h-[18px] w-1 -translate-y-1/2 rounded-pill bg-emerald" />
           )}
-          <div style={{
-            width: 40, height: 40, borderRadius: '50%', flexShrink: 0, marginRight: 12,
-            border: `2px dashed ${active ? ringColor : '#e2e8f0'}`,
-            background: eligible ? lightColor : '#f8fafc',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={active ? ringColor : '#cbd5e1'} strokeWidth="2.5" strokeLinecap="round">
+          <div className={[
+            'mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-pill border border-dashed',
+            active ? 'border-emerald bg-emerald-tint text-emerald' : 'border-line-strong bg-surface-sunken text-ink-3',
+          ].join(' ')}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: active ? ringColor : '#cbd5e1', fontStyle: 'italic' }}>
-              {eligible ? 'Move here' : canPick ? 'Tap to add a player' : 'Empty slot'}
-            </div>
-            <div style={{ fontSize: 10, color: active ? ringColor : '#e2e8f0', opacity: 0.8 }}>{label}</div>
+          <div className="flex-1">
+            <p className={['text-label', active ? 'text-emerald' : 'text-ink-3'].join(' ')}>
+              {eligible ? 'Move here' : canPick ? 'Add a player' : 'Empty slot'}
+            </p>
+            <p className={['text-eyebrow uppercase', active ? 'text-emerald' : 'text-ink-3'].join(' ')}>{label}</p>
           </div>
           {active && (
-            <div style={{
-              fontSize: 10, fontWeight: 700, color: ringColor,
-              background: lightColor, border: `1px solid ${ringColor}`,
-              borderRadius: 20, padding: '2px 8px', opacity: 0.9,
-            }}>
-              {eligible ? '↑ Start' : pickerOpen ? '✕ Close' : '+ Add'}
-            </div>
+            <span className="rounded-pill border border-emerald bg-emerald-tint px-2 py-0.5 text-label text-emerald">
+              {eligible ? 'Start' : pickerOpen ? 'Close' : 'Add'}
+            </span>
           )}
         </div>
 
         {pickerOpen && canPick && (
-          <div style={{ padding: '4px 20px 10px', background: '#fafafa' }}>
+          <div className="bg-surface-sunken px-5 pb-2.5 pt-1">
             {pickable.map(p => (
               <div
                 key={p.id}
                 onClick={() => onPick(p)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '7px 10px', borderRadius: 9, cursor: 'pointer',
-                  background: '#fff', border: '1px solid #e2e8f0', marginTop: 5,
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = ringColor; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0'; }}
+                className="mt-1.5 flex cursor-pointer items-center gap-2.5 rounded-control border border-line bg-surface px-2.5 py-1.5 transition-colors duration-150 ease-out-quart hover:border-emerald"
               >
                 <Avatar player={p} size={28} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-label text-ink">
                     {formatPlayerName(p.full_name)}
-                  </div>
-                  <div style={{ fontSize: 10, color: '#94a3b8' }}>{p.position} · {p.team_code}</div>
+                  </p>
+                  <p className="text-eyebrow text-ink-3">{p.position} · {p.team_code}</p>
                 </div>
-                <div style={{
-                  fontSize: 10, fontWeight: 700, color: ringColor,
-                  background: lightColor, border: `1px solid ${ringColor}`,
-                  borderRadius: 20, padding: '2px 8px', flexShrink: 0,
-                }}>
+                <span className="shrink-0 rounded-pill border border-emerald bg-emerald-tint px-2 py-0.5 text-label text-emerald">
                   Start
-                </div>
+                </span>
               </div>
             ))}
           </div>
@@ -647,65 +596,57 @@ export default function RosterList({ roster, teamId, matchups, season }: {
   function EmptyBenchSlotRow({ eligible, onMove }: { eligible: boolean; onMove: () => void }) {
     return (
       <div
+        role={eligible ? 'button' : undefined}
+        tabIndex={eligible ? 0 : -1}
         onClick={eligible ? onMove : undefined}
-        style={{
-          display: 'flex', alignItems: 'center',
-          padding: '9px 20px',
-          cursor: eligible ? 'pointer' : 'default',
-          background: eligible ? '#f8fafc' : 'transparent',
-          outline: eligible ? '1.5px dashed #cbd5e1' : 'none',
-          outlineOffset: '-2px',
-          borderRadius: eligible ? 10 : 0,
-          transition: 'all 0.2s',
-          opacity: eligible ? 1 : 0.45,
-          position: 'relative',
+        onKeyDown={e => {
+          if (!eligible) return;
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          onMove();
         }}
-        onMouseEnter={e => { if (eligible) (e.currentTarget as HTMLElement).style.opacity = '0.8'; }}
-        onMouseLeave={e => { if (eligible) (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+        className={[
+          'relative flex items-center px-5 py-2.5 transition-colors duration-150 ease-out-quart',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald',
+          eligible
+            ? 'cursor-pointer bg-surface-sunken ring-1 ring-inset ring-line-strong hover:bg-surface'
+            : 'cursor-default opacity-45',
+        ].join(' ')}
       >
         {eligible && (
-          <div style={{
-            position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
-            width: 4, height: '60%', minHeight: 18, borderRadius: 4, background: '#94a3b8', opacity: 0.7,
-          }} />
+          <div aria-hidden="true" className="absolute left-1 top-1/2 h-[60%] min-h-[18px] w-1 -translate-y-1/2 rounded-pill bg-ink-3" />
         )}
-        <div style={{
-          width: 40, height: 40, borderRadius: '50%', flexShrink: 0, marginRight: 12,
-          border: `2px dashed ${eligible ? '#94a3b8' : '#e2e8f0'}`,
-          background: '#f8fafc',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
+        <div className={[
+          'mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-pill border border-dashed bg-surface-sunken',
+          eligible ? 'border-ink-3 text-ink-3' : 'border-line text-ink-3',
+        ].join(' ')}>
           {eligible ? (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <polyline points="17 13 12 18 7 13" /><line x1="12" y1="18" x2="12" y2="6" />
             </svg>
           ) : (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" strokeWidth="2" strokeLinecap="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           )}
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: eligible ? '#64748b' : '#cbd5e1', fontStyle: 'italic' }}>
+        <div className="flex-1">
+          <p className={['text-label', eligible ? 'text-ink-2' : 'text-ink-3'].join(' ')}>
             {eligible ? 'Move to bench' : 'Empty bench slot'}
-          </div>
-          <div style={{ fontSize: 10, color: '#94a3b8', opacity: 0.7 }}>Bench</div>
+          </p>
+          <p className="text-eyebrow uppercase text-ink-3">Bench</p>
         </div>
         {eligible && (
-          <div style={{
-            fontSize: 10, fontWeight: 700, color: '#64748b',
-            background: '#f1f5f9', border: '1px solid #cbd5e1',
-            borderRadius: 20, padding: '2px 8px',
-          }}>
-            ↓ Bench
-          </div>
+          <span className="rounded-pill border border-line-strong bg-surface-sunken px-2 py-0.5 text-label text-ink-2">
+            Bench
+          </span>
         )}
       </div>
     );
   }
 
   return (
-    <div style={{ borderRadius: 16, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0', overflow: 'hidden', position: 'relative' }}>
+    <div className="relative overflow-hidden rounded-card border border-line bg-surface">
       <style>{`
         @keyframes eligible-pulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
@@ -751,50 +692,41 @@ export default function RosterList({ roster, teamId, matchups, season }: {
       `}</style>
 
       {/* Header */}
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>Full Roster</h3>
-          <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{roster.length} active players · {starters.length} starters · {bench.length} bench</p>
-        </div>
-        {/* Column labels — widths mirror PlayerRow data columns exactly. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 0, fontSize: 9, fontWeight: 700, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          <span style={{ width: 68, textAlign: 'right' }}>Live / Wk</span>
-          <span style={{ width: 56, textAlign: 'right' }}>Proj</span>
-          <span style={{ width: 56, textAlign: 'right' }}>Pos Rk</span>
-          <span style={{ width: 72, textAlign: 'right' }}>Season</span>
-          <span style={{ width: 64, flexShrink: 0 }} />
-        </div>
+      <div className="px-5 pb-3 pt-4">
+        <SectionHeader
+          title="Full roster"
+          sub={`${roster.length} active · ${starters.length} starting · ${bench.length} on the bench`}
+        />
+      </div>
+
+      {/* Column labels — sticky, and widths mirror PlayerRow's data columns exactly. */}
+      <div className="sticky top-0 z-10 flex items-center justify-end border-y border-line bg-surface-sunken px-5 py-2 text-eyebrow uppercase text-ink-3">
+        <span className="mr-auto">Player</span>
+        <span className="w-[68px] text-right">{anyLive ? 'Live' : 'Last wk'}</span>
+        <span className="w-14 text-right">Proj</span>
+        <span className="w-14 text-right">Pos rk</span>
+        <span className="w-[72px] text-right">Season</span>
+        <span className="w-16 shrink-0" />
       </div>
 
       {/* Swap banner */}
       {selected && (
-        <div style={{
-          padding: '10px 20px',
-          background: ACCENT_LIGHT,
-          borderBottom: `2px solid ${ACCENT_RING}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{
-              width: 8, height: 8, borderRadius: '50%',
-              background: ACCENT_RING,
-            }} />
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald bg-emerald-tint px-5 py-2.5">
+          <div className="flex items-center gap-2">
+            <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-pill bg-emerald" />
+            <span className="text-label text-ink">
               {selected.roster_slot === 'BENCH' ? 'Starting' : 'Moving'} {formatPlayerName(selected.full_name)}
             </span>
-            <span style={{ fontSize: 11, color: '#64748b' }}>
+            <span className="text-label text-ink-2">
               {selected.roster_slot === 'BENCH'
-                ? '— select an open starter slot or player to swap with'
-                : '— select an eligible player to swap with, or move to bench'}
+                ? '— pick an open starter slot or a player to swap with'
+                : '— pick an eligible player to swap with, or move to the bench'}
             </span>
           </div>
           <button
+            type="button"
             onClick={() => setSelected(null)}
-            style={{
-              padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-              border: '1px solid #e2e8f0', background: '#fff', color: '#64748b',
-              cursor: 'pointer',
-            }}
+            className="h-8 rounded-control border border-line bg-surface px-3 text-label text-ink-2 transition-colors duration-150 ease-out-quart hover:border-line-strong hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2"
           >
             Cancel
           </button>
@@ -803,18 +735,8 @@ export default function RosterList({ roster, teamId, matchups, season }: {
 
       {/* Starters */}
       <div>
-        <div style={{
-          padding: '9px 20px',
-          background: '#f8fafc',
-          borderBottom: '1px solid #f1f5f9',
-          fontSize: 13, fontWeight: 800, color: '#475569',
-          textTransform: 'uppercase', letterSpacing: '0.08em',
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          Starters
+        <div className="border-b border-line px-5 py-2.5">
+          <p className="text-eyebrow uppercase text-ink-3">Starting lineup</p>
         </div>
 
         {STARTER_SLOTS.map(slotDef => {
@@ -851,34 +773,17 @@ export default function RosterList({ roster, teamId, matchups, season }: {
 
       {/* Bench section — always shown so starters can be moved down */}
       <>
-        <div style={{
-          height: 6,
-          background: 'linear-gradient(90deg, #0f172a 0%, #334155 50%, #0f172a 100%)',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
-        }} />
-        <div style={{
-          padding: '9px 20px',
-          background: '#f8fafc',
-          borderBottom: '1px solid #f1f5f9',
-          fontSize: 13, fontWeight: 800, color: '#64748b',
-          textTransform: 'uppercase', letterSpacing: '0.08em',
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <line x1="3" y1="9" x2="21" y2="9" />
-            <line x1="9" y1="21" x2="9" y2="9" />
-          </svg>
-          Bench
-          <span style={{ fontSize: 10, color: '#cbd5e1', fontWeight: 500 }}>· {bench.length} players</span>
+        {/* Section identity comes from the label and a hairline rule, not a
+            slab of colour — this used to be a 6px near-black gradient bar. */}
+        <div className="flex items-center gap-2 border-y border-line px-5 py-2.5">
+          <p className="text-eyebrow uppercase text-ink-3">Bench</p>
+          <span className="font-mono tabular-nums text-eyebrow text-ink-3">
+            · {bench.length} players
+          </span>
           {isSelectionActive && (
-            <span style={{
-              marginLeft: 'auto', fontSize: 10,
-              color: ACCENT_RING,
-              fontWeight: 700,
-            }}>
+            <span className="ml-auto text-label text-emerald">
               {isEmptyBenchEligible()
-                ? 'Move to bench →'
+                ? 'Move to bench'
                 : bench.filter(p => isEligible(p)).length > 0
                   ? `${bench.filter(p => isEligible(p)).length} eligible swap${bench.filter(p => isEligible(p)).length > 1 ? 's' : ''}`
                   : 'No eligible bench players'}

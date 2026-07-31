@@ -60,29 +60,28 @@ export default async function WeekScoreSection({ teamId, season, currentWeek }: 
 
   const projected = await fetchProjectedTotal(season, teamId, currentWeek);
 
+  // Dark panel is earned here: this is live/market-state data (see the
+  // dark-panel ruling). Flat fill, no gradient.
   return (
-    <div style={{
-      borderRadius: 20,
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #064e3b 100%)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
-      overflow: 'hidden',
-      padding: '18px 20px 20px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-        <span style={{ fontSize: 10, fontWeight: 800, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.14em' }}>
+    <div className="overflow-hidden rounded-card bg-ink p-5">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <span className="text-eyebrow uppercase text-emerald">
           {formatWeekLong(currentWeek)}
         </span>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
+        <span className="text-label text-turf-chalk/50">
           Games haven&apos;t started yet
         </span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginTop: 10 }}>
-        <span style={{ fontSize: 40, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1, color: 'rgba(255,255,255,0.25)' }}>
+
+      {/* The projected total is the point of this panel, so it's the
+          brightest thing on it. It used to render at 25% white — dimmer than
+          its own caption — which made the hero read as disabled. */}
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-2.5">
+        <span className="font-mono tabular-nums text-display text-turf-chalk">
           {formatPoints(projected)}
         </span>
-        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', fontWeight: 600, marginBottom: 5 }}>
-          projected pts this week
+        <span className="text-label text-turf-chalk/60">
+          projected points this week
         </span>
       </div>
     </div>

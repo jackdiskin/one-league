@@ -1,5 +1,12 @@
 'use client';
 
+// Lightweight player preview, opened from any player row in the app. Upsells
+// to the full /players/[id] page.
+//
+// Shared by the draft board, transfers board, roster list, live field and
+// ClickablePlayerRow — five surfaces, so keep it neutral and don't grow it into
+// a page.
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -32,6 +39,37 @@ function formatGameDate(raw: string): string {
   return `${MONTH_ABBR[dt.month - 1]} ${dt.day}`;
 }
 
+/** A stat tile. `muted` marks a placeholder so it reads as absent, not zero. */
+function Stat({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {
+  return (
+    <div className="rounded-control border border-line bg-surface-sunken px-3 py-2.5">
+      <p className="text-eyebrow uppercase text-ink-3">{label}</p>
+      <p className={[
+        'mt-0.5 font-mono tabular-nums text-body',
+        muted ? 'text-ink-3' : 'text-ink',
+      ].join(' ')}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function Skeleton() {
+  return (
+    <div className="flex flex-col items-center">
+      <div className="h-24 w-24 animate-pulse rounded-pill bg-line" />
+      <div className="mt-3 h-6 w-40 animate-pulse rounded-control bg-line" />
+      <div className="mt-2 h-4 w-24 animate-pulse rounded-pill bg-line" />
+      <div className="mt-5 grid w-full grid-cols-2 gap-2.5">
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="h-16 animate-pulse rounded-control bg-line" />
+        ))}
+      </div>
+      <div className="mt-4 h-10 w-full animate-pulse rounded-control bg-line" />
+    </div>
+  );
+}
+
 export default function PlayerProfileModal({
   playerId,
   season,
@@ -44,10 +82,18 @@ export default function PlayerProfileModal({
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Clear the previous player's data during render rather than in an effect,
+  // so the modal never paints one frame showing the wrong player.
+  const requestKey = `${playerId}:${season ?? ''}`;
+  const [prevKey, setPrevKey] = useState(requestKey);
+  if (requestKey !== prevKey) {
+    setPrevKey(requestKey);
     setProfile(null);
     setError(null);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
     const qs = season ? `?season=${season}` : '';
     fetch(`/api/players/${playerId}${qs}`)
       .then(async res => {
@@ -62,34 +108,30 @@ export default function PlayerProfileModal({
     return () => { cancelled = true; };
   }, [playerId, season]);
 
+  // Escape closes, matching every other dismissible surface in the app.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const seasonSuffix = season ? `?season=${season}` : '';
 
   return (
     <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 60,
-        background: 'rgba(7,10,22,0.6)', backdropFilter: 'blur(8px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 24,
-      }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={profile ? `${profile.full_name} profile` : 'Player profile'}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-6 backdrop-blur-sm"
     >
-      <div style={{
-        background: '#fff', borderRadius: 20, width: '100%', maxWidth: 380,
-        boxShadow: '0 24px 64px rgba(0,0,0,0.3)', overflow: 'hidden',
-      }}>
-        {/* Header */}
-        <div style={{
-          padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-          borderBottom: '1px solid #f1f5f9',
-        }}>
+      <div className="motion-safe:animate-modal-in w-full max-w-sm overflow-hidden rounded-card border border-line bg-surface shadow-xl">
+        <div className="flex items-center justify-end border-b border-line px-5 py-3">
           <button
+            type="button"
             onClick={onClose}
-            style={{
-              width: 28, height: 28, borderRadius: 8, border: 'none',
-              background: '#f8fafc', color: '#94a3b8', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
+            aria-label="Close"
+            className="flex h-8 w-8 items-center justify-center rounded-control border border-line bg-surface text-ink-3 transition-colors duration-150 ease-out-quart hover:border-line-strong hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -97,106 +139,85 @@ export default function PlayerProfileModal({
           </button>
         </div>
 
-        <div style={{ padding: '8px 24px 24px' }}>
+        <div className="px-6 pb-6 pt-4">
           {error && (
-            <div style={{ padding: '24px 0', textAlign: 'center', fontSize: 13, color: '#dc2626', fontWeight: 600 }}>
-              {error}
-            </div>
+            <p className="py-8 text-center text-body text-down">{error}</p>
           )}
 
-          {!profile && !error && (
-            <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: '#94a3b8' }}>
-              Loading…
-            </div>
-          )}
+          {!profile && !error && <Skeleton />}
 
           {profile && (
             <>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: 20 }}>
+              <div className="flex flex-col items-center text-center">
                 {profile.headshot_url ? (
-                  <Image src={profile.headshot_url} alt={profile.full_name} width={110} height={110} unoptimized
-                    style={{ width: 110, height: 110, objectFit: 'contain', display: 'block' }}
+                  <Image
+                    src={profile.headshot_url} alt="" width={96} height={96} unoptimized
+                    className="h-24 w-24 object-contain"
                   />
                 ) : (
-                  <div style={{
-                    width: 110, height: 110, borderRadius: 10, background: '#e2e8f0',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 36, fontWeight: 700, color: '#94a3b8',
-                  }}>
-                    {profile.full_name[0]}
-                  </div>
+                  <span className="flex h-24 w-24 items-center justify-center rounded-pill bg-emerald-tint text-display text-emerald">
+                    {profile.full_name.charAt(0)}
+                  </span>
                 )}
 
-                <h2 style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', marginTop: 12 }}>
+                <h2 className="mt-3 text-section text-ink">
                   {formatPlayerName(profile.full_name)}
                 </h2>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                  <span style={{
-                    fontSize: 11, fontWeight: 700, color: '#64748b', background: '#f1f5f9',
-                    borderRadius: 20, padding: '2px 8px',
-                  }}>
-                    {profile.position}
-                  </span>
-                  <TeamLogo code={profile.team_code} size={16} />
-                  <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>{profile.team_code}</span>
-                </div>
+                <p className="mt-1.5 flex items-center gap-2 text-label text-ink-3">
+                  <span className="rounded-pill bg-surface-sunken px-2 py-0.5">{profile.position}</span>
+                  <TeamLogo code={profile.team_code} size={14} />
+                  <span>{profile.team_code}</span>
+                </p>
               </div>
 
-              <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 16,
-              }}>
-                {[
-                  { label: 'Price', value: formatPrice(profile.current_price) },
-                  {
-                    label: 'Wk Δ',
-                    value: profile.price_delta === 0 ? '—' : `${profile.price_delta > 0 ? '+' : ''}${formatPrice(profile.price_delta)}`,
-                  },
-                  { label: 'Last Week', value: profile.last_week_points != null ? formatPoints(profile.last_week_points) : '—' },
-                  { label: 'Season Pts', value: formatPoints(profile.season_points) },
-                ].map(s => (
-                  <div key={s.label} style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: 12, padding: '10px 12px' }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>
-                      {s.label}
-                    </div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>{s.value}</div>
-                  </div>
-                ))}
+              <div className="mt-5 grid grid-cols-2 gap-2.5">
+                <Stat label="Price" value={formatPrice(profile.current_price)} />
+                <Stat
+                  label="Week change"
+                  value={profile.price_delta === 0
+                    ? 'No change'
+                    : `${profile.price_delta > 0 ? '+' : ''}${formatPrice(profile.price_delta)}`}
+                  muted={profile.price_delta === 0}
+                />
+                <Stat
+                  label="Last week"
+                  value={profile.last_week_points != null ? formatPoints(profile.last_week_points) : 'Not played'}
+                  muted={profile.last_week_points == null}
+                />
+                <Stat label="Season points" value={formatPoints(profile.season_points)} />
               </div>
 
               {profile.next_matchups.length > 0 && (
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
-                    Next {profile.next_matchups.length} Matchups
-                  </div>
-                  <div style={{ border: '1px solid #f1f5f9', borderRadius: 12, overflow: 'hidden' }}>
+                <div className="mt-4">
+                  <p className="text-eyebrow uppercase text-ink-3">
+                    Next {profile.next_matchups.length} matchups
+                  </p>
+                  <ul className="mt-1.5 overflow-hidden rounded-control border border-line">
                     {profile.next_matchups.map((m, i) => (
-                      <div key={i} style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '8px 12px', background: '#f8fafc',
-                        borderBottom: i < profile.next_matchups.length - 1 ? '1px solid #f1f5f9' : 'none',
-                      }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: '#475569' }}>{formatWeek(m.week)}</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <span style={{ fontSize: 11, color: '#cbd5e1', fontWeight: 700 }}>{m.isHome ? 'vs' : '@'}</span>
+                      <li
+                        key={i}
+                        className={[
+                          'flex items-center justify-between bg-surface-sunken px-3 py-2',
+                          i < profile.next_matchups.length - 1 ? 'border-b border-line' : '',
+                        ].join(' ')}
+                      >
+                        <span className="font-mono tabular-nums text-label text-ink-2">{formatWeek(m.week)}</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="text-label text-ink-3">{m.isHome ? 'vs' : '@'}</span>
                           <TeamLogo code={m.opponent} size={14} />
-                          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{m.opponent}</span>
-                        </div>
-                        <span style={{ fontSize: 10, color: '#94a3b8' }}>{formatGameDate(m.gameDate)}</span>
-                      </div>
+                          <span className="text-label text-ink">{m.opponent}</span>
+                        </span>
+                        <span className="text-label text-ink-3">{formatGameDate(m.gameDate)}</span>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 </div>
               )}
 
               <Link
                 href={`/players/${profile.id}${seasonSuffix}`}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  padding: '11px 0', borderRadius: 12,
-                  background: 'linear-gradient(135deg, #0f172a, #1e293b)', color: '#fff',
-                  fontSize: 13, fontWeight: 700, textDecoration: 'none',
-                }}
+                className="mt-5 flex h-10 items-center justify-center gap-1.5 rounded-control bg-emerald-press text-body font-medium text-surface transition-colors duration-150 ease-out-quart hover:bg-emerald-hover active:bg-emerald-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2"
               >
                 View full profile
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">

@@ -1,5 +1,7 @@
 'use client';
 
+import Icon from '@/components/ui/Icon';
+
 import { useState } from 'react';
 import { formatPoints } from '@/lib/format';
 
@@ -11,11 +13,9 @@ export interface StandingRow {
   user_id: string;
 }
 
-function medalFor(rank: number): string | null {
-  if (rank === 1) return '🥇';
-  if (rank === 2) return '🥈';
-  if (rank === 3) return '🥉';
-  return null;
+// Top three are marked with an emerald rank chip rather than medal emoji.
+function isPodium(rank: number): boolean {
+  return rank <= 3;
 }
 
 export default function LeaderboardModalTrigger({ standings, myRank, userId }: {
@@ -33,7 +33,7 @@ export default function LeaderboardModalTrigger({ standings, myRank, userId }: {
         style={{ border: 'none' }}
       >
         <div className="flex items-center gap-2 mb-4">
-          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-600 text-xs">🏆</span>
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-pill bg-emerald-tint text-emerald"><Icon name="trophy" size={13} /></span>
           <h3 className="font-semibold text-slate-900">Global Rank</h3>
         </div>
 
@@ -80,7 +80,7 @@ export default function LeaderboardModalTrigger({ standings, myRank, userId }: {
               flexShrink: 0,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 18 }}>🏆</span>
+                <Icon name="trophy" size={18} className="text-emerald" />
                 <span style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>Global Rank</span>
               </div>
               <button
@@ -101,7 +101,7 @@ export default function LeaderboardModalTrigger({ standings, myRank, userId }: {
             <div style={{ overflowY: 'auto', padding: '10px 12px' }}>
               {standings.map(row => {
                 const isMe = row.user_id === userId;
-                const medal = medalFor(row.rank);
+                const podium = isPodium(row.rank);
                 return (
                   <div
                     key={row.user_id}
@@ -112,8 +112,12 @@ export default function LeaderboardModalTrigger({ standings, myRank, userId }: {
                       border: isMe ? '1.5px solid #6ee7b7' : '1.5px solid transparent',
                     }}
                   >
-                    <span style={{ width: 26, textAlign: 'center', flexShrink: 0, fontSize: medal ? 16 : 13, fontWeight: 800, color: isMe ? '#059669' : '#94a3b8' }}>
-                      {medal ?? row.rank}
+                    <span className={[
+                      'flex h-6 w-6 shrink-0 items-center justify-center rounded-pill',
+                      'font-mono tabular-nums text-label',
+                      podium ? 'bg-emerald text-surface' : isMe ? 'text-emerald' : 'text-ink-3',
+                    ].join(' ')}>
+                      {row.rank}
                     </span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

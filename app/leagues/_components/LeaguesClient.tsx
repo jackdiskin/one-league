@@ -1,5 +1,7 @@
 'use client';
 
+import Icon from '@/components/ui/Icon';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -54,7 +56,7 @@ function LeagueRow({ league, onLeave, leaving }: {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 18,
       }}>
-        {isGlobal ? '🌍' : '🔒'}
+        <Icon name={isGlobal ? 'globe' : 'lock'} size={18} />
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -357,7 +359,7 @@ export default function LeaguesClient({ initialLeagues, season }: { initialLeagu
                     display: 'flex', alignItems: 'center', gap: 8,
                   }}
                 >
-                  <span style={{ fontSize: 13 }}>{league.is_public ? '🌐' : '🔒'}</span>
+                  <Icon name={league.is_public ? 'globe' : 'lock'} size={13} className="text-ink-3" />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {league.name}

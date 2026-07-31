@@ -10,13 +10,8 @@
 
 import Image from 'next/image';
 import { formatPrice, formatPlayerName } from '@/lib/format';
+import { FIELD_CARD as CARD, FIELD_FOCUS as FOCUS } from '@/components/field/cardStyles';
 import type { DraftPlayer } from './types';
-
-const CARD = 'w-28 h-36 rounded-slot flex flex-col items-center justify-center';
-
-const FOCUS =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald ' +
-  'focus-visible:ring-offset-2 focus-visible:ring-offset-turf';
 
 export function EmptySlot({
   label,

@@ -8,8 +8,8 @@ import type { Matchup } from '@/lib/schedule';
 import { CAP, QUOTA, TOTAL_SLOTS, STARTERS, posGroup, type DraftPlayer } from './types';
 import { sortPlayers, type SortKey } from './sorting';
 import CapHeader from './CapHeader';
-import { FORMATION_SLOTS } from './fieldGeometry';
-import FieldPanel from './FieldPanel';
+import { FORMATION_SLOTS } from '@/components/field/fieldGeometry';
+import DraftField from './DraftField';
 import FilterBar from './FilterBar';
 import PlayerList from './PlayerList';
 import WelcomeModal from './WelcomeModal';
@@ -190,7 +190,7 @@ export default function DraftBoard({
         {/* Field — a single SVG trapezoid in a contained panel. See
             fieldGeometry for the perspective math. */}
         <div className="flex-1 overflow-auto bg-surface p-6">
-          <FieldPanel
+          <DraftField
             filledSlots={filledSlots}
             activeGroup={pos === 'WR' || pos === 'TE' ? 'FLEX' : pos}
             onSlotClick={setPos}

@@ -1,70 +1,15 @@
 import { query } from '@/lib/mysql';
 import { formatPrice, formatPoints } from '@/lib/format';
-import LiveTeamField, { type FieldPlayer, type FieldSlot } from './LiveTeamField';
+import LineupField from '@/components/field/LineupField';
+import { lineupFormation } from '@/components/field/formations';
+import { isBench } from '@/components/field/slots';
+import EmptyState from '@/components/ui/EmptyState';
+import Icon from '@/components/ui/Icon';
+import type { FieldPlayer } from '@/components/field/types';
 
 interface Props { userId: string; seasonYear: number; hidePrices?: boolean; interactive?: boolean }
 
 type Player = FieldPlayer;
-
-// Compute (x%, y%) for each slot — a real NFL pre-snap shotgun look: the
-// O-line marks the line of scrimmage near the top, and every skill player
-// lines up even with it or behind it (nobody lines up ahead of the ball).
-// WR1/WR2/WR3 are fixed WR/TE slots, always out on the line. FLEX1 is the
-// true flex (RB/WR/TE) and adapts to who's actually starting there: a TE
-// lines up tight next to the tackle, a WR lines up in the slot — both stay
-// in the front row alongside WR1/WR2/WR3 — and a RB drops into the
-// backfield instead of lining up as a receiver, directly behind the QB and
-// deeper than RB1/RB2, so the four backfield players form a diamond: QB at
-// the front point, RB1/RB2 flanking the sides slightly behind him, and the
-// flex RB at the back point.
-// Coordinates are tuned against LiveTeamField's fixed-height layout bands
-// (CROWD_H/PITCH_H/BENCH_H) and card sizes (STARTER_W/H) so every slot
-// clears its neighbors with real pixel margin — no two cards' boxes
-// intersect at any depth.
-// Looked up by named roster_slot (not position), so subbing auto-updates it
-// and a RB sitting in the FLEX slot renders in the right spot.
-function getPositions(starters: Player[]) {
-  const bySlot = (slot: string) => starters.find(p => p.roster_slot === slot) ?? null;
-
-  const wr1  = bySlot('WR1');
-  const wr2  = bySlot('WR2');
-  const wr3  = bySlot('WR3');
-  const flex = bySlot('FLEX1');
-  const qb1  = bySlot('QB1');
-  const rb1  = bySlot('RB1');
-  const rb2  = bySlot('RB2');
-
-  const out: FieldSlot[] = [];
-  const LOS = 17; // front row — WR/TE line of scrimmage depth, clear of the end zone band
-  const flexIsTE = flex?.position === 'TE';
-  const flexIsRB = flex?.position === 'RB';
-
-  // ── Front row: WR1/WR3/WR2 always on the line ─────────────────────────
-  out.push({ player: wr1, pos: wr1?.position ?? 'WR', x: 8,  y: LOS });
-  out.push({ player: wr3, pos: wr3?.position ?? 'WR', x: 50, y: LOS });
-  out.push({ player: wr2, pos: wr2?.position ?? 'WR', x: 92, y: LOS });
-
-  // ── QB in shotgun, well behind the line ───────────────────────────────
-  out.push({ player: qb1, pos: 'QB', x: 50, y: 48 });
-
-  // ── RBs split, flanking the QB, only slightly deeper than him ─────────
-  out.push({ player: rb1, pos: 'RB', x: 26, y: 55 });
-  out.push({ player: rb2, pos: 'RB', x: 74, y: 55 });
-
-  // TE lines up on the line too, tight next to the tackle; a flex WR lines
-  // up in its own lane in that same front row, between WR1 and WR3; a flex
-  // RB drops deepest of all, directly behind the QB, completing the
-  // backfield diamond — needs a big depth gap from the QB since both sit at
-  // the same x=50 center lane (no horizontal separation to fall back on).
-  out.push({
-    player: flex, pos: flex?.position ?? 'FLEX',
-    x: flexIsTE ? 72 : flexIsRB ? 50 : 29,
-    y: flexIsRB ? 83 : LOS,
-  });
-
-  return out;
-}
-
 
 export default async function MyTeamSummary({ userId, seasonYear, hidePrices = false, interactive = false }: Props) {
   const [team] = await query<{
@@ -101,10 +46,11 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
 
   if (!team) {
     return (
-      <div className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm p-8 text-center">
-        <div className="mx-auto mb-3 h-12 w-12 rounded-2xl bg-emerald-50 ring-1 ring-emerald-200 flex items-center justify-center text-2xl">🏈</div>
-        <p className="font-semibold text-slate-900">No team yet</p>
-        <p className="text-sm text-slate-500 mt-1">Join a league to get started.</p>
+      <div className="rounded-card border border-line bg-surface">
+        <EmptyState
+          icon={<Icon name="football" size={20} />}
+          title="Draft a squad to see it on the field."
+        />
       </div>
     );
   }
@@ -128,49 +74,38 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
     [seasonYear, seasonYear, lastWeek, team.id]
   );
 
-  const starters = roster.filter(p => p.roster_slot !== 'BENCH');
-  const bench    = roster.filter(p => p.roster_slot === 'BENCH');
+  const starters = roster.filter(p => !isBench(p.roster_slot));
+  const bench    = roster.filter(p => isBench(p.roster_slot));
 
-  const positions = getPositions(starters);
+  const formation = lineupFormation(starters);
 
   const rankLabel = team.rank === 1 ? '1st' : team.rank === 2 ? '2nd' : team.rank === 3 ? '3rd' : `${team.rank}th`;
 
   return (
-    <div className="rounded-2xl overflow-hidden ring-1 ring-slate-200 shadow-sm">
+    <div className="overflow-hidden rounded-card border border-line">
 
       {/* ── Header ── */}
-      <div style={{
-        background: '#fff', borderBottom: '1px solid #e2e8f0',
-        padding: '14px 20px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-      }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{
-            fontSize: 21, fontWeight: 900, letterSpacing: '-0.03em',
-            background: 'linear-gradient(135deg, #0f172a 0%, #334155 55%, #059669 100%)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {team.team_name}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+      <div className="flex items-center justify-between gap-3 border-b border-line bg-surface px-5 py-3.5">
+        {/* Emerald on the team name mirrors the dashboard greeting — the two
+            brand moments, and nowhere else. */}
+        <p className="min-w-0 truncate text-section text-emerald">{team.team_name}</p>
+        <div className="flex shrink-0 gap-2">
           {[
-            { label: 'Points', value: formatPoints(team.total_points), bg: '#f8fafc', border: '#e2e8f0', color: '#0f172a', labelColor: '#94a3b8' },
-            ...(hidePrices ? [] : [{ label: 'Cap Space', value: formatPrice(team.budget_remaining), bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d', labelColor: '#16a34a' }]),
-            { label: 'Rank',   value: rankLabel,  bg: team.rank <= 3 ? '#fffbeb' : '#f8fafc', border: team.rank <= 3 ? '#fde68a' : '#e2e8f0', color: '#0f172a', labelColor: '#94a3b8' },
-          ].map(s => (
-            <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 12, padding: '6px 12px', textAlign: 'center' }}>
-              <div style={{ fontSize: 9, fontWeight: 600, color: s.labelColor, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.label}</div>
-              <div style={{ fontSize: 16, fontWeight: 900, color: s.color, lineHeight: 1.2 }}>{s.value}</div>
+            { label: 'Points', value: formatPoints(team.total_points) },
+            ...(hidePrices ? [] : [{ label: 'Cap space', value: formatPrice(team.budget_remaining) }]),
+            { label: 'Rank', value: rankLabel },
+          ].map(stat => (
+            <div key={stat.label} className="rounded-control border border-line bg-surface-sunken px-3 py-1.5 text-center">
+              <p className="text-eyebrow uppercase text-ink-3">{stat.label}</p>
+              <p className="font-mono tabular-nums text-body text-ink">{stat.value}</p>
             </div>
           ))}
         </div>
       </div>
 
       {/* ── Field ── */}
-      <LiveTeamField
-        positions={positions} hidePrices={hidePrices}
+      <LineupField
+        formation={formation} hidePrices={hidePrices}
         bench={bench} teamId={team.id} interactive={interactive} season={seasonYear}
       />
     </div>

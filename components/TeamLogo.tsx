@@ -6,8 +6,16 @@ export default function TeamLogo({ code, size = 16 }: { code: string | null | un
   if (!url) return null;
   return (
     <Image
-      src={url} alt={code as string} width={size} height={size} unoptimized
-      style={{ width: size, height: size, objectFit: 'contain', display: 'block', flexShrink: 0 }}
+      src={url}
+      // Decorative: the team code is always rendered as text next to it, so
+      // announcing it again would just duplicate.
+      alt=""
+      width={size}
+      height={size}
+      unoptimized
+      className="block shrink-0 object-contain"
+      // Dimensions come from a prop, so they can't be a static class.
+      style={{ width: size, height: size }}
     />
   );
 }

@@ -3,8 +3,8 @@
 // Search + filters. Every control is h-9 so the rows line up exactly.
 
 import { useEffect, useRef } from 'react';
-import Select from './ui/Select';
-import Checkbox from './ui/Checkbox';
+import Select from '@/components/ui/Select';
+import Checkbox from '@/components/ui/Checkbox';
 import { PRICE_PRESETS, SORT_OPTIONS, type SortKey } from './sorting';
 import { POSITIONS } from './types';
 

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { auth } from '@/lib/auth';
 import { query } from '@/lib/mysql';
+import Icon from '@/components/ui/Icon';
 import Sidebar, { type SidebarLeague } from '@/app/dashboard/_components/Sidebar';
 import LeaguesClient, { type MyLeague } from './_components/LeaguesClient';
 import LeaderboardCard from './_components/LeaderboardCard';
@@ -108,7 +109,7 @@ export default async function LeaguesPage({
 
           {!hasTeam ? (
             <div className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm p-8 text-center">
-              <div className="mx-auto mb-3 h-12 w-12 rounded-2xl bg-emerald-50 ring-1 ring-emerald-200 flex items-center justify-center text-2xl">🏈</div>
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-card bg-emerald-tint text-emerald"><Icon name="football" size={22} /></div>
               <p className="font-semibold text-slate-900">Draft your team first</p>
               <p className="text-sm text-slate-500 mt-1">You're auto-enrolled in the Global Leaderboard the moment you draft — private leagues can wait until after.</p>
             </div>

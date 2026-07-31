@@ -9,6 +9,14 @@ import CapBreakdown from './CapBreakdown';
 import TeamLogo from '@/components/TeamLogo';
 import PlayerProfileModal from '@/components/PlayerProfileModal';
 import type { Matchup } from '@/lib/schedule';
+import { POS_COLORS } from '@/components/positions';
+import { quotaFor } from '@/components/rosterRules';
+import Select from '@/components/ui/Select';
+import Checkbox from '@/components/ui/Checkbox';
+import SectionHeader from '@/components/ui/SectionHeader';
+import PositionChip from '@/components/ui/PositionChip';
+import EmptyState from '@/components/ui/EmptyState';
+import Icon from '@/components/ui/Icon';
 
 export interface CatalogPlayer {
   id: number;
@@ -53,15 +61,9 @@ interface PendingTransfer {
   groupLabel: string;
 }
 
-const POS_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
-  QB: { bg: '#eff6ff', text: '#3b82f6', bar: '#3b82f6' },
-  RB: { bg: '#f0fdf4', text: '#10b981', bar: '#10b981' },
-  WR: { bg: '#fffbeb', text: '#f59e0b', bar: '#f59e0b' },
-  TE: { bg: '#faf5ff', text: '#a855f7', bar: '#a855f7' },
-};
+// Position identity comes from components/positions.ts — see A3.
 
-// Mirrors the quota enforced server-side in app/api/market/buy/route.ts
-const QUOTA: Record<string, number> = { QB: 2, RB: 4, FLEX: 5 };
+// Squad composition comes from components/rosterRules.ts.
 
 // $0.5M increments from $18M down to $1M, e.g. "$17.5M", "$17M", ... (same presets as the draft screen)
 const PRICE_PRESETS: { label: string; value: number | null }[] = [
@@ -123,17 +125,16 @@ async function extractError(res: Response, fallback: string): Promise<string> {
 
 function Avatar({ player, size = 38 }: { player: Pick<CatalogPlayer, 'headshot_url' | 'full_name' | 'position'>; size?: number }) {
   return (
-    <div style={{ position: 'relative', flexShrink: 0 }}>
+    <div className="relative shrink-0">
       {player.headshot_url ? (
         <Image src={player.headshot_url} alt={player.full_name} width={size} height={size} unoptimized
-          style={{ width: size, height: size, objectFit: 'contain', display: 'block' }}
+          className="block object-contain" style={{ width: size, height: size }}
         />
       ) : (
-        <div style={{
-          width: size, height: size, borderRadius: 8, background: '#e2e8f0',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: size * 0.38, fontWeight: 700, color: '#64748b',
-        }}>{player.full_name[0]}</div>
+        <div
+          className="flex items-center justify-center rounded-pill bg-emerald-tint text-emerald"
+          style={{ width: size, height: size }}
+        >{player.full_name[0]}</div>
       )}
     </div>
   );
@@ -268,32 +269,32 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
   }, [pending, fantasyTeamId, currentWeek, router]);
 
   return (
-    <div className="grid grid-cols-1 lg:[grid-template-columns:minmax(0,1fr)_380px]" style={{ gap: 16, alignItems: 'start' }}>
+    <div className="grid grid-cols-1 items-start gap-4 lg:[grid-template-columns:minmax(0,1fr)_380px]">
 
       {/* My Squad */}
-      <div style={{ borderRadius: 16, background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid #f1f5f9' }}>
-          <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>My Squad</h3>
-          <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
-            Tap any number of players (or open slots) to build your transfers
-          </p>
+      <div className="overflow-hidden rounded-card border border-line bg-surface">
+        <div className="border-b border-line px-5 py-3.5">
+          <SectionHeader
+            title="My squad"
+            sub="Pick players or open slots to build your transfers"
+          />
         </div>
 
         {GROUPS.map(group => {
           const groupPlayers = owned.filter(p => group.positions.includes(p.position));
           const pendingEmptyInGroup = pending.filter(t => !t.outgoing && t.groupLabel === group.label).length;
-          const openSlots = Math.max(0, QUOTA[group.key] - groupPlayers.length - pendingEmptyInGroup);
+          const openSlots = Math.max(0, quotaFor(group.key) - groupPlayers.length - pendingEmptyInGroup);
           if (!groupPlayers.length && !openSlots) return null;
           const col = POS_COLORS[group.positions[0]] ?? POS_COLORS.QB;
           return (
             <div key={group.key}>
-              <div style={{
-                padding: '6px 18px', background: '#fafafa', borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9',
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <div style={{ width: 3, height: 12, borderRadius: 2, background: col.bar, flexShrink: 0 }} />
-                <span style={{ fontSize: 10, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{group.label}</span>
-                <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>· {groupPlayers.length}/{QUOTA[group.key]}</span>
+              <div className="flex items-center gap-2 border-y border-line bg-surface-sunken px-5 py-1.5">
+                {/* Position colour is the sanctioned exception — it keys the group. */}
+                <div aria-hidden="true" className="h-3 w-[3px] shrink-0 rounded-pill" style={{ background: col.bar }} />
+                <span className="text-eyebrow uppercase text-ink-2">{group.label}</span>
+                <span className="font-mono tabular-nums text-eyebrow text-ink-3">
+                  · {groupPlayers.length}/{quotaFor(group.key)}
+                </span>
               </div>
               {groupPlayers.map((p, i) => {
                 const isSelected = pending.some(t => t.key === `out-${p.id}`);
@@ -301,49 +302,49 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                   <div
                     key={p.id}
                     onClick={() => setProfileId(p.id)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px',
-                      cursor: 'pointer', transition: 'background 0.12s',
-                      background: isSelected ? '#fef2f2' : 'transparent',
-                      outline: isSelected ? '1.5px solid #fca5a5' : 'none',
-                      outlineOffset: '-2px', borderRadius: isSelected ? 10 : 0,
-                      borderBottom: (i < groupPlayers.length - 1 || openSlots > 0) ? '1px solid #f8fafc' : 'none',
-                    }}
-                    onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#fafafa'; }}
-                    onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                    className={[
+                      'flex cursor-pointer items-center gap-2.5 px-5 py-2.5',
+                      'transition-colors duration-150 ease-out-quart',
+                      isSelected
+                        ? 'bg-down/5 ring-1 ring-inset ring-down/40'
+                        : 'hover:bg-surface-sunken',
+                      (i < groupPlayers.length - 1 || openSlots > 0) ? 'border-b border-line' : '',
+                    ].join(' ')}
                   >
                     <Avatar player={p} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(p.full_name)}</span>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 5px' }}>{p.position}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-body font-medium text-ink">{formatPlayerName(p.full_name)}</span>
+                        <PositionChip label={p.position} />
                         <TeamLogo code={p.team_code} size={12} />
-                        <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{p.team_code}</span>
+                        <span className="shrink-0 text-label text-ink-3">{p.team_code}</span>
                         {isSelected && (
-                          <span style={{ fontSize: 9, fontWeight: 800, color: '#dc2626', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 20, padding: '1px 6px', letterSpacing: '0.04em' }}>
-                            OUT
+                          <span className="shrink-0 rounded-pill border border-down/30 bg-down/10 px-1.5 py-0.5 text-eyebrow uppercase text-down">
+                            Out
                           </span>
                         )}
                       </div>
                       {p.last_week_points != null && (
-                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-label text-ink-3">
                           <span>{formatPoints(p.last_week_points)} last wk</span>
                         </div>
                       )}
                     </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>{formatPrice(p.current_price)}</div>
+                    <div className="shrink-0 text-right">
+                      <div className="font-mono tabular-nums text-body text-ink">{formatPrice(p.current_price)}</div>
                     </div>
                     <button
                       onClick={e => { e.stopPropagation(); toggleOutgoing(p); }}
-                      style={{
-                        padding: '5px 10px', borderRadius: 8, flexShrink: 0,
-                        border: isSelected ? '1px solid #fca5a5' : '1px solid #e2e8f0',
-                        background: isSelected ? '#fee2e2' : '#fff',
-                        color: isSelected ? '#dc2626' : '#475569',
-                        fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', gap: 4,
-                      }}
+                      type="button"
+                      aria-pressed={isSelected}
+                      className={[
+                        'flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-control border px-2.5 text-label',
+                        'transition-colors duration-150 ease-out-quart',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2',
+                        isSelected
+                          ? 'border-down/40 bg-down/10 text-down'
+                          : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink',
+                      ].join(' ')}
                     >
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                         <polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
@@ -358,25 +359,23 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                 <div
                   key={`empty-${group.key}-${i}`}
                   onClick={() => addEmptySlot(group)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px',
-                    cursor: 'pointer', borderBottom: i < openSlots - 1 ? '1px solid #f8fafc' : 'none',
-                  }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#fafafa'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                  className={[
+                    'flex cursor-pointer items-center gap-2.5 px-5 py-2.5',
+                    'transition-colors duration-150 ease-out-quart hover:bg-surface-sunken',
+                    i < openSlots - 1 ? 'border-b border-line' : '',
+                  ].join(' ')}
                 >
-                  <div style={{
-                    width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
-                    border: `2px dashed ${col.bar}`, opacity: 0.5,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={col.bar} strokeWidth="2.5" strokeLinecap="round">
+                  <div
+                    className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-pill border-2 border-dashed opacity-50"
+                    style={{ borderColor: col.bar, color: col.bar }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                       <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                     </svg>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', fontStyle: 'italic' }}>Open slot</div>
-                    <div style={{ fontSize: 10, color: '#cbd5e1' }}>Tap to sign a {group.label.toLowerCase().replace(/s$/, '')}</div>
+                  <div className="flex-1">
+                    <div className="text-label text-ink-2">Open slot</div>
+                    <div className="text-eyebrow text-ink-3">Sign a {group.label.toLowerCase().replace(/s$/, '')}</div>
                   </div>
                 </div>
               ))}
@@ -386,28 +385,31 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
       </div>
 
       {/* Sidebar: results, pending transfers + replacement pickers, cap breakdown */}
-      <div style={{ position: 'sticky', top: 90, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="sticky top-[90px] flex flex-col gap-4">
 
         {results && (
-          <div style={{ borderRadius: 16, background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: '14px 16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <h3 style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Transfer results</h3>
+          <div className="rounded-card border border-line bg-surface p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-section text-ink">Transfer results</h3>
               <button
+                type="button"
                 onClick={() => setResults(null)}
-                style={{ border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
+                className="rounded-control px-1.5 py-0.5 text-label text-ink-3 transition-colors duration-150 ease-out-quart hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald"
               >
                 Dismiss
               </button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="flex flex-col gap-1.5">
               {results.map((r, i) => (
-                <div key={i} style={{
-                  display: 'flex', flexDirection: 'column', gap: 2, padding: '7px 10px', borderRadius: 8,
-                  background: r.ok ? '#f0fdf4' : '#fef2f2', border: `1px solid ${r.ok ? '#bbf7d0' : '#fecaca'}`,
-                  fontSize: 11, fontWeight: 600, color: r.ok ? '#065f46' : '#991b1b',
-                }}>
-                  <span>{r.ok ? '✓' : '✕'} {r.label}</span>
-                  {r.msg && !r.ok && <span style={{ color: '#dc2626', fontWeight: 500 }}>{r.msg}</span>}
+                <div key={i} className={[
+                  'flex flex-col gap-0.5 rounded-control border px-2.5 py-2 text-label',
+                  r.ok ? 'border-emerald-line bg-emerald-tint text-ink' : 'border-down/30 bg-down/5 text-down',
+                ].join(' ')}>
+                  <span className="flex items-center gap-1.5">
+                    <Icon name={r.ok ? 'check' : 'plus'} size={12} className={r.ok ? 'text-emerald' : 'rotate-45 text-down'} />
+                    {r.label}
+                  </span>
+                  {r.msg && !r.ok && <span className="text-ink-2">{r.msg}</span>}
                 </div>
               ))}
             </div>
@@ -415,79 +417,93 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
         )}
 
         {pending.length === 0 ? (
-          <div style={{
-            borderRadius: 16, background: '#fff', border: '1px dashed #e2e8f0',
-            padding: '20px 16px', textAlign: 'center',
-          }}>
-            <p style={{ fontSize: 12, color: '#94a3b8' }}>
-              Select a player (or an open slot) on the left to start a transfer
-            </p>
+          <div className="rounded-card border border-line bg-surface">
+            <EmptyState
+              compact
+              icon={<Icon name="arrowRight" size={18} />}
+              title="Pick a player to trade away, or an open slot to fill."
+            />
           </div>
         ) : (
-          <div style={{ borderRadius: 16, background: '#fff', border: '1.5px solid #ef4444', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>
-                  Transfers ({pending.length})
-                </h3>
-                <button
-                  onClick={() => setPending([])}
-                  disabled={confirming}
-                  style={{
-                    padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700,
-                    border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: confirming ? 'default' : 'pointer',
-                  }}
-                >
-                  Clear all
-                </button>
+          <div className="overflow-hidden rounded-card border border-emerald bg-surface">
+            <div className="border-b border-line p-4">
+              <div className="flex items-center justify-between gap-2">
+                <SectionHeader
+                  title="Pending transfers"
+                  right={
+                    <button
+                      type="button"
+                      onClick={() => setPending([])}
+                      disabled={confirming}
+                      className={[
+                        'h-8 rounded-control border border-line px-2.5 text-label',
+                        'transition-colors duration-150 ease-out-quart',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2',
+                        confirming
+                          ? 'cursor-not-allowed bg-surface-sunken text-ink-3'
+                          : 'cursor-pointer bg-surface text-ink-2 hover:border-line-strong hover:text-ink',
+                      ].join(' ')}
+                    >
+                      Clear all
+                    </button>
+                  }
+                />
               </div>
-              <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
-                Budget after: {formatPrice(totalBudgetAfter)}
+              <p className="mt-2 text-label text-ink-3">
+                Budget after: <span className="font-mono tabular-nums text-ink">{formatPrice(totalBudgetAfter)}</span>
               </p>
               <button
+                type="button"
                 onClick={confirmAll}
                 disabled={!canConfirm}
-                style={{
-                  marginTop: 10, width: '100%', padding: '9px 0', borderRadius: 12, fontSize: 12, fontWeight: 800,
-                  border: 'none', cursor: canConfirm ? 'pointer' : 'not-allowed',
-                  background: canConfirm ? 'linear-gradient(135deg, #0f172a, #1e293b)' : '#f1f5f9',
-                  color: canConfirm ? '#fff' : '#cbd5e1',
-                }}
+                // A disabled control states its condition.
+                title={canConfirm ? undefined : confirming ? 'Confirming your transfers' : 'Pick a replacement for each pending transfer first'}
+                className={[
+                  'mt-3 h-10 w-full rounded-control text-body font-medium',
+                  'transition-colors duration-150 ease-out-quart',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2',
+                  canConfirm
+                    ? 'cursor-pointer bg-emerald-press text-surface hover:bg-emerald-hover active:bg-emerald-press'
+                    : 'cursor-not-allowed bg-surface-sunken text-ink-3',
+                ].join(' ')}
               >
-                {confirming ? 'Confirming…' : `Confirm ${actionableCount || ''} Transfer${actionableCount === 1 ? '' : 's'}`}
+                {confirming
+                  ? 'Confirming'
+                  : `Confirm ${actionableCount || ''} transfer${actionableCount === 1 ? '' : 's'}`}
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className="flex flex-col">
               {pending.map((t, idx) => {
                 const available = availableBudgetFor(t.key);
                 const candidates = candidatesFor(t);
                 return (
-                  <div key={t.key} style={{ borderTop: idx > 0 ? '1px solid #f1f5f9' : 'none' }}>
+                  <div key={t.key} className={idx > 0 ? 'border-t border-line' : ''}>
 
                     {/* Slot summary */}
-                    <div style={{ padding: '10px 16px', background: '#fafafa' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="bg-surface-sunken px-4 py-2.5">
+                      <div className="flex items-center gap-2">
                         {t.outgoing ? (
                           <>
                             <Avatar player={t.outgoing} size={28} />
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(t.outgoing.full_name)}</div>
-                              <div style={{ fontSize: 9, color: '#94a3b8' }}>sells for {formatPrice(sellProceeds(Number(t.outgoing.current_price)))}</div>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-label text-ink">{formatPlayerName(t.outgoing.full_name)}</div>
+                              <div className="text-eyebrow text-ink-3">
+                                Sells for <span className="font-mono tabular-nums">{formatPrice(sellProceeds(Number(t.outgoing.current_price)))}</span>
+                              </div>
                             </div>
                           </>
                         ) : (
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', fontStyle: 'italic' }}>Open {t.groupLabel.toLowerCase()} slot</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-label text-ink-2">Open {t.groupLabel.toLowerCase()} slot</div>
                           </div>
                         )}
                         <button
+                          type="button"
                           onClick={() => removeSlot(t.key)}
-                          title="Remove"
-                          style={{
-                            width: 22, height: 22, borderRadius: 7, border: '1px solid #f1f5f9', background: '#fff',
-                            color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                          }}
+                          aria-label="Remove this transfer"
+                          title="Remove this transfer"
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-control border border-line bg-surface text-ink-3 transition-colors duration-150 ease-out-quart hover:border-down hover:text-down focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2"
                         >
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                             <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -496,18 +512,17 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                       </div>
 
                       {t.incoming && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, paddingTop: 8, borderTop: '1px dashed #e2e8f0' }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" style={{ flexShrink: 0 }}>
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
+                        <div className="mt-2 flex items-center gap-2 border-t border-dashed border-line pt-2">
+                          <Icon name="check" size={12} className="shrink-0 text-emerald" />
                           <Avatar player={t.incoming} size={28} />
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(t.incoming.full_name)}</div>
-                            <div style={{ fontSize: 9, color: '#94a3b8' }}>{formatPrice(t.incoming.current_price)}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-label text-ink">{formatPlayerName(t.incoming.full_name)}</div>
+                            <div className="font-mono tabular-nums text-eyebrow text-ink-3">{formatPrice(t.incoming.current_price)}</div>
                           </div>
                           <button
+                            type="button"
                             onClick={() => setSlotIncoming(t.key, null)}
-                            style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', flexShrink: 0 }}
+                            className="h-8 shrink-0 rounded-control border border-line bg-surface px-2.5 text-label text-ink-2 transition-colors duration-150 ease-out-quart hover:border-line-strong hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2"
                           >
                             Change
                           </button>
@@ -518,123 +533,103 @@ export default function TransferBoard({ players, season, fantasyTeamId, currentW
                     {/* Replacement picker */}
                     {!t.incoming && (
                       <div>
-                        <div style={{ padding: '8px 16px 0' }}>
-                          <div style={{ position: 'relative' }}>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
-                              style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)' }}>
-                              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                            </svg>
+                        <div className="px-4 pt-2">
+                          <div className="relative">
+                            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-3">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                              </svg>
+                            </span>
                             <input
                               value={searchBySlot[t.key] ?? ''}
                               onChange={e => setSearchBySlot(s => ({ ...s, [t.key]: e.target.value }))}
-                              placeholder={`Search ${t.positions.join('/')}...`}
-                              style={{
-                                width: '100%', paddingLeft: 26, paddingRight: 10, paddingTop: 5, paddingBottom: 5,
-                                fontSize: 11, borderRadius: 20, border: '1px solid #e2e8f0',
-                                background: '#f8fafc', color: '#0f172a', outline: 'none', boxSizing: 'border-box',
-                              }}
+                              placeholder={`Search ${t.positions.join('/')}`}
+                              aria-label={`Search ${t.positions.join('/')} players`}
+                              className="h-9 w-full rounded-control border border-line bg-surface pl-8 pr-3 text-label text-ink placeholder:text-ink-3 transition-colors duration-150 ease-out-quart hover:border-line-strong focus-visible:border-emerald focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald"
                             />
                           </div>
 
-                          {/* Sort + team filter */}
-                          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                            <select
+                          <div className="mt-2 flex gap-2">
+                            <Select
+                              ariaLabel="Sort replacements"
                               value={sortBy}
-                              onChange={e => setSortBy(e.target.value as SortKey)}
-                              style={{
-                                flex: 1, minWidth: 0, padding: '5px 7px', fontSize: 10.5, fontWeight: 600,
-                                borderRadius: 9, border: '1px solid #e2e8f0', background: '#f8fafc',
-                                color: '#0f172a', outline: 'none',
-                              }}
-                            >
-                              {SORT_OPTIONS.map(o => (
-                                <option key={o.key} value={o.key}>{o.label}</option>
-                              ))}
-                            </select>
-                            <select
+                              onValueChange={v => setSortBy(v as SortKey)}
+                              options={SORT_OPTIONS.map(o => ({ value: o.key, label: o.label }))}
+                              className="min-w-0 flex-1"
+                            />
+                            <Select
+                              ariaLabel="Filter by team"
                               value={teamFilter}
-                              onChange={e => setTeamFilter(e.target.value)}
-                              style={{
-                                width: 76, padding: '5px 7px', fontSize: 10.5, fontWeight: 600,
-                                borderRadius: 9, border: '1px solid #e2e8f0', background: '#f8fafc',
-                                color: '#0f172a', outline: 'none',
-                              }}
-                            >
-                              <option value="ALL">All Teams</option>
-                              {teams.map(tc => <option key={tc} value={tc}>{tc}</option>)}
-                            </select>
+                              onValueChange={setTeamFilter}
+                              options={[{ value: 'ALL', label: 'All teams' }, ...teams.map(tc => ({ value: tc, label: tc }))]}
+                              className="w-24 shrink-0"
+                            />
                           </div>
 
-                          {/* Max price filter */}
-                          <select
+                          <Select
+                            ariaLabel="Maximum price"
                             value={maxPrice == null ? 'any' : String(maxPrice)}
-                            onChange={e => setMaxPrice(e.target.value === 'any' ? null : Number(e.target.value))}
-                            style={{
-                              width: '100%', marginTop: 6, padding: '5px 7px', fontSize: 10.5, fontWeight: 600,
-                              borderRadius: 9, border: '1px solid #e2e8f0', background: '#f8fafc',
-                              color: '#0f172a', outline: 'none', boxSizing: 'border-box',
-                            }}
-                          >
-                            {PRICE_PRESETS.map(preset => (
-                              <option key={preset.label} value={preset.value == null ? 'any' : preset.value}>
-                                {preset.label}
-                              </option>
-                            ))}
-                          </select>
+                            onValueChange={v => setMaxPrice(v === 'any' ? null : Number(v))}
+                            options={PRICE_PRESETS.map(preset => ({
+                              value: preset.value == null ? 'any' : String(preset.value),
+                              label: preset.value == null ? 'Any price' : preset.label,
+                            }))}
+                            className="mt-2 w-full"
+                          />
 
-                          {/* Affordable-only toggle */}
-                          <label style={{
-                            display: 'flex', alignItems: 'center', gap: 6, marginTop: 6,
-                            fontSize: 10.5, fontWeight: 600, color: '#475569', cursor: 'pointer',
-                          }}>
-                            <input
-                              type="checkbox"
+                          <div className="mt-2.5">
+                            <Checkbox
                               checked={affordableOnly}
-                              onChange={e => setAffordableOnly(e.target.checked)}
+                              onCheckedChange={setAffordableOnly}
+                              label="Only show players I can afford"
                             />
-                            Show affordable players only
-                          </label>
+                          </div>
                         </div>
 
-                        <div style={{ maxHeight: 280, overflowY: 'auto', marginTop: 6 }}>
+                        <div className="mt-2 max-h-72 overflow-y-auto">
                           {candidates.length === 0 && (
-                            <div style={{ padding: '16px', textAlign: 'center', fontSize: 11, color: '#94a3b8' }}>
-                              No players found
-                            </div>
+                            <EmptyState compact title="No players match these filters." />
                           )}
-                          {candidates.map((p, i) => {
+                          {candidates.map(p => {
                             const canAfford = Number(p.current_price) <= available;
                             return (
-                              <div key={p.id} style={{
-                                display: 'flex', alignItems: 'center', gap: 8, padding: '7px 16px',
-                                borderTop: '1px solid #f8fafc',
-                              }}>
-                                <div onClick={() => setProfileId(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1, cursor: 'pointer' }}>
+                              <div key={p.id} className="flex items-center gap-2 border-t border-line px-4 py-2">
+                                <div
+                                  onClick={() => setProfileId(p.id)}
+                                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-2"
+                                >
                                   <Avatar player={p} size={26} />
-                                  <div style={{ minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                      <span style={{ fontSize: 11.5, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatPlayerName(p.full_name)}</span>
-                                      <span style={{ fontSize: 8, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 4px' }}>{p.position}</span>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="truncate text-label text-ink">{formatPlayerName(p.full_name)}</span>
+                                      <PositionChip label={p.position} />
                                       <TeamLogo code={p.team_code} size={11} />
-                                      <span style={{ fontSize: 9, color: '#94a3b8' }}>{p.team_code}</span>
+                                      <span className="text-eyebrow text-ink-3">{p.team_code}</span>
                                     </div>
                                   </div>
                                 </div>
-                                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                  <div style={{ fontSize: 11, fontWeight: 800, color: canAfford ? '#0f172a' : '#cbd5e1', marginBottom: 3 }}>
+                                <div className="shrink-0 text-right">
+                                  <div className={[
+                                    'mb-1 font-mono tabular-nums text-label',
+                                    canAfford ? 'text-ink' : 'text-ink-3',
+                                  ].join(' ')}>
                                     {formatPrice(p.current_price)}
                                   </div>
                                   <button
+                                    type="button"
                                     onClick={() => setSlotIncoming(t.key, p)}
                                     disabled={!canAfford}
-                                    style={{
-                                      padding: '3px 9px', borderRadius: 7, fontSize: 10, fontWeight: 700,
-                                      border: 'none', cursor: canAfford ? 'pointer' : 'not-allowed',
-                                      background: canAfford ? '#0f172a' : '#f1f5f9',
-                                      color: canAfford ? '#fff' : '#cbd5e1',
-                                    }}
+                                    title={canAfford ? undefined : `${formatPrice(Number(p.current_price) - available)} over your remaining budget`}
+                                    className={[
+                                      'h-7 rounded-control px-2.5 text-label',
+                                      'transition-colors duration-150 ease-out-quart',
+                                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2',
+                                      canAfford
+                                        ? 'cursor-pointer bg-emerald-press text-surface hover:bg-emerald-hover'
+                                        : 'cursor-not-allowed bg-surface-sunken text-ink-3',
+                                    ].join(' ')}
                                   >
-                                    {canAfford ? 'Select' : "Can't afford"}
+                                    {canAfford ? 'Select' : 'Too pricey'}
                                   </button>
                                 </div>
                               </div>

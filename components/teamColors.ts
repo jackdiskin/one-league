@@ -1,8 +1,8 @@
 // Primary team colours for the list's identity chip.
 //
-// Lives here rather than in lib/ because lib/ is out of scope for this
-// redesign. Keys match the team_code values in the players table, the same
-// set lib/team-logos.ts uses.
+// Lives in components/ rather than lib/ because lib/ is out of scope for the
+// redesign. Keys match the team_code values in the players table, the same set
+// lib/team-logos.ts uses.
 export const TEAM_COLORS: Record<string, string> = {
   ARI: '#97233F', ATL: '#A71930', BAL: '#241773', BUF: '#00338D',
   CAR: '#0085CA', CHI: '#0B162A', CIN: '#FB4F14', CLE: '#311D00',

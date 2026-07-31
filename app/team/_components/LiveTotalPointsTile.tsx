@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useLiveStats } from '@/hooks/useLiveStats';
 import { formatPoints } from '@/lib/format';
+import StatCard from '@/components/ui/StatCard';
 import type { RosterPlayer } from './RosterList';
 
 interface Props {
@@ -40,19 +41,11 @@ export default function LiveTotalPointsTile({ roster, seasonBasePoints }: Props)
   const anyLive = roster.some(p => p.roster_slot !== 'BENCH' && p.external_player_id && liveStats.has(p.external_player_id));
 
   return (
-    <div className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm" style={{ padding: '14px 16px' }}>
-      <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
-        Total Points
-      </p>
-      <p style={{
-        fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1,
-        color: '#0f172a',
-      }}>
-        {formatPoints(total)}
-      </p>
-      <p style={{ fontSize: 10, color: anyLive ? '#10b981' : '#94a3b8', marginTop: 4 }}>
-        {anyLive ? 'season total · live' : 'season total'}
-      </p>
-    </div>
+    <StatCard
+      label="Total points"
+      value={formatPoints(total)}
+      sub={anyLive ? 'Season total · updating live' : 'Season total'}
+      tone={anyLive ? 'accent' : 'default'}
+    />
   );
 }

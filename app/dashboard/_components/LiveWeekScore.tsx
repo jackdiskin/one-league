@@ -44,97 +44,64 @@ export default function LiveWeekScore({ roster, currentWeek }: Props) {
   const anyScore = players.some(p => p.pts > 0);
 
   return (
-    <div style={{
-      borderRadius: 20,
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #064e3b 100%)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
-      overflow: 'hidden',
-    }}>
+    <div className="overflow-hidden rounded-card bg-ink">
       {/* Top band */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 20px',
-        borderBottom: '1px solid rgba(255,255,255,0.07)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 10, fontWeight: 800, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.14em' }}>
-            Week {currentWeek}
-          </span>
+      <div className="flex items-center justify-between gap-3 border-b border-turf-chalk/10 px-5 py-3">
+        <div className="flex items-center gap-2.5">
+          <span className="text-eyebrow uppercase text-emerald">Week {currentWeek}</span>
           {anyLive && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 9, fontWeight: 800, color: '#fff',
-              background: '#ef4444', borderRadius: 20, padding: '2px 8px',
-              letterSpacing: '0.12em', textTransform: 'uppercase',
-            }}>
-              <span style={{
-                width: 5, height: 5, borderRadius: '50%', background: '#fff',
-                display: 'inline-block',
-                animation: 'pulse 1s infinite',
-              }} />
-              Live
+            <span className="inline-flex items-center gap-1.5 rounded-pill bg-emerald px-2 py-0.5">
+              <span
+                aria-hidden="true"
+                className="motion-safe:animate-live-dot inline-block h-1.5 w-1.5 rounded-pill bg-surface"
+              />
+              <span className="text-eyebrow uppercase text-surface">Live</span>
             </span>
           )}
         </div>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
-          {anyLive ? 'Updating in real time' : anyScore ? 'Week finalized' : 'Awaiting kickoff'}
+        <span className="text-label text-turf-chalk/50">
+          {anyLive ? 'Updating in real time' : anyScore ? 'Week final' : 'Awaiting kickoff'}
         </span>
       </div>
 
-      {/* Score hero — current week only */}
-      <div style={{ padding: '18px 20px 16px', display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-        <span style={{
-          fontSize: 52, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1,
-          color: anyLive ? '#34d399' : anyScore ? '#e2e8f0' : 'rgba(255,255,255,0.2)',
-          transition: 'color 0.4s',
-        }}>
+      {/* Score hero */}
+      <div className="flex flex-wrap items-baseline gap-x-2.5 px-5 pb-4 pt-4">
+        <span className={[
+          'font-mono tabular-nums text-display transition-colors duration-300',
+          anyLive ? 'text-emerald' : anyScore ? 'text-turf-chalk' : 'text-turf-chalk/60',
+        ].join(' ')}>
           {weekTotal.toFixed(1)}
         </span>
-        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', fontWeight: 600, marginBottom: 6 }}>
-          pts this week
-        </span>
+        <span className="text-label text-turf-chalk/60">points this week</span>
       </div>
 
       {/* Per-player breakdown */}
-      <div style={{
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-        gap: 0,
-      }}>
-        {players.map((p, i) => (
-          <div key={p.id} style={{
-            padding: '9px 14px',
-            borderRight: '1px solid rgba(255,255,255,0.04)',
-            borderBottom: '1px solid rgba(255,255,255,0.04)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-          }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{
-                fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.85)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] border-t border-turf-chalk/10">
+        {players.map(p => (
+          <div
+            key={p.id}
+            className="flex items-center justify-between gap-2 border-b border-r border-turf-chalk/5 px-3.5 py-2.5"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-label text-turf-chalk/85">
                 {formatPlayerName(p.full_name)}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b' }}>{p.position}</span>
+              </p>
+              <p className="mt-0.5 flex items-center gap-1.5 text-eyebrow text-turf-chalk/45">
+                <span>{p.position}</span>
                 {p.isLive ? (
-                  <span style={{ fontSize: 8, fontWeight: 800, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.1em' }}>● live</span>
+                  <span className="uppercase text-emerald">Live</span>
                 ) : p.pts > 0 ? (
-                  <span style={{ fontSize: 8, fontWeight: 700, color: '#64748b' }}>✓ final</span>
+                  <span className="uppercase">Final</span>
                 ) : (
-                  <span style={{ fontSize: 8, color: '#334155' }}>—</span>
+                  <span className="uppercase">Not started</span>
                 )}
-              </div>
+              </p>
             </div>
-            <span style={{
-              fontSize: 13, fontWeight: 800,
-              color: p.isLive ? '#34d399' : p.pts > 0 ? 'rgba(255,255,255,0.7)' : '#334155',
-              flexShrink: 0,
-              transition: 'color 0.3s',
-            }}>
-              {p.pts > 0 ? Number(p.pts).toFixed(1) : '—'}
+            <span className={[
+              'shrink-0 font-mono tabular-nums text-body transition-colors duration-300',
+              p.isLive ? 'text-emerald' : p.pts > 0 ? 'text-turf-chalk/80' : 'text-turf-chalk/40',
+            ].join(' ')}>
+              {p.pts > 0 ? Number(p.pts).toFixed(1) : '0.0'}
             </span>
           </div>
         ))}
