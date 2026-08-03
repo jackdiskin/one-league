@@ -77,11 +77,11 @@ export function LineupSlotCard({
 
       {player.headshot_url ? (
         <Image
-          src={player.headshot_url} alt="" width={56} height={56} unoptimized
-          className="h-14 w-14 object-contain"
+          src={player.headshot_url} alt="" width={48} height={48} unoptimized
+          className="h-12 w-12 object-contain"
         />
       ) : (
-        <span className="flex h-14 w-14 items-center justify-center rounded-pill bg-emerald-tint text-section text-emerald">
+        <span className="flex h-12 w-12 items-center justify-center rounded-pill bg-emerald-tint text-body text-emerald">
           {player.full_name.charAt(0)}
         </span>
       )}
@@ -114,20 +114,50 @@ export function LineupSlotCard({
   );
 }
 
-export function LineupEmptySlot({ label }: { label: string }) {
+/**
+ * An empty starter slot. Interactive only once a player is selected — clicking
+ * it while eligible moves the selection here (mirrors RosterList's EmptySlotRow,
+ * but the field has no picker: on the turf you always pick a player up first,
+ * then click where it goes, same as any other field swap).
+ */
+export function LineupEmptySlot({
+  label,
+  eligible = false,
+  onClick,
+}: {
+  label: string;
+  eligible?: boolean;
+  onClick?: () => void;
+}) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={eligible ? onClick : undefined}
+      disabled={!eligible}
+      title={eligible ? `Move here — ${label}` : label}
       className={[
-        FIELD_CARD,
-        'gap-2 border border-dashed border-line-strong bg-surface/90',
+        FIELD_CARD, FIELD_FOCUS,
+        'gap-2 border border-dashed bg-surface/90',
+        'transition duration-150 ease-out-quart',
+        eligible
+          ? 'cursor-pointer border-emerald -translate-y-0.5 shadow-lg hover:shadow-lg active:translate-y-0'
+          : 'cursor-default border-line-strong',
       ].join(' ')}
     >
-      <span className="flex h-7 w-7 items-center justify-center rounded-pill bg-surface-sunken text-ink-3" aria-hidden="true">
+      <span
+        aria-hidden="true"
+        className={[
+          'flex h-7 w-7 items-center justify-center rounded-pill',
+          eligible ? 'bg-emerald-tint text-emerald' : 'bg-surface-sunken text-ink-3',
+        ].join(' ')}
+      >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="8" r="3.5" /><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6" />
         </svg>
       </span>
-      <span className="text-label text-ink-2">{label}</span>
-    </div>
+      <span className={eligible ? 'text-label text-emerald' : 'text-label text-ink-2'}>
+        {eligible ? 'Move here' : label}
+      </span>
+    </button>
   );
 }

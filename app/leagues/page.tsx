@@ -68,7 +68,7 @@ export default async function LeaguesPage({
     <div className="flex min-h-screen flex-col bg-surface">
       <TopNav
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-        season={SEASON_YEAR} currentWeek={currentWeek}
+        currentWeek={currentWeek}
         logoUri={String(process.env.LOGO_URI)}
       />
 

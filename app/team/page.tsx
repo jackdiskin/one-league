@@ -167,7 +167,7 @@ export default async function TeamPage({
       <div className="flex min-h-screen flex-col bg-surface">
         <TopNav
           user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-          season={SEASON} currentWeek={currentWeek}
+          currentWeek={currentWeek}
           logoUri={String(process.env.LOGO_URI)}
         />
         <div className="flex flex-1 items-center justify-center">
@@ -194,7 +194,7 @@ export default async function TeamPage({
 
       <TopNav
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-        season={SEASON} currentWeek={currentWeek}
+        currentWeek={currentWeek}
         logoUri={String(process.env.LOGO_URI)}
       />
 
@@ -215,8 +215,11 @@ export default async function TeamPage({
         {/* Field + roster, side by side */}
         <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-team">
 
-          {/* Left column: projected points + formation */}
-          <div className="flex flex-col gap-4">
+          {/* Left column: projected points + formation. min-w-0 keeps the
+              field's internal min-width (see FieldPanel) from inflating this
+              grid track past its 1.1fr share — the field scrolls internally
+              instead of squeezing the roster column. */}
+          <div className="flex min-w-0 flex-col gap-4">
             <ProjectedPointsPanel week={currentWeek} projectedPoints={projectedTotal} />
             <Suspense fallback={<Skeleton h={580} />}>
               <MyTeamSummary

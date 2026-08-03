@@ -5,11 +5,10 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { authClient } from '@/lib/auth-client';
-import SeasonModeSwitcher from '@/app/dashboard/_components/SeasonModeSwitcher';
+import { formatWeekLong } from '@/lib/format';
 
 interface Props {
   user: { name: string; email: string };
-  season: number;
   currentWeek: number;
   logoUri: string;
 }
@@ -27,7 +26,7 @@ function isNavActive(pathname: string, href: string) {
   return href === '/leagues' ? pathname.startsWith('/league') : pathname === href;
 }
 
-export default function TopNav({ user, season, currentWeek, logoUri }: Props) {
+export default function TopNav({ user, currentWeek, logoUri }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -86,9 +85,9 @@ export default function TopNav({ user, season, currentWeek, logoUri }: Props) {
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          <div className="hidden md:block">
-            <SeasonModeSwitcher season={season} currentWeek={currentWeek} />
-          </div>
+          <span className="hidden font-mono tabular-nums text-label text-ink-3 md:inline">
+            NFL {formatWeekLong(currentWeek)}
+          </span>
 
           <div className="relative">
             <button
@@ -145,7 +144,9 @@ export default function TopNav({ user, season, currentWeek, logoUri }: Props) {
 
       {mobileNavOpen && (
         <nav className="flex flex-col gap-3 border-t border-line px-4 py-3 md:hidden">
-          <SeasonModeSwitcher season={season} currentWeek={currentWeek} />
+          <span className="font-mono tabular-nums text-label text-ink-3">
+            NFL {formatWeekLong(currentWeek)}
+          </span>
           {NAV.map(item => {
             const active = isNavActive(pathname, item.href);
             return (

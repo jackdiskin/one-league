@@ -397,7 +397,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
       <div className="flex flex-col" style={{ minHeight: '100vh', background: '#f8fafc' }}>
         <TopNav
           user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-          season={SEASON} currentWeek={currentWeek}
+          currentWeek={currentWeek}
           logoUri={String(process.env.LOGO_URI)}
         />
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -468,7 +468,7 @@ export default async function LeaguePage({ searchParams }: { searchParams: Searc
 
       <TopNav
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-        season={SEASON} currentWeek={currentWeek}
+        currentWeek={currentWeek}
         logoUri={String(process.env.LOGO_URI)}
       />
 

@@ -124,13 +124,57 @@ export const FORMATION_SLOTS = [
   { id: 'QB2',   posGroup: 'QB',   label: 'QB',    nx: 67, u: 0.10 },
 ] as const;
 
+/** How much a slot card shrinks at depth `u` — gentler than the turf itself,
+ *  since full foreshortening would make the far cards unreadable. */
+export function cardScaleAt(u: number): number {
+  return 1 - 0.28 * u;
+}
+
 /** Panel-relative position (percent) and depth scale for a formation slot. */
 export function slotPlacement(nx: number, u: number) {
   return {
     leftPct: (xAt(nx, u) / W_NEAR) * 100,
     topPct: (svgY(u) / H) * 100,
-    // Cards shrink with depth, but more gently than the turf does — at full
-    // foreshortening the far cards become unreadable.
-    scale: 1 - 0.28 * u,
+    scale: cardScaleAt(u),
   };
+}
+
+/**
+ * Narrowest the field panel can render without two slot cards' boxes
+ * overlapping, given the cards' unscaled (near-edge) width/height.
+ *
+ * Card positions and sizes both scale linearly with the panel's rendered
+ * width (the SVG has no intrinsic size, only a fixed aspect ratio), so for
+ * every pair of slots there's a panel width below which their boxes start to
+ * intersect. Two axis-aligned boxes clear each other once *either* axis has
+ * enough separation, so each pair's threshold is the smaller of "wide enough
+ * to separate on x" and "wide enough to separate on y" — and the panel must
+ * be at least the largest of those thresholds across every pair.
+ */
+export function minOverlapFreeWidth(
+  slots: readonly { nx: number; u: number }[],
+  cardW: number,
+  cardH: number,
+): number {
+  let minWidth = 0;
+  for (let i = 0; i < slots.length; i++) {
+    for (let j = i + 1; j < slots.length; j++) {
+      const a = slots[i];
+      const b = slots[j];
+      const dxUnits = Math.abs(xAt(a.nx, a.u) - xAt(b.nx, b.u));
+      const dyUnits = Math.abs(svgY(a.u) - svgY(b.u));
+      const halfWSum = (cardW * cardScaleAt(a.u) + cardW * cardScaleAt(b.u)) / 2;
+      const halfHSum = (cardH * cardScaleAt(a.u) + cardH * cardScaleAt(b.u)) / 2;
+
+      // Panel width (in px) at which this pair clears on x, or on y —
+      // dx/dy in px scale as panelWidth * units / W_NEAR (the SVG's fixed
+      // near-edge width), since panel height tracks width at a fixed ratio.
+      const widthToClearX = dxUnits > 0 ? (halfWSum * W_NEAR) / dxUnits : Infinity;
+      const widthToClearY = dyUnits > 0 ? (halfHSum * W_NEAR) / dyUnits : Infinity;
+      const pairMinWidth = Math.min(widthToClearX, widthToClearY);
+
+      minWidth = Math.max(minWidth, pairMinWidth);
+    }
+  }
+  return minWidth;
 }

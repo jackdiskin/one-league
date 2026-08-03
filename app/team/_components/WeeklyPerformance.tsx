@@ -36,7 +36,7 @@ export default function WeeklyPerformance({ players, week, season, matchups }: {
   const teamUp = teamDiff >= 0;
 
   return (
-    <div className="overflow-hidden rounded-card border border-line bg-surface">
+    <div className="@container overflow-hidden rounded-card border border-line bg-surface">
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4 px-5 pb-3 pt-4">
         <SectionHeader
@@ -56,13 +56,14 @@ export default function WeeklyPerformance({ players, week, season, matchups }: {
         </div>
       </div>
 
-      {/* Column labels */}
+      {/* Column labels — Diff and the vs-projection bar are the first to
+          drop as the row narrows; Player/Projected/Actual never do. */}
       <div className="sticky top-0 z-10 flex items-center border-y border-line bg-surface-sunken px-5 py-2 text-eyebrow uppercase text-ink-3">
         <div className="flex-1">Player</div>
         <div className="w-[120px] text-right">Projected</div>
         <div className="w-20 text-right">Actual</div>
-        <div className="w-20 text-right">Diff</div>
-        <div className="w-40 pr-1 text-right">vs projection</div>
+        <div className="hidden w-20 text-right @lg:block">Diff</div>
+        <div className="hidden w-40 pr-1 text-right @2xl:block">vs projection</div>
       </div>
 
       {/* Player rows */}
@@ -102,7 +103,7 @@ export default function WeeklyPerformance({ players, week, season, matchups }: {
                 {/* Name */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="truncate text-body font-medium text-ink">
+                    <span className="min-w-0 truncate text-body font-medium text-ink">
                       {formatPlayerName(p.full_name)}
                     </span>
                     <TeamLogo code={p.team_code} size={11} />
@@ -127,7 +128,7 @@ export default function WeeklyPerformance({ players, week, season, matchups }: {
                 </div>
 
                 {/* Diff */}
-                <div className="w-20 text-right font-mono tabular-nums text-label">
+                <div className="hidden w-20 text-right font-mono tabular-nums text-label @lg:block">
                   {diff != null ? (
                     <span className={up ? 'text-up' : 'text-down'}>
                       {up ? '+' : ''}{formatPoints(diff)}
@@ -136,7 +137,7 @@ export default function WeeklyPerformance({ players, week, season, matchups }: {
                 </div>
 
                 {/* Visual bar */}
-                <div className="flex w-40 items-center gap-1.5 pl-3">
+                <div className="hidden w-40 items-center gap-1.5 pl-3 @2xl:flex">
                   {barPct != null ? (
                     <>
                       <div className="relative h-1.5 flex-1 overflow-hidden rounded-pill bg-line">

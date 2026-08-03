@@ -97,13 +97,13 @@ export function FilledSlot({
         <Image
           src={player.headshot_url}
           alt=""
-          width={56}
-          height={56}
+          width={48}
+          height={48}
           unoptimized
-          className="h-14 w-14 object-contain"
+          className="h-12 w-12 object-contain"
         />
       ) : (
-        <span className="flex h-14 w-14 items-center justify-center rounded-pill bg-emerald-tint text-section text-emerald">
+        <span className="flex h-12 w-12 items-center justify-center rounded-pill bg-emerald-tint text-body text-emerald">
           {player.full_name.charAt(0)}
         </span>
       )}

@@ -21,7 +21,7 @@ import PlayerProfileModal from '@/components/PlayerProfileModal';
 import FieldPanel from './FieldPanel';
 import LiveStatsModal from './LiveStatsModal';
 import { LineupSlotCard, LineupEmptySlot } from './LineupSlotCard';
-import { isEligibleSwap, swapBlockedReason, slotBadgeLabel } from './slots';
+import { isEligibleSwap, swapBlockedReason, slotBadgeLabel, eligiblePositionsForSlot } from './slots';
 import type { FieldPlayer, PlacedSlot } from './types';
 
 export default function LineupField({
@@ -88,6 +88,28 @@ export default function LineupField({
     }
   }, [teamId, router, startTransition]);
 
+  // Fills a genuinely empty starter slot — there's no counterpart player to
+  // swap with, so this is a move rather than a swap (mirrors RosterList's
+  // EmptySlotRow, which hits the same /api/roster/move endpoint).
+  const executeMove = useCallback(async (player: FieldPlayer, targetSlot: string) => {
+    if (!teamId) return;
+    setSwapping(new Set([player.id]));
+    setSelected(null);
+    try {
+      const res = await fetch('/api/roster/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fantasy_team_id: teamId, player_id: player.id, target_slot: targetSlot }),
+      });
+      if (!res.ok) throw new Error('Move failed');
+      startTransition(() => router.refresh());
+    } catch {
+      startTransition(() => router.refresh());
+    } finally {
+      setSwapping(new Set());
+    }
+  }, [teamId, router, startTransition]);
+
   const livePointsFor = useCallback((p: FieldPlayer): number | null => {
     const s = p.external_player_id ? liveStats.get(p.external_player_id) : undefined;
     return s ? s.totals.fantasyPointsTotal : null;
@@ -141,14 +163,21 @@ export default function LineupField({
         renderSlot={({ key }) => {
           const s = formation.find((f, i) => (f.slot || `slot-${i}`) === key);
           if (!s) return null;
-          return s.player
-            ? renderPlayer(s.player, s.label)
-            : <LineupEmptySlot label={s.label} />;
+          if (s.player) return renderPlayer(s.player, s.label);
+          const eligible = interactive && !!selected
+            && eligiblePositionsForSlot(s.slot).includes(selected.position);
+          return (
+            <LineupEmptySlot
+              label={s.label}
+              eligible={eligible}
+              onClick={() => selected && executeMove(selected, s.slot)}
+            />
+          );
         }}
         footer={
           interactive && selected ? (
             <p className="rounded-pill bg-turf-deep/80 px-4 py-2 text-label text-turf-chalk">
-              Pick a highlighted player to swap, or press Escape to cancel.
+              Pick a highlighted player or open slot to move here, or press Escape to cancel.
             </p>
           ) : undefined
         }

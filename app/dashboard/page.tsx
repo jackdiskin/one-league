@@ -8,8 +8,11 @@ import WeekScoreSection from './_components/WeekScoreSection';
 import TopMovers       from './_components/TopMovers';
 import StandingsCard, { type LeagueStanding } from './_components/StandingsCard';
 import DiscoverLeagues from './_components/DiscoverLeagues';
+import MatchupsCard    from './_components/MatchupsCard';
 import TopNav from '@/components/TopNav';
 import { formatWeekLong } from '@/lib/format';
+
+const SCHEDULE_SEASON = 2026;
 
 function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`animate-pulse rounded-card bg-line ${className}`} />;
@@ -114,7 +117,6 @@ export default async function DashboardPage({
 
       <TopNav
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-        season={SEASON}
         currentWeek={currentWeek}
         logoUri={String(process.env.LOGO_URI)}
       />
@@ -136,10 +138,24 @@ export default async function DashboardPage({
           <WeekScoreSection teamId={teamCheck.id} season={SEASON} currentWeek={currentWeek} />
         </Suspense>
 
-        {/* My Team */}
-        <Suspense fallback={<Skeleton className="h-48" />}>
-          <MyTeamSummary userId={userId} seasonYear={SEASON} hidePrices />
-        </Suspense>
+        {/* Field + matchups/standings, side by side — same grid as My Team so
+            the field renders at the same size. min-w-0 keeps the field's
+            internal min-width (see FieldPanel) from inflating this track past
+            its 1.1fr share; the field scrolls internally instead. */}
+        <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-team">
+          <div className="min-w-0">
+            <Suspense fallback={<Skeleton className="h-[580px]" />}>
+              <MyTeamSummary userId={userId} seasonYear={SEASON} hidePrices interactive />
+            </Suspense>
+          </div>
+
+          <div className="flex flex-col gap-5">
+            <Suspense fallback={<Skeleton className="h-64" />}>
+              <MatchupsCard season={SCHEDULE_SEASON} week={currentWeek} />
+            </Suspense>
+            <StandingsCard leagues={userLeagues} />
+          </div>
+        </div>
 
         {/* Top Movers */}
         <Suspense fallback={
@@ -151,12 +167,7 @@ export default async function DashboardPage({
           <TopMovers seasonYear={SEASON} />
         </Suspense>
 
-        {/* Bottom row */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <StandingsCard leagues={userLeagues} />
-
-          <DiscoverLeagues leagues={discoverLeagues} />
-        </div>
+        <DiscoverLeagues leagues={discoverLeagues} />
 
       </main>
     </div>

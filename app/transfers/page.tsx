@@ -130,7 +130,7 @@ export default async function TransfersPage({
 
       <TopNav
         user={{ name: session.user.name ?? 'User', email: session.user.email ?? '' }}
-        season={SEASON} currentWeek={currentWeek}
+        currentWeek={currentWeek}
         logoUri={String(process.env.LOGO_URI)}
       />
 

@@ -14,8 +14,8 @@ import type { FieldPlayer, PlacedSlot } from './types';
 
 // Depth bands, near (0) → far (1).
 const LOS      = 0.60; // line of scrimmage — receivers set here
-const BACKS    = 0.34; // running backs, behind the line
-const QB_DEPTH = 0.20; // quarterback in shotgun
+const QB_DEPTH = 0.27; // quarterback in shotgun
+const BACKS    = 0.19; // running backs — just behind and below the QB
 const DEEP     = 0.06; // flex RB, deepest point of the backfield diamond
 
 /**
@@ -39,27 +39,29 @@ export function lineupFormation(starters: FieldPlayer[]): PlacedSlot[] {
     STARTER_SLOTS.find(s => s.slot === slot)?.badgeLabel ||
     '';
 
-  // A flex TE lines up tight to the tackle, a flex WR takes the slot lane, and
-  // a flex RB drops into the backfield behind the QB — completing a diamond
-  // with RB1/RB2. It needs a large depth gap from the QB because both sit in
-  // the same centre lane and have no horizontal separation to fall back on.
-  const flexIsTE = flex?.position === 'TE';
+  // A flex RB drops into the backfield behind the QB, completing a diamond
+  // with RB1/RB2. A flex WR or TE instead joins the front row for four
+  // receivers, evenly spaced, instead of the three-point spread used when
+  // FLEX is a back.
   const flexIsRB = flex?.position === 'RB';
+  const flexInFrontRow = flex != null && !flexIsRB;
 
   return [
-    // Front row — receivers on the line of scrimmage
-    { player: wr1,  slot: 'WR1',   label: label('WR1', wr1),   nx: 8,  u: LOS },
-    { player: wr3,  slot: 'WR3',   label: label('WR3', wr3),   nx: 50, u: LOS },
+    // Front row — receivers on the line of scrimmage. Four evenly-spaced
+    // points (8/36/64/92) when FLEX joins them, otherwise the original
+    // three (8/50/92).
+    { player: wr1,  slot: 'WR1',   label: label('WR1', wr1),   nx: 8, u: LOS },
+    { player: wr3,  slot: 'WR3',   label: label('WR3', wr3),   nx: flexInFrontRow ? 64 : 50, u: LOS },
     { player: wr2,  slot: 'WR2',   label: label('WR2', wr2),   nx: 92, u: LOS },
 
     // Flex — position-dependent
     {
       player: flex, slot: 'FLEX1', label: label('FLEX1', flex),
-      nx: flexIsTE ? 72 : flexIsRB ? 50 : 29,
-      u:  flexIsRB ? DEEP : LOS,
+      nx: flexInFrontRow ? 36 : 50,
+      u:  flexInFrontRow ? LOS : DEEP,
     },
 
-    // Backfield
+    // Backfield — RB1/RB2 sit just below and to either side of the QB.
     { player: rb1,  slot: 'RB1',   label: label('RB1', rb1),   nx: 24, u: BACKS },
     { player: rb2,  slot: 'RB2',   label: label('RB2', rb2),   nx: 76, u: BACKS },
     { player: qb1,  slot: 'QB1',   label: label('QB1', qb1),   nx: 50, u: QB_DEPTH },

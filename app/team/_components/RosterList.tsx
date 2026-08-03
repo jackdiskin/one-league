@@ -7,7 +7,7 @@ import { formatPoints, formatPlayerName } from '@/lib/format';
 import { useLiveStats, getLivePoints, type LiveStatDelta } from '@/hooks/useLiveStats';
 import TeamLogo from '@/components/TeamLogo';
 import PlayerProfileModal from '@/components/PlayerProfileModal';
-import { STARTER_SLOTS, eligiblePositionsForSlot, slotBadgeLabel } from '@/components/field/slots';
+import { STARTER_SLOTS, eligiblePositionsForSlot, slotBadgeLabel, isEligibleSwap } from '@/components/field/slots';
 import PositionChip from '@/components/ui/PositionChip';
 import SectionHeader from '@/components/ui/SectionHeader';
 import MatchupBadge from '@/components/MatchupBadge';
@@ -193,19 +193,11 @@ function PosBadge({ label }: { label: string }) {
   return <PositionChip label={label} />;
 }
 
-// Extracted so PlayerRow (defined outside RosterList) can call it without closures.
-// Two players can swap whenever each is eligible for the other's current slot —
-// bench accepts anyone, so this still covers ordinary bench<->starter swaps, but
-// it also allows direct starter<->starter swaps (e.g. a WR sitting in WR1 and
-// whoever's in the FLEX slot), so any eligible player can move into FLEX
-// regardless of whether they're currently starting elsewhere or on the bench.
+// Null-safe wrapper around the canonical rule in components/field/slots.ts —
+// that's the single source of truth for slot eligibility (see its docstring
+// for why this must never be redefined locally again).
 function isEligibleForSwap(p: RosterPlayer, selected: RosterPlayer | null): boolean {
-  if (!selected) return false;
-  if (p.id === selected.id) return false;
-  if (p.roster_slot === 'BENCH' && selected.roster_slot === 'BENCH') return false;
-  const pAcceptsSelected = p.roster_slot === 'BENCH' || eligiblePositionsForSlot(p.roster_slot).includes(selected.position);
-  const selectedAcceptsP = selected.roster_slot === 'BENCH' || eligiblePositionsForSlot(selected.roster_slot).includes(p.position);
-  return pAcceptsSelected && selectedAcceptsP;
+  return selected != null && isEligibleSwap(p, selected);
 }
 
 interface PlayerRowProps {
@@ -296,10 +288,13 @@ const PlayerRow = memo(function PlayerRow({
 
       <Avatar player={p} />
 
-      {/* Name / position / live chips */}
+      {/* Name / position / live chips — name only shrinks (never grows), so
+          the position badge and team logo sit right against it instead of
+          being pushed to the far edge of the row; it still ellipsizes first
+          under real pressure since it's the only shrinkable item here. */}
       <div className="min-w-0 flex-1">
         <div className="flex flex-nowrap items-center gap-1.5">
-          <span className="truncate text-body font-medium text-ink">
+          <span className="min-w-0 truncate text-body font-medium text-ink">
             {formatPlayerName(p.full_name)}
           </span>
           <PosBadge label={rowBadgeLabel(p)} />
@@ -319,9 +314,10 @@ const PlayerRow = memo(function PlayerRow({
         {isLive && liveData && <LiveStatChips totals={liveData.totals} />}
       </div>
 
-      {/* Data columns */}
+      {/* Data columns — Live/Last wk and Pos rk hide first as the row
+          narrows; Proj (and the name/team/position to its left) never do. */}
       <div className="flex shrink-0 items-center font-mono tabular-nums">
-        <div className="w-[68px] text-right">
+        <div className="hidden w-[68px] text-right @lg:block">
           {isLive && livePoints != null ? (
             <span className="text-body text-emerald">{formatPoints(livePoints)}</span>
           ) : p.last_week_points != null ? (
@@ -330,19 +326,18 @@ const PlayerRow = memo(function PlayerRow({
             <span className="text-label text-ink-3">0.0</span>
           )}
         </div>
+        <div className="hidden w-14 text-right text-label text-ink-2 @2xl:block">
+          {p.position_rank != null ? `${p.position_rank}` : '--'}
+        </div>
         <div className="w-14 text-right text-label text-ink-2">
           {p.projected_points != null ? formatPoints(p.projected_points) : '0.0'}
         </div>
-        <div className="w-14 text-right text-label text-ink-2">
-          {p.position_rank != null ? `${p.position_rank}` : '--'}
-        </div>
-        <div className="w-[72px] text-right text-label text-ink-2">
-          {p.season_points != null ? formatPoints(p.season_points) : '0.0'}
-        </div>
       </div>
 
-      {/* Move (select for starter/bench swap) — 64px */}
-      <div className="flex w-16 shrink-0 items-center justify-end">
+      {/* Move (select for starter/bench swap) — wide enough that the
+          button's own content (icon + "Move" + padding) never overflows
+          into the Proj column to its left. */}
+      <div className="flex w-20 shrink-0 items-center justify-end">
         <button
           type="button"
           onClick={e => { e.stopPropagation(); if (!isSwapping) onPlayerClick(p); }}
@@ -646,7 +641,7 @@ export default function RosterList({ roster, teamId, matchups, season }: {
   }
 
   return (
-    <div className="relative overflow-hidden rounded-card border border-line bg-surface">
+    <div className="@container relative overflow-hidden rounded-card border border-line bg-surface">
       <style>{`
         @keyframes eligible-pulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
@@ -699,14 +694,18 @@ export default function RosterList({ roster, teamId, matchups, season }: {
         />
       </div>
 
-      {/* Column labels — sticky, and widths mirror PlayerRow's data columns exactly. */}
+      {/* Column labels — sticky, and widths mirror PlayerRow's data columns
+          exactly. Live/Last wk and Pos rk are the first things to drop as the
+          row narrows; Player and Proj never do. Container queries, not
+          viewport breakpoints — this panel sits in a fluid grid column whose
+          rendered width doesn't track the viewport once the two-column
+          layout kicks in. */}
       <div className="sticky top-0 z-10 flex items-center justify-end border-y border-line bg-surface-sunken px-5 py-2 text-eyebrow uppercase text-ink-3">
         <span className="mr-auto">Player</span>
-        <span className="w-[68px] text-right">{anyLive ? 'Live' : 'Last wk'}</span>
+        <span className="hidden w-[68px] text-right @lg:block">{anyLive ? 'Live' : 'Last wk'}</span>
+        <span className="hidden w-14 text-right @2xl:block">Pos rk</span>
         <span className="w-14 text-right">Proj</span>
-        <span className="w-14 text-right">Pos rk</span>
-        <span className="w-[72px] text-right">Season</span>
-        <span className="w-16 shrink-0" />
+        <span className="w-20 shrink-0" />
       </div>
 
       {/* Swap banner */}

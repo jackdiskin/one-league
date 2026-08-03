@@ -40,8 +40,18 @@ export function eligiblePositionsForSlot(slot: string): readonly string[] {
   return STARTER_SLOTS.find(s => s.slot === slot)?.eligiblePositions ?? [];
 }
 
-/** Neutral badge text for a player, by their slot; falls back to raw position. */
+/**
+ * Neutral badge text for a player, by their slot; falls back to raw position.
+ *
+ * WR1/WR2/WR3 accept either a WR or a TE, so their slot-level badge is the
+ * combined "WR/TE" — but for an occupied slot that's less useful than just
+ * saying which one the player actually is. Show the real position there;
+ * the combined label still applies to the slot itself when it's empty (see
+ * STARTER_SLOTS' own badgeLabel, used directly for empty-slot placeholders).
+ */
 export function slotBadgeLabel(rosterSlot: string, position: string): string {
+  const isFlexWrSlot = rosterSlot === 'WR1' || rosterSlot === 'WR2' || rosterSlot === 'WR3';
+  if (isFlexWrSlot && position) return position;
   return STARTER_SLOTS.find(s => s.slot === rosterSlot)?.badgeLabel ?? position;
 }
 
@@ -50,9 +60,12 @@ export function isBench(rosterSlot: string): boolean {
 }
 
 /**
- * Whether two rostered players may trade places. One must be a starter and the
- * other on the bench, and the bench player must be eligible for the starter's
- * slot. Mirrors the validation in /api/roster/swap.
+ * Whether two rostered players may trade places. Bench accepts anyone, so this
+ * covers ordinary bench<->starter swaps, but it also allows direct
+ * starter<->starter swaps (e.g. a WR sitting in WR1 and whoever's in FLEX) —
+ * each player just has to be eligible for the other's current slot. Two bench
+ * players never swap; bench order isn't user-orderable here. Mirrors the
+ * validation in /api/roster/swap.
  */
 export function isEligibleSwap(
   a: { id: number; position: string; roster_slot: string },
@@ -61,11 +74,10 @@ export function isEligibleSwap(
   if (a.id === b.id) return false;
   const aBench = isBench(a.roster_slot);
   const bBench = isBench(b.roster_slot);
-  if (aBench === bBench) return false; // one starter, one bench
-  const starter = aBench ? b : a;
-  const benched = aBench ? a : b;
-  const eligible = eligiblePositionsForSlot(starter.roster_slot);
-  return (eligible.length ? eligible : [starter.position]).includes(benched.position);
+  if (aBench && bBench) return false;
+  const aSlotAcceptsB = aBench || eligiblePositionsForSlot(a.roster_slot).includes(b.position);
+  const bSlotAcceptsA = bBench || eligiblePositionsForSlot(b.roster_slot).includes(a.position);
+  return aSlotAcceptsB && bSlotAcceptsA;
 }
 
 /**
@@ -79,16 +91,19 @@ export function swapBlockedReason(
   if (selected.id === target.id) return null;
   const selBench = isBench(selected.roster_slot);
   const tgtBench = isBench(target.roster_slot);
-  if (selBench === tgtBench) {
-    return selBench
-      ? 'Both players are on your bench'
-      : 'Both players are already starting';
+  if (selBench && tgtBench) return 'Both players are on your bench';
+
+  if (!selBench) {
+    const eligible = eligiblePositionsForSlot(selected.roster_slot);
+    if (eligible.length && !eligible.includes(target.position)) {
+      return `${slotBadgeLabel(selected.roster_slot, selected.position)} takes ${eligible.join(' or ')}`;
+    }
   }
-  const starter = selBench ? target : selected;
-  const benched = selBench ? selected : target;
-  const eligible = eligiblePositionsForSlot(starter.roster_slot);
-  if (eligible.length && !eligible.includes(benched.position)) {
-    return `${slotBadgeLabel(starter.roster_slot, starter.position)} takes ${eligible.join(' or ')}`;
+  if (!tgtBench) {
+    const eligible = eligiblePositionsForSlot(target.roster_slot);
+    if (eligible.length && !eligible.includes(selected.position)) {
+      return `${slotBadgeLabel(target.roster_slot, target.position)} takes ${eligible.join(' or ')}`;
+    }
   }
   return null;
 }

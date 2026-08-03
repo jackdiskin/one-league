@@ -12,7 +12,8 @@
 
 import type { ReactNode } from 'react';
 import FieldSurface from './FieldSurface';
-import { slotPlacement } from './fieldGeometry';
+import { slotPlacement, minOverlapFreeWidth } from './fieldGeometry';
+import { FIELD_CARD_W, FIELD_CARD_H } from './cardStyles';
 
 export interface FieldSlotPlacement {
   /** Stable key for this slot. */
@@ -36,32 +37,40 @@ export default function FieldPanel({
   /** Optional content below the turf, inside the same rounded container. */
   children?: ReactNode;
 }) {
+  // Card positions and sizes both scale with the panel's rendered width, so
+  // below some width two cards would start overlapping. Rather than let that
+  // happen, the turf never renders narrower than that — it scrolls
+  // horizontally instead once its container can't fit it.
+  const minWidth = minOverlapFreeWidth(slots, FIELD_CARD_W, FIELD_CARD_H);
+
   return (
     <div className="overflow-hidden rounded-card bg-turf shadow-sm">
-      <div className="relative">
-        <FieldSurface />
+      <div className="overflow-x-auto">
+        <div className="relative" style={{ minWidth }}>
+          <FieldSurface />
 
-        <div className="absolute inset-0">
-          {slots.map(slot => {
-            const { leftPct, topPct, scale } = slotPlacement(slot.nx, slot.u);
-            return (
-              <div
-                key={slot.key}
-                className="absolute -translate-x-1/2 -translate-y-1/2"
-                style={{ left: `${leftPct}%`, top: `${topPct}%` }}
-              >
-                <div style={{ transform: `scale(${scale})` }}>
-                  {renderSlot(slot)}
+          <div className="absolute inset-0">
+            {slots.map(slot => {
+              const { leftPct, topPct, scale } = slotPlacement(slot.nx, slot.u);
+              return (
+                <div
+                  key={slot.key}
+                  className="absolute -translate-x-1/2 -translate-y-1/2"
+                  style={{ left: `${leftPct}%`, top: `${topPct}%` }}
+                >
+                  <div style={{ transform: `scale(${scale})` }}>
+                    {renderSlot(slot)}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
 
-          {footer && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-6 flex justify-center">
-              {footer}
-            </div>
-          )}
+            {footer && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-6 flex justify-center">
+                {footer}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
