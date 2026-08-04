@@ -1,6 +1,6 @@
 import { query } from '@/lib/mysql';
 import { isWeekLive } from '@/lib/live-week';
-import LiveWeekScore from './LiveWeekScore';
+import LiveWeekScore, { type LiveGameState } from './LiveWeekScore';
 import ProjectedPointsPanel from '@/components/ProjectedPointsPanel';
 import type { RosterPlayer } from '@/app/team/_components/RosterList';
 
@@ -48,14 +48,37 @@ async function fetchProjectedTotal(season: number, teamId: number, week: number)
   return Number(row?.total ?? 0);
 }
 
+// Every game this week's game state — score, clock, quarter — so the live
+// popup can show "who's playing whom, right now" per roster player without
+// an N+1 query per player. Matched to a player by team_code against
+// home/away_team_abbr client-side (one team can only be in one game a week).
+async function fetchGameStates(season: number, week: number): Promise<LiveGameState[]> {
+  return query<LiveGameState>(
+    `SELECT event_id, game_state, game_clock, period_num,
+            home_team_abbr, away_team_abbr, home_score, away_score
+     FROM live_game_states
+     WHERE season = ? AND week_num = ?`,
+    [season, week]
+  );
+}
+
 // Only shows the live current-week score once a game is actually underway
 // (mirrors ESPN FantasyCast) — otherwise shows the team's projected total.
 export default async function WeekScoreSection({ teamId, season, currentWeek }: Props) {
   const live = await isWeekLive(season, currentWeek);
 
   if (live) {
-    const roster = await fetchRoster(season, teamId, currentWeek);
-    return <LiveWeekScore roster={roster} currentWeek={currentWeek} />;
+    const [roster, projectedPoints, gameStates] = await Promise.all([
+      fetchRoster(season, teamId, currentWeek),
+      fetchProjectedTotal(season, teamId, currentWeek),
+      fetchGameStates(season, currentWeek),
+    ]);
+    return (
+      <LiveWeekScore
+        roster={roster} currentWeek={currentWeek}
+        projectedPoints={projectedPoints} gameStates={gameStates}
+      />
+    );
   }
 
   const projected = await fetchProjectedTotal(season, teamId, currentWeek);
