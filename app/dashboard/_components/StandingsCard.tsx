@@ -45,7 +45,7 @@ export default function StandingsCard({ leagues }: Props) {
               <Link
                 key={league.id}
                 href={`/league?leagueId=${league.id}`}
-                className="flex items-center gap-3 rounded-control border border-line bg-surface-sunken px-3 py-2.5 transition-colors duration-150 ease-out-quart hover:border-line-strong hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-control border border-line bg-surface-sunken px-3 py-2.5 transition-colors duration-150 ease-out-quart hover:border-line-strong hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2"
               >
                 <span
                   className={[
@@ -56,13 +56,17 @@ export default function StandingsCard({ leagues }: Props) {
                   {/* Unranked reads as a word, not an em-dash that could mean zero */}
                   {rl ?? 'Unranked'}
                 </span>
-                <div className="min-w-0 flex-1">
+                {/* min-w (not min-w-0) so the name keeps a real sliver to
+                    truncate into instead of getting squeezed to nothing —
+                    once the row is too narrow for everything, member count
+                    (ml-auto) wraps to its own right-aligned line instead. */}
+                <div className="min-w-28 flex-1">
                   <p className="truncate text-body font-medium text-ink">{league.name}</p>
                   {league.team_name && (
                     <p className="mt-0.5 truncate text-label text-ink-3">{league.team_name}</p>
                   )}
                 </div>
-                <span className="shrink-0 font-mono tabular-nums text-label text-ink-3">
+                <span className="ml-auto shrink-0 font-mono tabular-nums text-label text-ink-3">
                   {league.member_count} {league.member_count === 1 ? 'member' : 'members'}
                 </span>
               </Link>

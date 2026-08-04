@@ -44,15 +44,19 @@ export default async function MatchupsCard({ season, week }: { season: number; w
       ) : (
         <div>
           {games.map(g => (
-            <div key={g.game_key} className="flex items-center justify-between gap-3 border-t border-line px-5 py-2.5">
-              <div className="flex min-w-0 items-center gap-2">
+            <div key={g.game_key} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line px-5 py-2.5">
+              <div className="flex items-center gap-2">
                 <TeamLogo code={g.away_team} size={20} />
                 <span className="shrink-0 text-label font-medium text-ink">{g.away_team}</span>
                 <span className="shrink-0 text-label text-ink-3">@</span>
                 <TeamLogo code={g.home_team} size={20} />
                 <span className="shrink-0 text-label font-medium text-ink">{g.home_team}</span>
               </div>
-              <span className="shrink-0 font-mono tabular-nums text-eyebrow text-ink-3">
+              {/* ml-auto rather than justify-between on the row — once this
+                  wraps to its own line on a narrow column, auto margin still
+                  pushes it flush right there instead of overlapping the teams
+                  above it. */}
+              <span className="ml-auto shrink-0 font-mono tabular-nums text-eyebrow text-ink-3">
                 {formatKickoff(g.game_date)}
               </span>
             </div>

@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { authClient } from '@/lib/auth-client';
-import { formatWeekLong } from '@/lib/format';
 
 interface Props {
   user: { name: string; email: string };
+  // Accepted for callers that still pass it, unused here — TopNav no longer
+  // renders a week indicator itself.
   currentWeek: number;
   logoUri: string;
 }
@@ -26,7 +27,7 @@ function isNavActive(pathname: string, href: string) {
   return href === '/leagues' ? pathname.startsWith('/league') : pathname === href;
 }
 
-export default function TopNav({ user, currentWeek, logoUri }: Props) {
+export default function TopNav({ user, logoUri }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -85,10 +86,6 @@ export default function TopNav({ user, currentWeek, logoUri }: Props) {
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          <span className="hidden font-mono tabular-nums text-label text-ink-3 md:inline">
-            NFL {formatWeekLong(currentWeek)}
-          </span>
-
           <div className="relative">
             <button
               type="button"
@@ -144,9 +141,6 @@ export default function TopNav({ user, currentWeek, logoUri }: Props) {
 
       {mobileNavOpen && (
         <nav className="flex flex-col gap-3 border-t border-line px-4 py-3 md:hidden">
-          <span className="font-mono tabular-nums text-label text-ink-3">
-            NFL {formatWeekLong(currentWeek)}
-          </span>
           {NAV.map(item => {
             const active = isNavActive(pathname, item.href);
             return (

@@ -7,7 +7,7 @@ import MyTeamSummary   from './_components/MyTeamSummary';
 import WeekScoreSection from './_components/WeekScoreSection';
 import TopMovers       from './_components/TopMovers';
 import StandingsCard, { type LeagueStanding } from './_components/StandingsCard';
-import DiscoverLeagues from './_components/DiscoverLeagues';
+import JoinPrivateLeague from './_components/JoinPrivateLeague';
 import MatchupsCard    from './_components/MatchupsCard';
 import TopNav from '@/components/TopNav';
 import { formatWeekLong } from '@/lib/format';
@@ -67,22 +67,6 @@ async function fetchUserLeagues(userId: string): Promise<LeagueStanding[]> {
   );
 }
 
-async function fetchDiscoverLeagues(userId: string) {
-  return query<{
-    id: number; name: string; season_year: number;
-    salary_cap: number; member_count: number; max_members: number;
-  }>(
-    `SELECT l.id, l.name, l.season_year, l.salary_cap, l.max_members,
-            COUNT(lm.id) AS member_count
-     FROM leagues l
-     LEFT JOIN league_members lm ON lm.league_id = l.id
-     LEFT JOIN league_members my ON my.league_id = l.id AND my.user_id = ?
-     WHERE l.is_public = TRUE AND my.id IS NULL
-     GROUP BY l.id ORDER BY l.created_at DESC LIMIT 4`,
-    [userId]
-  );
-}
-
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -106,9 +90,8 @@ export default async function DashboardPage({
   );
   if (!teamCheck) redirect('/onboarding/draft');
 
-  const [currentWeek, discoverLeagues, userLeagues] = await Promise.all([
+  const [currentWeek, userLeagues] = await Promise.all([
     fetchCurrentWeek(SEASON),
-    fetchDiscoverLeagues(userId),
     fetchUserLeagues(userId),
   ]);
 
@@ -138,10 +121,12 @@ export default async function DashboardPage({
           <WeekScoreSection teamId={teamCheck.id} season={SEASON} currentWeek={currentWeek} />
         </Suspense>
 
-        {/* Field + matchups/standings, side by side — same grid as My Team so
-            the field renders at the same size. min-w-0 keeps the field's
-            internal min-width (see FieldPanel) from inflating this track past
-            its 1.1fr share; the field scrolls internally instead. */}
+        {/* Field, same grid-cols-team split as My Team so the field renders
+            at the exact same size there — then the second track (1fr) splits
+            again into standings+join-league on the left and matchups on the
+            right. min-w-0 keeps the field's internal min-width (see
+            FieldPanel) from inflating its track past its 1.1fr share; it
+            scrolls internally instead. */}
         <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-team">
           <div className="min-w-0">
             <Suspense fallback={<Skeleton className="h-[580px]" />}>
@@ -149,11 +134,14 @@ export default async function DashboardPage({
             </Suspense>
           </div>
 
-          <div className="flex flex-col gap-5">
+          <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-2">
+            <div className="flex flex-col gap-5">
+              <StandingsCard leagues={userLeagues} />
+              <JoinPrivateLeague />
+            </div>
             <Suspense fallback={<Skeleton className="h-64" />}>
               <MatchupsCard season={SCHEDULE_SEASON} week={currentWeek} />
             </Suspense>
-            <StandingsCard leagues={userLeagues} />
           </div>
         </div>
 
@@ -166,8 +154,6 @@ export default async function DashboardPage({
         }>
           <TopMovers seasonYear={SEASON} />
         </Suspense>
-
-        <DiscoverLeagues leagues={discoverLeagues} />
 
       </main>
     </div>

@@ -99,9 +99,14 @@ export default async function MyTeamSummary({ userId, seasonYear, hidePrices = f
         </div>
       ) : (
         <div className="flex items-center justify-between gap-3 border-b border-line bg-surface px-5 py-3.5">
-          {/* Emerald on the team name mirrors the dashboard greeting — the two
-              brand moments, and nowhere else. */}
-          <p className="min-w-0 truncate text-section text-emerald">{team.team_name}</p>
+          {/* Same slate-to-emerald gradient as the landing page headline —
+              the one other place the team name gets brand treatment. */}
+          <p
+            className="min-w-0 truncate bg-gradient-to-br from-slate-900 via-slate-700 to-emerald-500 bg-clip-text text-section text-transparent"
+            style={{ WebkitTextFillColor: 'transparent' }}
+          >
+            {team.team_name}
+          </p>
           <div className="flex shrink-0 gap-2">
             {[
               { label: 'Points', value: formatPoints(team.total_points) },

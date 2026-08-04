@@ -4,7 +4,7 @@
 // Colour and opacity come from tokens via Tailwind fill/stroke utilities.
 
 import {
-  W_NEAR, H, GOAL_LINE_U,
+  W_NEAR, CANVAS_H, GOAL_LINE_U,
   svgY, edgesAt, xAt, foreshorten,
   YARD_LINES, TURF_BANDS, HASH_YARDS, HASH_NX, NUMERAL_NX,
   yardsToU,
@@ -27,7 +27,7 @@ const FIELD_OUTLINE = band(0, 1);
 export default function FieldSurface() {
   return (
     <svg
-      viewBox={`0 0 ${W_NEAR} ${H}`}
+      viewBox={`0 0 ${W_NEAR} ${CANVAS_H}`}
       className="block w-full h-auto"
       role="img"
       aria-label="Football field showing your squad in formation"
@@ -108,37 +108,18 @@ export default function FieldSurface() {
           });
         })}
 
-        {/* 6 — yard lines and numerals */}
-        {YARD_LINES.map(({ yards, u, number }) => {
+        {/* 6 — yard lines */}
+        {YARD_LINES.map(({ yards, u }) => {
           const { x1, x2 } = edgesAt(u);
           const y = svgY(u);
           const s = foreshorten(u);
           return (
-            <g key={yards}>
-              <line
-                x1={x1} x2={x2} y1={y} y2={y}
-                className="stroke-turf-chalk opacity-40"
-                strokeWidth={Math.max(1, 2.5 * s)}
-              />
-              {number != null &&
-                NUMERAL_NX.map(nx => (
-                  <text
-                    key={nx}
-                    x={xAt(nx, u)}
-                    y={y}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    className="fill-turf-chalk opacity-30 font-sans font-bold"
-                    style={{
-                      fontSize: 40 * s,
-                      // Numerals lie flat on the grass, so they squash with depth
-                      transform: `translate(0px, ${y}px) scale(1, 0.55) translate(0px, ${-y}px)`,
-                    }}
-                  >
-                    {number}
-                  </text>
-                ))}
-            </g>
+            <line
+              key={yards}
+              x1={x1} x2={x2} y1={y} y2={y}
+              className="stroke-turf-chalk opacity-40"
+              strokeWidth={Math.max(1, 2.5 * s)}
+            />
           );
         })}
 
@@ -146,6 +127,49 @@ export default function FieldSurface() {
         <polygon points={FIELD_OUTLINE} fill="url(#turf-grain)" className="opacity-5" />
         <polygon points={FIELD_OUTLINE} fill="url(#turf-vignette)" />
       </g>
+
+      {/* 8 — yard-line numerals, deliberately outside the trapezoid clip:
+          the near-most line sits exactly on the clip's own edge (y = H), so
+          straddling it — half above, half below — needs the sliver of canvas
+          between H and CANVAS_H that the clip would otherwise cut off. */}
+      {YARD_LINES.map(({ yards, u, number }) => {
+        if (number == null) return null;
+        const y = svgY(u);
+        const s = foreshorten(u);
+        return NUMERAL_NX.map(nx => {
+          const cx = xAt(nx, u);
+          // Real field numerals are painted so they read right-side-up from
+          // the nearer sideline, not from the end zone — rotating the digit
+          // pair 90° toward that sideline also happens to be what splits the
+          // two characters across the yard line itself (a horizontally
+          // middle-anchored string becomes vertically split once rotated a
+          // quarter turn), instead of both digits sitting flat on top of it.
+          const faceDeg = nx < 50 ? 90 : -90;
+          return (
+            <g
+              key={`${yards}-${nx}`}
+              style={{
+                // Numerals lie flat on the grass, so they squash with depth —
+                // applied in screen space, outside the rotation, so it
+                // foreshortens the same regardless of which way they face.
+                transform: `translate(0px, ${y}px) scale(1, 0.55) translate(0px, ${-y}px)`,
+              }}
+            >
+              <text
+                x={cx}
+                y={y}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                transform={`rotate(${faceDeg} ${cx} ${y})`}
+                className="fill-turf-chalk opacity-30 font-sans font-bold"
+                style={{ fontSize: 40 * s, letterSpacing: 8 * s }}
+              >
+                {number}
+              </text>
+            </g>
+          );
+        });
+      })}
     </svg>
   );
 }

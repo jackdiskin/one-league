@@ -202,7 +202,13 @@ export default async function TeamPage({
 
         {/* Page title */}
         <div className="flex items-center justify-between gap-3">
-          <h1 className="min-w-0 truncate text-display text-emerald">{team.team_name}</h1>
+          {/* Same slate-to-emerald gradient as the landing page headline. */}
+          <h1
+            className="min-w-0 truncate bg-gradient-to-br from-slate-900 via-slate-700 to-emerald-500 bg-clip-text text-display text-transparent"
+            style={{ WebkitTextFillColor: 'transparent' }}
+          >
+            {team.team_name}
+          </h1>
           <div className="flex shrink-0 gap-2">
             <LiveTotalPointsTile roster={roster} seasonBasePoints={team.total_points} compact />
             <div className="rounded-control border border-line bg-surface-sunken px-3 py-1.5 text-center">

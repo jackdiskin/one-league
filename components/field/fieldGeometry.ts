@@ -8,8 +8,15 @@
 // ─── Panel ────────────────────────────────────────────────────────────────────
 export const W_NEAR = 1000;                 // near (bottom) edge width
 export const W_FAR  = W_NEAR * 0.54;        // far (top) edge = 54% of near
-export const H      = W_NEAR * 0.62;        // panel height
+export const H      = W_NEAR * 0.62;        // panel height — the trapezoid itself, drives all depth math below
 const K = 1.4;                              // perspective compression constant
+
+// The near-most yard line's numeral sits exactly on the panel's own bottom
+// edge (svgY(0) === H), so straddling it needs a sliver of canvas below H to
+// render into without being clipped — added here, not in H, so the trapezoid
+// and every card position stay pixel-identical; only the outer canvas grows.
+export const NUMERAL_MARGIN = 26;
+export const CANVAS_H = H + NUMERAL_MARGIN;
 
 /**
  * Depth curve. `u` runs 0 (near/bottom) → 1 (far/top) in *field* space and
@@ -130,11 +137,14 @@ export function cardScaleAt(u: number): number {
   return 1 - 0.28 * u;
 }
 
-/** Panel-relative position (percent) and depth scale for a formation slot. */
+/** Panel-relative position (percent) and depth scale for a formation slot.
+ *  topPct is a percentage of CANVAS_H (the full rendered SVG), not H (the
+ *  trapezoid) — the two only differ by the numeral margin, and dividing by
+ *  the wrong one would put every card lower than its true depth. */
 export function slotPlacement(nx: number, u: number) {
   return {
     leftPct: (xAt(nx, u) / W_NEAR) * 100,
-    topPct: (svgY(u) / H) * 100,
+    topPct: (svgY(u) / CANVAS_H) * 100,
     scale: cardScaleAt(u),
   };
 }

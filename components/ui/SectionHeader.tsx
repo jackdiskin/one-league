@@ -20,8 +20,8 @@ export default function SectionHeader({
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <Tag className="text-section text-ink">{title}</Tag>
-        {sub && <p className="mt-0.5 text-label text-ink-3">{sub}</p>}
+        <Tag className="truncate text-section text-ink">{title}</Tag>
+        {sub && <p className="mt-0.5 truncate text-label text-ink-3">{sub}</p>}
       </div>
       {right && <div className="shrink-0">{right}</div>}
     </div>
